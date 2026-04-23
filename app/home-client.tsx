@@ -231,7 +231,9 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                 <NoticeCard
                   tone="emerald"
                   title={`جاهز لـ ${current.label}`}
-                  text="المرحلة هاذي مخصصة للتنزيل فقط: نزّل ملف التنصيب المناسب للسيستام متاعك وكمل الخطوات اللي تظهرلك." 
+                  text={current.key === "windows"
+                    ? "في ويندوز، الملف يتهبط بصيغة .cmd باش المستخدم ينجم يضغط عليه مباشرة ويتحل PowerShell وحدو."
+                    : "المرحلة هاذي مخصصة للتنزيل فقط: نزّل ملف التنصيب المناسب للسيستام متاعك وكمل الخطوات اللي تظهرلك."}
                 />
 
                 <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
@@ -243,11 +245,19 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
                 <div className="grid gap-4 xl:grid-cols-2">
                   <InfoPanel title="طريقة التحميل" tone="slate">
-                    <ol className="space-y-2 text-sm leading-7 text-slate-700">
-                      <li>1. نزّل الملف على جهازك</li>
-                      <li>2. افتح الملف من الدوسي اللي تهبّط فيه</li>
-                      <li>3. كمّل الخطوات اللي تظهرلك على الشاشة</li>
-                    </ol>
+                    {current.key === "windows" ? (
+                      <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                        <li>1. نزّل ملف <InlineCode>setup-opencode.cmd</InlineCode></li>
+                        <li>2. بعد ما يتهبط، اضغط عليه مرتين مباشرة</li>
+                        <li>3. PowerShell يتحل وحدو ويبدأ التنصيب</li>
+                      </ol>
+                    ) : (
+                      <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                        <li>1. نزّل الملف على جهازك</li>
+                        <li>2. افتح الملف من الدوسي اللي تهبّط فيه</li>
+                        <li>3. كمّل الخطوات اللي تظهرلك على الشاشة</li>
+                      </ol>
+                    )}
                   </InfoPanel>
 
                   <InfoPanel title="شنوّة يصير وقت التنصيب؟" tone="slate">
@@ -440,7 +450,7 @@ function getOsOptions(siteUrl: string) {
       command:
         `powershell -ExecutionPolicy Bypass -Command "irm ${siteUrl}/api/install/windows | iex"`,
       downloadHref: "/api/download/windows",
-      downloadLabel: "ملف Windows (.ps1)",
+      downloadLabel: "ملف Windows (.cmd)",
     },
     linux: {
       key: "linux" as const,
