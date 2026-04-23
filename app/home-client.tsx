@@ -12,6 +12,7 @@ export type HomeConfig = {
 type OsKey = "windows" | "linux" | "macos";
 
 const STORAGE_KEY = "ai-pilot-home-state";
+const TOTAL_STEPS = 4;
 
 export default function HomeClient({ config }: { config: HomeConfig }) {
   const [selectedOs, setSelectedOs] = useState<OsKey>("windows");
@@ -41,7 +42,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           setSelectedOs(parsed.selectedOs);
         }
         if (typeof parsed.currentStep === "number") {
-          setCurrentStep(Math.min(Math.max(parsed.currentStep, 1), 4));
+          setCurrentStep(Math.min(Math.max(parsed.currentStep, 1), TOTAL_STEPS));
         }
         setIsReady(true);
       });
@@ -62,12 +63,12 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
     );
   }, [currentStep, isReady, selectedOs]);
 
-  function completeStep(step: number) {
-    setCurrentStep((prev) => Math.max(prev, Math.min(step + 1, 4)));
+  function nextStep() {
+    setCurrentStep((prev) => Math.min(prev + 1, TOTAL_STEPS));
   }
 
-  function goToStep(step: number) {
-    setCurrentStep(step);
+  function previousStep() {
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
   }
 
   function resetSteps() {
@@ -78,37 +79,35 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
   return (
     <main dir="rtl" className="mx-auto w-full max-w-6xl px-4 py-8 text-right sm:px-6 lg:px-8">
-      <header className="rounded-[2rem] border border-sky-200 bg-linear-to-br from-sky-100 via-white to-emerald-50 p-6 shadow-sm sm:p-8">
+      <header className="rounded-[2.25rem] border border-sky-200 bg-linear-to-br from-sky-100 via-white to-emerald-50 p-6 shadow-sm sm:p-8">
         <p className="text-sm font-semibold text-sky-700">AI Pilot</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">
-          حضّر OpenCode في 4 خطوات بسيطة
+          ركّب OpenCode خطوة بخطوة ومن غير تعقيد
         </h1>
         <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700">
-          الصفحة هاذي معمولة للناس اللي تحب تركّب كل شيء بسهولة. اختار السيستام
-          متاعك، نزّل الملف ولا استعمل الطريقة اليدوية، وبعدها افتح VS Code وابدأ.
+          هالصفحة معمولة للناس اللي تحب تشوف خطوة واحدة واضحة كل مرة. اختار
+          السيستام، كمّل التنصيب، وبعدها استعمل OpenCode داخل VS Code ولا من
+          التيرمينال.
         </p>
 
         <div className="mt-5 flex flex-wrap justify-end gap-2 text-sm">
           <Badge tone="blue">ساهلة لغير التقنيين</Badge>
-          <Badge tone="emerald">تنصيب خطوة بخطوة</Badge>
-          <Badge tone="violet">OpenCode + Skills جاهزين</Badge>
+          <Badge tone="emerald">يشبه Claude Code</Badge>
+          <Badge tone="violet">موديلات Azure جاهزين</Badge>
         </div>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-3">
-          <HeroCard
-            tone="blue"
-            title="شنوّة هو OpenCode؟"
-            text="هو مساعد برمجة كيما Claude Code، أما هنا مهيألك مسبقاً مع الإعدادات والموديلات والـ skills اللي حاجتك بيهم."
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <QuickFact
+            title="كيفاش يخدم؟"
+            text="مساعد برمجة كيما Claude Code، أما هنا محضّر بإعداداتك وموديلاتك من الأول."
           />
-          <HeroCard
-            tone="emerald"
-            title="شنوّة الموديلات الجاهزة؟"
-            text={`عندك ${config.azureDefaultDeployment} كموديل افتراضي، وزادة GPT-5.3-Codex و GPT-5.4-Pro و Kimi.`}
+          <QuickFact
+            title="شنوّة الموديلات؟"
+            text={`${config.azureDefaultDeployment} هو الافتراضي، ومعاه GPT-5.3-Codex و GPT-5.4-Pro و Kimi.`}
           />
-          <HeroCard
-            tone="violet"
-            title="شنوّة يتحضّر آلياً؟"
-            text="OpenCode CLI، ملفات الكونفيغ، Azure setup، والـ shared skills باش تخدم الخدمة من أول مرة."
+          <QuickFact
+            title="شنوّة يتثبت؟"
+            text="OpenCode CLI، ملفات الكونفيغ، Azure setup، والـ skills المشتركة." 
           />
         </div>
       </header>
@@ -120,174 +119,283 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         <StepperItem step="4" title="ابدأ الخدمة" state={getStepState(currentStep, 4)} />
       </section>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
-        <StepPanel
-          title="اختار السيستام متاعك"
-          kicker="الخطوة 1"
-          tone="blue"
-          state={getStepState(currentStep, 1)}
-          summary={`السيستام المختار: ${current.label}`}
-          onEdit={() => goToStep(1)}
-        >
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {Object.values(options).map((option) => {
-              const isSelected = option.key === selectedOs;
+      <section className="mt-6 overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
+        <div className="border-b border-slate-200 bg-slate-50/90 p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row-reverse lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold tracking-[0.18em] text-slate-500">
+                الخطوة {currentStep} من {TOTAL_STEPS}
+              </p>
+              <h2 className="mt-2 text-2xl font-bold text-slate-950 sm:text-4xl">
+                {getWizardTitle(currentStep, current.label)}
+              </h2>
+              <p className="mt-3 text-sm leading-8 text-slate-700 sm:text-base">
+                {getWizardDescription(currentStep, current.label)}
+              </p>
+            </div>
 
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setSelectedOs(option.key)}
-                  className={`rounded-2xl border p-4 text-right transition ${
-                    isSelected
-                      ? "border-sky-400 bg-sky-100 shadow-md"
-                      : "border-slate-200 bg-white/80 hover:border-slate-300 hover:bg-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                      {option.tag}
-                    </span>
-                    {isSelected ? (
-                      <span className="text-xs font-semibold text-emerald-700">
-                        مختار توّا
-                      </span>
-                    ) : null}
-                  </div>
-                  <h3 className="mt-4 text-xl font-semibold text-slate-950">
-                    {option.label}
+            <div className="inline-flex items-center gap-3 self-start rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-900">
+                {currentStep}
+              </span>
+              <div>
+                <p className="text-xs font-semibold text-slate-500">التقدّم</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {Math.round((currentStep / TOTAL_STEPS) * 100)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+          <div className="order-1 space-y-4 lg:order-2">
+            {currentStep === 1 ? (
+              <>
+                <NoticeCard
+                  tone="blue"
+                  title="اختار سيستام واحد"
+                  text="كانك موش متأكد، خليك على ويندوز. تنجم ديما ترجع وتبدّل قبل ما تكمل."
+                />
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {Object.values(options).map((option) => {
+                    const isSelected = option.key === selectedOs;
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setSelectedOs(option.key)}
+                        className={`group rounded-[1.75rem] border p-5 text-right transition ${
+                          isSelected
+                            ? "border-sky-400 bg-sky-100 shadow-md"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold tracking-wide text-slate-500">
+                              سيستام
+                            </p>
+                            <h3 className="mt-2 text-xl font-bold text-slate-950">
+                              {option.label}
+                            </h3>
+                          </div>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              isSelected
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {isSelected ? "مختار" : option.tag}
+                          </span>
+                        </div>
+
+                        <p className="mt-4 text-sm leading-7 text-slate-600">
+                          {option.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
+                  <h3 className="text-sm font-bold text-slate-950">
+                    شنوّة باش تلقى بعد هالخطوة؟
                   </h3>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {option.description}
+                  <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+                    <li>- رابط تحميل واضح للسيستام اللي اخترتو</li>
+                    <li>- أمر يدوي للتيرمينال إذا ما تحبش التحميل</li>
+                    <li>- شرح مبسّط باش تستعمل OpenCode داخل VS Code</li>
+                  </ul>
+                </div>
+              </>
+            ) : null}
+
+            {currentStep === 2 ? (
+              <>
+                <NoticeCard
+                  tone="emerald"
+                  title={`جاهز لـ ${current.label}`}
+                  text="الأسهل هو التنزيل، أما زادة خلّينالك الطريقة اليدوية إذا تحب تنفّذ كل شيء من التيرمينال."
+                />
+
+                <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
+                  <DownloadButton
+                    href={current.downloadHref}
+                    label={`نزّل ${current.downloadLabel}`}
+                  />
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <InfoPanel title="طريقة التحميل" tone="slate">
+                    <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                      <li>1. نزّل الملف على جهازك</li>
+                      <li>2. افتح الملف من الدوسي اللي تهبّط فيه</li>
+                      <li>3. كمّل الخطوات اللي تظهرلك على الشاشة</li>
+                    </ol>
+                  </InfoPanel>
+
+                  <InfoPanel title="شنوّة يصير وقت التنصيب؟" tone="slate">
+                    <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                      <li>- يركّب OpenCode كانو موش موجود</li>
+                      <li>
+                        - {config.includeApiKeyInInstaller
+                          ? "الـ API key يتزاد وحدو من الإعدادات اللي خزّنتهم"
+                          : "إذا يلزم، باش يطلب منك الـ API key مرة وحدة"}
+                      </li>
+                      <li>- يخلق ملفات الإعدادات داخل البروجيه</li>
+                      <li>- يهبّط الـ skills المشتركة ويحضّر الموديلات</li>
+                    </ul>
+                  </InfoPanel>
+                </div>
+
+                <InfoPanel title="الطريقة اليدوية من التيرمينال" tone="blue">
+                  <p className="text-sm leading-7 text-slate-700">
+                    كان تحب تخدم مباشرة من غير تنزيل، انسخ هالكوموند وشغّلو داخل
+                    الدوسي متاع البروجيه.
                   </p>
-                </button>
-              );
-            })}
+                  <CodeBlock lines={[current.command]} />
+                </InfoPanel>
+              </>
+            ) : null}
+
+            {currentStep === 3 ? (
+              <>
+                <NoticeCard
+                  tone="violet"
+                  title="عندك زوز طرق واضحين"
+                  text="يا إمّا تخلّي OpenCode يركّب الإكستنشن وحدو من التيرمينال داخل VS Code، يا إمّا تركّبها وحدك من الـ Marketplace."
+                />
+
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <OptionCard title="الطريقة الأسهل" kicker="من داخل VS Code" tone="emerald">
+                    <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                      <li>1. افتح البروجيه متاعك في VS Code</li>
+                      <li>2. افتح الـ integrated terminal</li>
+                      <li>3. اكتب <InlineCode>opencode</InlineCode></li>
+                      <li>4. الإكستنشن تركّب وحدها وتولي الخدمة جاهزة</li>
+                    </ol>
+                  </OptionCard>
+
+                  <OptionCard title="التركيب اليدوي" kicker="من VS Code Marketplace" tone="blue">
+                    <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                      <li>1. افتح تبويب <InlineCode>Extensions</InlineCode></li>
+                      <li>2. قلّب على <InlineCode>OpenCode</InlineCode></li>
+                      <li>3. اضغط <InlineCode>Install</InlineCode></li>
+                      <li>4. ارجع للتيرمينال واكتب <InlineCode>opencode</InlineCode></li>
+                    </ol>
+                  </OptionCard>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
+                  <LinkButton
+                    href="https://marketplace.visualstudio.com/search?term=OpenCode&target=VSCode&category=All%20categories&sortBy=Relevance"
+                    label="حل VS Code Marketplace"
+                    tone="blue"
+                    external
+                  />
+                  <LinkButton
+                    href="https://opencode.ai/docs/ide/"
+                    label="حل OpenCode IDE docs"
+                    tone="slate"
+                    external
+                  />
+                </div>
+
+                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
+                  <h3 className="text-sm font-bold text-slate-950">
+                    وإذا تحب تستعملو من التيرمينال فقط
+                  </h3>
+                  <p className="mt-2 text-sm leading-7 text-slate-700">
+                    تنجم زادة تشغّل <InlineCode>opencode</InlineCode> من PowerShell
+                    ولا Windows Terminal. أما داخل VS Code التجربة أسهل على خاطر
+                    الإكستنشن تركّب وحدها وتخدم مع الدوسي المفتوح.
+                  </p>
+                </div>
+              </>
+            ) : null}
+
+            {currentStep === 4 ? (
+              <>
+                <NoticeCard
+                  tone="amber"
+                  title="أنت حاضر توّا"
+                  text="بعد ما تفتح OpenCode، اختار الموديل اللي تحب عليه الخدمة وابدأ مباشرة من نفس التيرمينال."
+                />
+
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <InfoPanel title="الانطلاقة العادية" tone="slate">
+                    <p className="text-sm leading-7 text-slate-700">
+                      هذا هو المسار العادي، والموديل الافتراضي مربوط على Azure.
+                    </p>
+                    <CodeBlock lines={[`opencode -m azure/${config.azureDefaultDeployment}`]} />
+                  </InfoPanel>
+
+                  <InfoPanel title="إذا تحب Kimi" tone="slate">
+                    <p className="text-sm leading-7 text-slate-700">
+                      إذا تحب تستعمل Kimi بدل Azure GPT، استعمل هالكوموند.
+                    </p>
+                    <CodeBlock lines={["opencode -m azure-chat/Kimi-K2.6"]} />
+                  </InfoPanel>
+                </div>
+
+                <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-4">
+                  <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                    <li>- موديلات Azure GPT في هالsetup تستعمل reasoning xhigh</li>
+                    <li>- إذا تحب تبدّل الموديل بعد ما تدخل، اكتب <InlineCode>/models</InlineCode></li>
+                    <li>- إذا حبيت تعاود من الأول، استعمل الزر اللي تحت</li>
+                  </ul>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
+                  <LinkButton href="/dev" label="حل صفحة الديفلوبر" tone="violet" />
+                  <LinkButton href="/admin" label="حل /admin" tone="emerald" />
+                </div>
+              </>
+            ) : null}
           </div>
 
-          <StepActions>
-            <DoneButton onClick={() => completeStep(1)}>تم، كمّل للخطوة اللي بعد</DoneButton>
-          </StepActions>
-        </StepPanel>
-
-        <StepPanel
-          title={`نزّل السكريبت متاع ${current.label}`}
-          kicker="الخطوة 2"
-          tone="blue"
-          state={getStepState(currentStep, 2)}
-          summary={`جاهز لـ ${current.label}: تحميل الملف أو استعمال الطريقة اليدوية`}
-          onEdit={() => goToStep(2)}
-        >
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
-            <DownloadButton href={current.downloadHref} label={`نزّل ${current.downloadLabel}`} />
+          <div className="order-2 lg:order-1">
+            <PreviewShell
+              title={getPreviewTitle(currentStep)}
+              subtitle={getPreviewSubtitle(currentStep, current.label)}
+            >
+              <WizardPreview
+                step={currentStep}
+                selectedOs={selectedOs}
+                current={current}
+                defaultDeployment={config.azureDefaultDeployment}
+              />
+            </PreviewShell>
           </div>
+        </div>
 
-          <details className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm leading-7 text-slate-700">
-            <summary className="cursor-pointer font-semibold text-slate-900">
-              الطريقة اليدوية
-            </summary>
-            <p className="mt-3">
-              كان تحب الخدمة من غير تحميل، انسخ هالكوموند وشغّلو في التيرمينال داخل الدوسي
-              متاع البروجيه.
+        <div className="border-t border-slate-200 bg-slate-50/80 p-5 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row-reverse sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row-reverse">
+              {currentStep < TOTAL_STEPS ? (
+                <PrimaryButton onClick={nextStep}>{getNextLabel(currentStep)}</PrimaryButton>
+              ) : (
+                <PrimaryButton onClick={resetSteps}>عاود من الأول</PrimaryButton>
+              )}
+
+              {currentStep > 1 ? (
+                <SecondaryButton onClick={previousStep}>ارجع للخطوة اللي قبل</SecondaryButton>
+              ) : null}
+            </div>
+
+            <p className="text-sm leading-7 text-slate-600">
+              {currentStep < TOTAL_STEPS
+                ? "كل مرة كمّل خطوة واحدة فقط، والصفحة تبدّل وحدها للمرحلة اللي بعدها."
+                : "إذا كل شيء خدم، افتح التيرمينال واكتب opencode وابدأ الخدمة."}
             </p>
-            <CodeBlock lines={[current.command]} />
-
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="font-semibold text-slate-900">شنوّة يصير وقت تشغّل التنصيب؟</p>
-              <ul className="mt-2 space-y-2">
-                <li>- يركّب OpenCode كانو موش موجود</li>
-                <li>
-                  - {config.includeApiKeyInInstaller
-                    ? "الـ API key يتزاد وحدو من الإعدادات اللي خزّنتهم"
-                    : "إذا يلزم، باش يطلب منك الـ API key مرة وحدة"}
-                </li>
-                <li>- يخلق ملفات الإعدادات داخل البروجيه</li>
-                <li>- يهبّط الـ skills المشتركة ويحضّر الموديلات</li>
-              </ul>
-            </div>
-          </details>
-
-          <StepActions>
-            <DoneButton onClick={() => completeStep(2)}>تمّ التنصيب، كمّل للـ VS Code</DoneButton>
-          </StepActions>
-        </StepPanel>
-
-        <StepPanel
-          title="افتح VS Code وكمل من غادي"
-          kicker="الخطوة 3"
-          tone="emerald"
-          state={getStepState(currentStep, 3)}
-          summary="VS Code جاهز وOpenCode يتركّب من داخل التيرمينال"
-          onEdit={() => goToStep(3)}
-        >
-          <p className="mt-4 text-sm leading-7 text-slate-700">
-            حسب دوك OpenCode للـ IDE، الإكستنشن متاع VS Code يتركّب أوتوماتيكياً
-            أول مرة تشغّل <InlineCode>opencode</InlineCode> داخل التيرمينال المدموج في VS Code.
-          </p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <MiniStep number="1" title="حل الدوسي">
-              افتح البروجيه متاعك في VS Code. كان عندك أمر <InlineCode>code</InlineCode>
-              يخدم، استعمل <InlineCode>code .</InlineCode>.
-            </MiniStep>
-            <MiniStep number="2" title="حل التيرمينال">
-              من داخل VS Code، افتح الـ integrated terminal.
-            </MiniStep>
-            <MiniStep number="3" title="شغّل OpenCode">
-              اكتب <InlineCode>opencode</InlineCode>. الإكستنشن تركّب وحدها وتولي الخدمة جاهزة.
-            </MiniStep>
           </div>
-
-          <StepActions>
-            <DoneButton onClick={() => completeStep(3)}>تم، OpenCode حاضر في VS Code</DoneButton>
-          </StepActions>
-        </StepPanel>
-
-        <StepPanel
-          title="ابدا الاستعمال"
-          kicker="الخطوة 4"
-          tone="amber"
-          state={getStepState(currentStep, 4)}
-        >
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-sm font-medium text-slate-900">الانطلاقة العادية</p>
-              <CodeBlock lines={[`opencode -m azure/${config.azureDefaultDeployment}`]} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-900">إذا تحب Kimi</p>
-              <CodeBlock lines={["opencode -m azure-chat/Kimi-K2.6"]} />
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-amber-200 bg-white/80 p-4 text-sm leading-7 text-slate-700">
-            إذا تحب تبدّل الموديل بعد ما تدخل، اكتب <InlineCode>/models</InlineCode>
-            واختار اللي يناسبك.
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
-            <a
-              href="/dev"
-              className="inline-flex w-full items-center justify-center rounded-xl border border-violet-200 bg-violet-100 px-4 py-3 text-sm font-semibold text-violet-900 transition hover:border-violet-300 hover:bg-violet-50 sm:w-auto"
-            >
-              افتح صفحة الديفلوبر
-            </a>
-            <a
-              href="/admin"
-              className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-900 transition hover:border-emerald-300 hover:bg-emerald-50 sm:w-auto"
-            >
-              افتح /admin
-            </a>
-            <button
-              type="button"
-              onClick={resetSteps}
-              className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto"
-            >
-              عاود من الأول
-            </button>
-          </div>
-        </StepPanel>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }
@@ -296,6 +404,50 @@ function getStepState(currentStep: number, step: number) {
   if (currentStep > step) return "done";
   if (currentStep === step) return "active";
   return "locked";
+}
+
+function getWizardTitle(currentStep: number, selectedLabel: string) {
+  if (currentStep === 1) return "اختار السيستام متاعك";
+  if (currentStep === 2) return `نزّل السكريبت متاع ${selectedLabel}`;
+  if (currentStep === 3) return "حضّر VS Code ولا التيرمينال";
+  return "ابدا الاستعمال";
+}
+
+function getWizardDescription(currentStep: number, selectedLabel: string) {
+  if (currentStep === 1) {
+    return "بداية سهلة: اختار السيستام اللي تخدم عليه. من بعدك الصفحة تبدّل وحدها وتوريك الخطوة الجاية فقط.";
+  }
+
+  if (currentStep === 2) {
+    return `توّا بعد ما اخترت ${selectedLabel}، عندك زر تنزيل واضح وأمر يدوي جاهز إذا تحب تكمل مباشرة من التيرمينال.`;
+  }
+
+  if (currentStep === 3) {
+    return "في هالمرحلة عندك زوز طرق: يا إمّا OpenCode يركّب الإكستنشن وحدو داخل VS Code، يا إمّا تركّبها يدويّاً من الـ Marketplace.";
+  }
+
+  return "آخر خطوة: شغّل OpenCode بالموديل اللي تحب عليه الخدمة وابدأ مباشرة. إذا حبيت، تنجم تبدّل الموديل من داخل OpenCode.";
+}
+
+function getNextLabel(currentStep: number) {
+  if (currentStep === 1) return "التالي: التنصيب";
+  if (currentStep === 2) return "التالي: VS Code";
+  if (currentStep === 3) return "التالي: ابدأ الخدمة";
+  return "عاود من الأول";
+}
+
+function getPreviewTitle(currentStep: number) {
+  if (currentStep === 1) return "معاينة الاختيار";
+  if (currentStep === 2) return "معاينة التنصيب";
+  if (currentStep === 3) return "معاينة VS Code";
+  return "معاينة التشغيل";
+}
+
+function getPreviewSubtitle(currentStep: number, selectedLabel: string) {
+  if (currentStep === 1) return "كيفاش باش تشوف اختيار السيستام";
+  if (currentStep === 2) return `شنوّة باش يبانلك وقت تنزّل سكريبت ${selectedLabel}`;
+  if (currentStep === 3) return "شكل مبسّط لواجهة VS Code والتيرمينال";
+  return "الأوامر الأولى قبل ما تبدأ تخدم";
 }
 
 function getOsOptions(siteUrl: string) {
@@ -331,6 +483,15 @@ function getOsOptions(siteUrl: string) {
   };
 }
 
+function QuickFact({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-sm">
+      <h2 className="text-sm font-bold text-slate-950">{title}</h2>
+      <p className="mt-2 text-sm leading-7 text-slate-700">{text}</p>
+    </div>
+  );
+}
+
 function StepperItem({
   step,
   title,
@@ -363,63 +524,73 @@ function StepperItem({
   );
 }
 
-function StepPanel({
+function NoticeCard({
+  title,
+  text,
+  tone,
+}: {
+  title: string;
+  text: string;
+  tone: "blue" | "emerald" | "violet" | "amber";
+}) {
+  const tones = {
+    blue: "border-sky-200 bg-sky-50",
+    emerald: "border-emerald-200 bg-emerald-50",
+    violet: "border-violet-200 bg-violet-50",
+    amber: "border-amber-200 bg-amber-50",
+  };
+
+  return (
+    <div className={`rounded-[1.75rem] border p-4 ${tones[tone]}`}>
+      <h3 className="text-base font-bold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-7 text-slate-700">{text}</p>
+    </div>
+  );
+}
+
+function InfoPanel({
+  title,
+  tone,
+  children,
+}: {
+  title: string;
+  tone: "slate" | "blue";
+  children: React.ReactNode;
+}) {
+  const tones = {
+    slate: "border-slate-200 bg-white",
+    blue: "border-sky-200 bg-sky-50/70",
+  };
+
+  return (
+    <div className={`rounded-[1.75rem] border p-4 ${tones[tone]}`}>
+      <h3 className="text-base font-bold text-slate-950">{title}</h3>
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function OptionCard({
   title,
   kicker,
   tone,
-  state,
-  summary,
-  onEdit,
   children,
 }: {
   title: string;
   kicker: string;
-  tone: "blue" | "emerald" | "amber";
-  state: "done" | "active" | "locked";
-  summary?: string;
-  onEdit?: () => void;
+  tone: "blue" | "emerald";
   children: React.ReactNode;
 }) {
   const tones = {
     blue: "border-sky-200 bg-sky-50/70",
     emerald: "border-emerald-200 bg-emerald-50/70",
-    amber: "border-amber-200 bg-amber-50/70",
   };
 
   return (
-    <section className={`h-fit rounded-[2rem] border p-5 shadow-sm sm:p-6 ${tones[tone]} ${state === "locked" ? "opacity-60" : ""}`}>
-      <SectionTitle kicker={kicker} title={title} />
-      {state === "active" ? (
-        children
-      ) : state === "done" ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/85 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm leading-7 text-slate-700">
-            {summary ?? "المرحلة هاذي تكمّلت."}
-          </p>
-          {onEdit ? (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto"
-            >
-              رجّع افتح الخطوة
-            </button>
-          ) : null}
-        </div>
-      ) : (
-        <p className="mt-4 text-sm leading-7 text-slate-600">
-          كمّل الخطوة اللي قبلها باش تتفتح هالمرحلة.
-        </p>
-      )}
-    </section>
-  );
-}
-
-function SectionTitle({ kicker, title }: { kicker: string; title: string }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold tracking-wide text-slate-500">{kicker}</p>
-      <h2 className="mt-2 text-2xl font-bold text-slate-950">{title}</h2>
+    <div className={`rounded-[1.75rem] border p-4 ${tones[tone]}`}>
+      <p className="text-xs font-semibold tracking-[0.18em] text-slate-500">{kicker}</p>
+      <h3 className="mt-2 text-base font-bold text-slate-950">{title}</h3>
+      <div className="mt-3">{children}</div>
     </div>
   );
 }
@@ -440,47 +611,157 @@ function Badge({
   return <span className={`rounded-full border px-3 py-1 font-medium ${tones[tone]}`}>{children}</span>;
 }
 
-function HeroCard({
+function LinkButton({
+  href,
+  label,
   tone,
-  title,
-  text,
+  external = false,
 }: {
-  tone: "blue" | "emerald" | "violet";
-  title: string;
-  text: string;
+  href: string;
+  label: string;
+  tone: "slate" | "blue" | "emerald" | "violet";
+  external?: boolean;
 }) {
   const tones = {
-    blue: "border-sky-200 bg-white/80",
-    emerald: "border-emerald-200 bg-white/80",
-    violet: "border-violet-200 bg-white/80",
+    slate: "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50",
+    blue: "border-sky-200 bg-sky-100 text-sky-900 hover:border-sky-300 hover:bg-sky-50",
+    emerald:
+      "border-emerald-200 bg-emerald-100 text-emerald-900 hover:border-emerald-300 hover:bg-emerald-50",
+    violet:
+      "border-violet-200 bg-violet-100 text-violet-900 hover:border-violet-300 hover:bg-violet-50",
   };
 
   return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${tones[tone]}`}>
-      <h2 className="text-base font-bold text-slate-950">{title}</h2>
-      <p className="mt-2 text-sm leading-7 text-slate-700">{text}</p>
+    <a
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
+      className={`inline-flex w-full items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition sm:w-auto ${tones[tone]}`}
+    >
+      {label}
+    </a>
+  );
+}
+
+function PreviewShell({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[2rem] border border-slate-900/10 bg-slate-950 text-white shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <div>
+          <h3 className="text-sm font-bold">{title}</h3>
+          <p className="mt-1 text-xs text-slate-300">{subtitle}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+        </div>
+      </div>
+      <div className="bg-[radial-gradient(circle_at_top,#1e293b,#0f172a_55%,#020617)] p-4 sm:p-5">
+        {children}
+      </div>
     </div>
   );
 }
 
-function MiniStep({
-  number,
-  title,
-  children,
+function WizardPreview({
+  step,
+  selectedOs,
+  current,
+  defaultDeployment,
 }: {
-  number: string;
-  title: string;
-  children: React.ReactNode;
+  step: number;
+  selectedOs: OsKey;
+  current: {
+    label: string;
+    command: string;
+    downloadLabel: string;
+  };
+  defaultDeployment: string;
 }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-900">
-          {number}
-        </span>
-        <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+  if (step === 1) {
+    return (
+      <div className="space-y-3">
+        <PreviewPillRow items={["Windows", "Linux", "macOS"]} active={selectedOs} />
+        <div className="grid gap-3">
+          <PreviewChoice title="ويندوز" active={selectedOs === "windows"} />
+          <PreviewChoice title="لينكس" active={selectedOs === "linux"} />
+          <PreviewChoice title="ماك" active={selectedOs === "macos"} />
+        </div>
       </div>
-      <p className="mt-3 text-sm leading-7 text-slate-700">{children}</p>
+    );
+  }
+
+  if (step === 2) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-4">
+          <p className="text-sm font-semibold text-white">تنزيل جاهز</p>
+          <p className="mt-2 text-xs leading-6 text-slate-300">{current.downloadLabel}</p>
+          <div className="mt-4 h-11 rounded-xl bg-sky-400/90" />
+        </div>
+        <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/60 p-4">
+          <p className="text-sm font-semibold text-white">الأمر اليدوي</p>
+          <PreviewCode>{current.command}</PreviewCode>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 3) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-3">
+          <div className="grid grid-cols-[58px_1fr] gap-3" dir="ltr">
+            <div className="rounded-xl bg-slate-900/70 p-2">
+              <PreviewBar width="70%" />
+              <PreviewBar width="55%" />
+              <PreviewBar width="65%" />
+            </div>
+            <div className="space-y-3 rounded-xl bg-slate-900/55 p-3">
+              <PreviewBar width="60%" />
+              <PreviewBar width="90%" />
+              <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
+                <PreviewCode>opencode</PreviewCode>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-4">
+          <p className="text-sm font-semibold text-white">Marketplace</p>
+          <div className="mt-3 rounded-xl bg-slate-900/60 p-3">
+            <PreviewBar width="40%" />
+            <PreviewBar width="92%" />
+            <div className="mt-3 h-10 rounded-xl bg-sky-400/90" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-4">
+        <p className="text-sm font-semibold text-white">الموديل الافتراضي</p>
+        <PreviewCode>{`opencode -m azure/${defaultDeployment}`}</PreviewCode>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <PreviewTag>GPT-5.4-1 xhigh</PreviewTag>
+        <PreviewTag>GPT-5.3-Codex xhigh</PreviewTag>
+        <PreviewTag>GPT-5.4-Pro xhigh</PreviewTag>
+        <PreviewTag>Kimi</PreviewTag>
+      </div>
+      <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/60 p-4">
+        <PreviewCode>/models</PreviewCode>
+      </div>
     </div>
   );
 }
@@ -497,7 +778,7 @@ function DownloadButton({ href, label }: { href: string; label: string }) {
   );
 }
 
-function DoneButton({
+function PrimaryButton({
   onClick,
   children,
 }: {
@@ -515,8 +796,22 @@ function DoneButton({
   );
 }
 
-function StepActions({ children }: { children: React.ReactNode }) {
-  return <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">{children}</div>;
+function SecondaryButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto"
+    >
+      {children}
+    </button>
+  );
 }
 
 function InlineCode({ children }: { children: React.ReactNode }) {
@@ -535,5 +830,93 @@ function CodeBlock({ lines }: { lines: string[] }) {
     >
       <code>{lines.join("\n")}</code>
     </pre>
+  );
+}
+
+function PreviewChoice({ title, active }: { title: string; active?: boolean }) {
+  return (
+    <div
+      className={`rounded-[1.35rem] border p-4 ${
+        active ? "border-sky-300 bg-sky-400/15" : "border-white/10 bg-white/8"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-white">{title}</span>
+        <span
+          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+            active ? "bg-emerald-400/20 text-emerald-300" : "bg-slate-800 text-slate-300"
+          }`}
+        >
+          {active ? "Selected" : "OS"}
+        </span>
+      </div>
+      <PreviewBar width="85%" className="mt-3" />
+      <PreviewBar width="62%" className="mt-2" />
+    </div>
+  );
+}
+
+function PreviewPillRow({
+  items,
+  active,
+}: {
+  items: string[];
+  active: OsKey;
+}) {
+  const activeMap = {
+    windows: "Windows",
+    linux: "Linux",
+    macos: "macOS",
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => {
+        const isActive = item === activeMap[active];
+
+        return (
+          <span
+            key={item}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+              isActive
+                ? "border-sky-300 bg-sky-400/15 text-sky-200"
+                : "border-white/10 bg-white/8 text-slate-300"
+            }`}
+          >
+            {item}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function PreviewBar({
+  width,
+  className = "",
+}: {
+  width: string;
+  className?: string;
+}) {
+  return (
+    <div className={`h-2 rounded-full bg-white/10 ${className}`}>
+      <div className="h-full rounded-full bg-white/55" style={{ width }} />
+    </div>
+  );
+}
+
+function PreviewCode({ children }: { children: React.ReactNode }) {
+  return (
+    <pre className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-3 text-left text-xs leading-6 text-sky-100" dir="ltr">
+      <code>{children}</code>
+    </pre>
+  );
+}
+
+function PreviewTag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold text-slate-200">
+      {children}
+    </span>
   );
 }
