@@ -67,7 +67,7 @@ export default async function AdminPage({
           placeholder="Required to save"
           type="password"
         />
-        <button className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800" type="submit">
+        <button className="rounded-xl border border-sky-200 bg-sky-100 px-4 py-2.5 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50" type="submit">
           Save settings
         </button>
       </form>

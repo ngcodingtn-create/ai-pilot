@@ -52,7 +52,7 @@ export default async function Home({
                 href={`/?os=${option.key}`}
                 className={`rounded-2xl border p-4 transition ${
                   isSelected
-                    ? "border-slate-900 bg-white shadow-md"
+                    ? "border-sky-400 bg-sky-100 shadow-md"
                     : "border-slate-200 bg-white/80 hover:border-slate-300 hover:bg-white"
                 }`}
               >
@@ -86,11 +86,11 @@ export default async function Home({
               title={`نزّل السكريبت متاع ${current.label}`}
             />
 
-            <div className="mt-4 flex flex-wrap justify-end gap-3">
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
               <DownloadButton href={current.downloadHref} label={`نزّل ${current.downloadLabel}`} />
               <a
                 href={current.installHref}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+                className="inline-flex w-full items-center justify-center rounded-xl border border-sky-200 bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50 sm:w-auto"
               >
                 حل صفحة التنصيب المباشر
               </a>
@@ -181,7 +181,7 @@ export default async function Home({
             </p>
             <a
               href="/dev"
-              className="mt-4 inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-violet-200 bg-violet-100 px-4 py-3 text-sm font-semibold text-violet-900 transition hover:border-violet-300 hover:bg-violet-50 sm:w-auto"
             >
               افتح صفحة الديفلوبر
             </a>
@@ -195,7 +195,7 @@ export default async function Home({
             </p>
             <a
               href="/admin"
-              className="mt-4 inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-900 transition hover:border-emerald-300 hover:bg-emerald-50 sm:w-auto"
             >
               افتح /admin
             </a>
@@ -271,7 +271,7 @@ function StepperItem({
   return (
     <div
       className={`rounded-2xl border px-4 py-3 ${
-        active ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-slate-50 text-slate-700"
+        active ? "border-sky-300 bg-sky-100 text-sky-950" : "border-slate-200 bg-slate-50 text-slate-700"
       }`}
     >
       <p className="text-xs font-semibold">الخطوة {step}</p>
@@ -333,9 +333,9 @@ function MiniStep({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+    <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-semibold text-white">
+        <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-900">
           {number}
         </span>
         <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
@@ -350,7 +350,7 @@ function DownloadButton({ href, label }: { href: string; label: string }) {
     <a
       href={href}
       download
-      className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+      className="inline-flex w-full items-center justify-center rounded-xl border border-sky-200 bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50 sm:w-auto"
     >
       {label}
     </a>
