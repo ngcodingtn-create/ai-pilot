@@ -71,7 +71,7 @@ New-Item -ItemType Directory -Force -Path $OpenCodeDir | Out-Null
 
 $ProjectConfig = @"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "`$schema": "https://opencode.ai/config.json",
   "model": "azure/gpt-5.4-1",
   "skills": {
     "paths": [

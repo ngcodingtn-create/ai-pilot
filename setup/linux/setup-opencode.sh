@@ -73,10 +73,11 @@ fi
 
 step "Write OpenCode project config"
 mkdir -p "$OPENCODE_DIR"
+DOLLAR='$'
 
 cat > "$PROJECT_ROOT/opencode.json" <<EOF
 {
-  "$schema": "https://opencode.ai/config.json",
+  "${DOLLAR}schema": "https://opencode.ai/config.json",
   "model": "azure/gpt-5.4-1",
   "skills": {
     "paths": [

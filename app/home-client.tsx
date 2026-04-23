@@ -93,6 +93,24 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           <Badge tone="emerald">تنصيب خطوة بخطوة</Badge>
           <Badge tone="violet">OpenCode + Skills جاهزين</Badge>
         </div>
+
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <HeroCard
+            tone="blue"
+            title="شنوّة هو OpenCode؟"
+            text="هو مساعد برمجة كيما Claude Code، أما هنا مهيألك مسبقاً مع الإعدادات والموديلات والـ skills اللي حاجتك بيهم."
+          />
+          <HeroCard
+            tone="emerald"
+            title="شنوّة الموديلات الجاهزة؟"
+            text={`عندك ${config.azureDefaultDeployment} كموديل افتراضي، وزادة GPT-5.3-Codex و GPT-5.4-Pro و Kimi.`}
+          />
+          <HeroCard
+            tone="violet"
+            title="شنوّة يتحضّر آلياً؟"
+            text="OpenCode CLI، ملفات الكونفيغ، Azure setup، والـ shared skills باش تخدم الخدمة من أول مرة."
+          />
+        </div>
       </header>
 
       <section className="mt-6 grid gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
@@ -420,6 +438,29 @@ function Badge({
   };
 
   return <span className={`rounded-full border px-3 py-1 font-medium ${tones[tone]}`}>{children}</span>;
+}
+
+function HeroCard({
+  tone,
+  title,
+  text,
+}: {
+  tone: "blue" | "emerald" | "violet";
+  title: string;
+  text: string;
+}) {
+  const tones = {
+    blue: "border-sky-200 bg-white/80",
+    emerald: "border-emerald-200 bg-white/80",
+    violet: "border-violet-200 bg-white/80",
+  };
+
+  return (
+    <div className={`rounded-2xl border p-4 shadow-sm ${tones[tone]}`}>
+      <h2 className="text-base font-bold text-slate-950">{title}</h2>
+      <p className="mt-2 text-sm leading-7 text-slate-700">{text}</p>
+    </div>
+  );
 }
 
 function MiniStep({
