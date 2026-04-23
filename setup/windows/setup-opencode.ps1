@@ -3,6 +3,7 @@ param(
   [string]$AzureApiKey = "",
   [string]$AzureDeployment = "gpt-5.4-1",
   [string]$ProjectRoot = "",
+  [switch]$PromptProjectRoot,
   [switch]$SkipSmokeTests
 )
 
@@ -12,10 +13,29 @@ function Step($text) {
   Write-Host "`n==> $text" -ForegroundColor Cyan
 }
 
+function SelectProjectFolder() {
+  Add-Type -AssemblyName System.Windows.Forms
+
+  $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+  $dialog.Description = "Choose the project folder where OpenCode config should be created"
+  $dialog.ShowNewFolderButton = $false
+  $dialog.SelectedPath = [Environment]::GetFolderPath("Desktop")
+
+  $result = $dialog.ShowDialog()
+  if ($result -ne [System.Windows.Forms.DialogResult]::OK -or [string]::IsNullOrWhiteSpace($dialog.SelectedPath)) {
+    throw "No project folder selected."
+  }
+
+  return $dialog.SelectedPath
+}
+
 $ResolvedProjectRoot = $null
 
 if ($ProjectRoot -and (Test-Path $ProjectRoot)) {
   $ResolvedProjectRoot = Resolve-Path $ProjectRoot
+} elseif ($PromptProjectRoot) {
+  Step "Choose the project folder where OpenCode config should be created"
+  $ResolvedProjectRoot = Resolve-Path (SelectProjectFolder)
 } elseif (Test-Path (Get-Location)) {
   $ResolvedProjectRoot = Resolve-Path (Get-Location)
 } else {

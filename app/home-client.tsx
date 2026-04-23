@@ -232,7 +232,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   tone="emerald"
                   title={`جاهز لـ ${current.label}`}
                   text={current.key === "windows"
-                    ? "في ويندوز، الملف يتهبط بصيغة .cmd باش المستخدم ينجم يضغط عليه مباشرة ويتحل PowerShell وحدو."
+                    ? "في ويندوز، الملف يتهبط بصيغة .cmd باش المستخدم ينجم يضغط عليه مباشرة، وبعدها يختار الدوسي الصحيح وين يحب يتركب OpenCode."
                     : "المرحلة هاذي مخصصة للتنزيل فقط: نزّل ملف التنصيب المناسب للسيستام متاعك وكمل الخطوات اللي تظهرلك."}
                 />
 
@@ -249,7 +249,8 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                       <ol className="space-y-2 text-sm leading-7 text-slate-700">
                         <li>1. نزّل ملف <InlineCode>setup-opencode.cmd</InlineCode></li>
                         <li>2. بعد ما يتهبط، اضغط عليه مرتين مباشرة</li>
-                        <li>3. PowerShell يتحل وحدو ويبدأ التنصيب</li>
+                        <li>3. اختار نفس الدوسي اللي فاتحو في VS Code</li>
+                        <li>4. PowerShell يتحل وحدو ويثبت الكونفيغ داخل هذاك الدوسي</li>
                       </ol>
                     ) : (
                       <ol className="space-y-2 text-sm leading-7 text-slate-700">

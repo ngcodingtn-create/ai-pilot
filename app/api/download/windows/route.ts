@@ -9,7 +9,7 @@ export async function GET() {
   const launcher = [
     "@echo off",
     "setlocal",
-    `powershell -ExecutionPolicy Bypass -Command \"irm ${siteUrl}/api/install/windows | iex\"`,
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command "$script = irm '${siteUrl}/api/install/windows'; & ([scriptblock]::Create($script)) -PromptProjectRoot"`,
     "if errorlevel 1 (",
     "  echo.",
     "  echo Setup failed. Press any key to close.",
