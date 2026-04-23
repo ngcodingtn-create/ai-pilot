@@ -112,12 +112,12 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         </div>
       </header>
 
-      <section className="mt-6 grid grid-cols-2 gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-4 sm:p-5">
-        <StepperItem step="1" title="اختار السيستام" state={getStepState(currentStep, 1)} />
-        <StepperItem step="2" title="نزّل ولا استعمل الطريقة اليدوية" state={getStepState(currentStep, 2)} />
-        <StepperItem step="3" title="افتح VS Code" state={getStepState(currentStep, 3)} />
-        <StepperItem step="4" title="ابدأ الخدمة" state={getStepState(currentStep, 4)} />
-      </section>
+        <section className="mt-6 grid grid-cols-2 gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-4 sm:p-5">
+          <StepperItem step="1" title="اختار السيستام" state={getStepState(currentStep, 1)} />
+          <StepperItem step="2" title="نزّل ملف التنصيب" state={getStepState(currentStep, 2)} />
+          <StepperItem step="3" title="افتح VS Code" state={getStepState(currentStep, 3)} />
+          <StepperItem step="4" title="ابدأ الخدمة" state={getStepState(currentStep, 4)} />
+        </section>
 
       <section className="mt-6 overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
         <div className="border-b border-slate-200 bg-slate-50/90 p-5 sm:p-6">
@@ -148,8 +148,8 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           </div>
         </div>
 
-        <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-          <div className="order-1 space-y-4 lg:order-2">
+        <div className="space-y-4 p-5 sm:p-6">
+          <div className="space-y-4">
             {currentStep === 1 ? (
               <>
                 <NoticeCard
@@ -174,13 +174,24 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold tracking-wide text-slate-500">
-                              سيستام
-                            </p>
-                            <h3 className="mt-2 text-xl font-bold text-slate-950">
-                              {option.label}
-                            </h3>
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${
+                                isSelected
+                                  ? "border-sky-200 bg-white/90"
+                                  : "border-slate-200 bg-slate-50"
+                              }`}
+                            >
+                              <OsLogo os={option.key} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold tracking-wide text-slate-500">
+                                سيستام
+                              </p>
+                              <h3 className="mt-2 text-xl font-bold text-slate-950">
+                                {option.label}
+                              </h3>
+                            </div>
                           </div>
 
                           <span
@@ -208,7 +219,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   </h3>
                   <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
                     <li>- رابط تحميل واضح للسيستام اللي اخترتو</li>
-                    <li>- أمر يدوي للتيرمينال إذا ما تحبش التحميل</li>
+                    <li>- خطوات مبسّطة باش تكمل التنصيب من غير تعقيد</li>
                     <li>- شرح مبسّط باش تستعمل OpenCode داخل VS Code</li>
                   </ul>
                 </div>
@@ -220,7 +231,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                 <NoticeCard
                   tone="emerald"
                   title={`جاهز لـ ${current.label}`}
-                  text="الأسهل هو التنزيل، أما زادة خلّينالك الطريقة اليدوية إذا تحب تنفّذ كل شيء من التيرمينال."
+                  text="المرحلة هاذي مخصصة للتنزيل فقط: نزّل ملف التنصيب المناسب للسيستام متاعك وكمل الخطوات اللي تظهرلك." 
                 />
 
                 <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
@@ -253,13 +264,6 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   </InfoPanel>
                 </div>
 
-                <InfoPanel title="الطريقة اليدوية من التيرمينال" tone="blue">
-                  <p className="text-sm leading-7 text-slate-700">
-                    كان تحب تخدم مباشرة من غير تنزيل، انسخ هالكوموند وشغّلو داخل
-                    الدوسي متاع البروجيه.
-                  </p>
-                  <CodeBlock lines={[current.command]} />
-                </InfoPanel>
               </>
             ) : null}
 
@@ -267,29 +271,19 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
               <>
                 <NoticeCard
                   tone="violet"
-                  title="عندك زوز طرق واضحين"
-                  text="يا إمّا تخلّي OpenCode يركّب الإكستنشن وحدو من التيرمينال داخل VS Code، يا إمّا تركّبها وحدك من الـ Marketplace."
+                  title="ركّب OpenCode داخل VS Code"
+                  text="هوني نمشيو بالطريقة الأسهل لغير التقنيين: افتح Extensions داخل VS Code، ركّب OpenCode، وبعدها اضغط عليه من الشريط الجانبي اليمين باش يتحل." 
                 />
 
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <OptionCard title="الطريقة الأسهل" kicker="من داخل VS Code" tone="emerald">
-                    <ol className="space-y-2 text-sm leading-7 text-slate-700">
-                      <li>1. افتح البروجيه متاعك في VS Code</li>
-                      <li>2. افتح الـ integrated terminal</li>
-                      <li>3. اكتب <InlineCode>opencode</InlineCode></li>
-                      <li>4. الإكستنشن تركّب وحدها وتولي الخدمة جاهزة</li>
-                    </ol>
-                  </OptionCard>
-
-                  <OptionCard title="التركيب اليدوي" kicker="من VS Code Marketplace" tone="blue">
-                    <ol className="space-y-2 text-sm leading-7 text-slate-700">
-                      <li>1. افتح تبويب <InlineCode>Extensions</InlineCode></li>
-                      <li>2. قلّب على <InlineCode>OpenCode</InlineCode></li>
-                      <li>3. اضغط <InlineCode>Install</InlineCode></li>
-                      <li>4. ارجع للتيرمينال واكتب <InlineCode>opencode</InlineCode></li>
-                    </ol>
-                  </OptionCard>
-                </div>
+                <InfoPanel title="الخطوات داخل VS Code" tone="slate">
+                  <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                    <li>1. افتح البروجيه متاعك في VS Code</li>
+                    <li>2. من الشريط الجانبي افتح <InlineCode>Extensions</InlineCode></li>
+                    <li>3. قلّب على <InlineCode>OpenCode</InlineCode></li>
+                    <li>4. اضغط <InlineCode>Install</InlineCode></li>
+                    <li>5. بعد التركيب، اضغط على <InlineCode>OpenCode</InlineCode> من الشريط الجانبي اليمين</li>
+                  </ol>
+                </InfoPanel>
 
                 <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
                   <LinkButton
@@ -306,16 +300,18 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   />
                 </div>
 
-                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="text-sm font-bold text-slate-950">
-                    وإذا تحب تستعملو من التيرمينال فقط
-                  </h3>
-                  <p className="mt-2 text-sm leading-7 text-slate-700">
-                    تنجم زادة تشغّل <InlineCode>opencode</InlineCode> من PowerShell
-                    ولا Windows Terminal. أما داخل VS Code التجربة أسهل على خاطر
-                    الإكستنشن تركّب وحدها وتخدم مع الدوسي المفتوح.
-                  </p>
-                </div>
+                <InfoPanel title="صور توضيحية" tone="blue">
+                  <div className="space-y-4">
+                    <PlaceholderImageCard
+                      title="صورة 1"
+                      caption="مكان تبويب Extensions والبحث على OpenCode داخل VS Code"
+                    />
+                    <PlaceholderImageCard
+                      title="صورة 2"
+                      caption="بعد التركيب: مكان OpenCode في الشريط الجانبي اليمين"
+                    />
+                  </div>
+                </InfoPanel>
               </>
             ) : null}
 
@@ -327,21 +323,19 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   text="بعد ما تفتح OpenCode، اختار الموديل اللي تحب عليه الخدمة وابدأ مباشرة من نفس التيرمينال."
                 />
 
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <InfoPanel title="الانطلاقة العادية" tone="slate">
-                    <p className="text-sm leading-7 text-slate-700">
-                      هذا هو المسار العادي، والموديل الافتراضي مربوط على Azure.
-                    </p>
-                    <CodeBlock lines={[`opencode -m azure/${config.azureDefaultDeployment}`]} />
-                  </InfoPanel>
+                <InfoPanel title="الانطلاقة العادية" tone="slate">
+                  <p className="text-sm leading-7 text-slate-700">
+                    هذا هو المسار العادي، والموديل الافتراضي مربوط على Azure.
+                  </p>
+                  <CodeBlock lines={[`opencode -m azure/${config.azureDefaultDeployment}`]} />
+                </InfoPanel>
 
-                  <InfoPanel title="إذا تحب Kimi" tone="slate">
-                    <p className="text-sm leading-7 text-slate-700">
-                      إذا تحب تستعمل Kimi بدل Azure GPT، استعمل هالكوموند.
-                    </p>
-                    <CodeBlock lines={["opencode -m azure-chat/Kimi-K2.6"]} />
-                  </InfoPanel>
-                </div>
+                <InfoPanel title="إذا تحب Kimi" tone="slate">
+                  <p className="text-sm leading-7 text-slate-700">
+                    إذا تحب تستعمل Kimi بدل Azure GPT، استعمل هالكوموند.
+                  </p>
+                  <CodeBlock lines={["opencode -m azure-chat/Kimi-K2.6"]} />
+                </InfoPanel>
 
                 <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-4">
                   <ul className="space-y-2 text-sm leading-7 text-slate-700">
@@ -351,6 +345,19 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   </ul>
                 </div>
 
+                <InfoPanel title="صور توضيحية" tone="blue">
+                  <div className="space-y-4">
+                    <PlaceholderImageCard
+                      title="صورة 1"
+                      caption="مكان التيرمينال داخل VS Code وقت تكتب أمر التشغيل"
+                    />
+                    <PlaceholderImageCard
+                      title="صورة 2"
+                      caption="شكل OpenCode بعد ما يتحل وتبدأ تختار الموديل أو تبدأ الشات"
+                    />
+                  </div>
+                </InfoPanel>
+
                 <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
                   <LinkButton href="/dev" label="حل صفحة الديفلوبر" tone="violet" />
                   <LinkButton href="/admin" label="حل /admin" tone="emerald" />
@@ -359,19 +366,6 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
             ) : null}
           </div>
 
-          <div className="order-2 lg:order-1">
-            <PreviewShell
-              title={getPreviewTitle(currentStep)}
-              subtitle={getPreviewSubtitle(currentStep, current.label)}
-            >
-              <WizardPreview
-                step={currentStep}
-                selectedOs={selectedOs}
-                current={current}
-                defaultDeployment={config.azureDefaultDeployment}
-              />
-            </PreviewShell>
-          </div>
         </div>
 
         <div className="border-t border-slate-200 bg-slate-50/80 p-5 sm:p-6">
@@ -409,7 +403,7 @@ function getStepState(currentStep: number, step: number) {
 function getWizardTitle(currentStep: number, selectedLabel: string) {
   if (currentStep === 1) return "اختار السيستام متاعك";
   if (currentStep === 2) return `نزّل السكريبت متاع ${selectedLabel}`;
-  if (currentStep === 3) return "حضّر VS Code ولا التيرمينال";
+  if (currentStep === 3) return "ركّب الإكستنشن داخل VS Code";
   return "ابدا الاستعمال";
 }
 
@@ -419,11 +413,11 @@ function getWizardDescription(currentStep: number, selectedLabel: string) {
   }
 
   if (currentStep === 2) {
-    return `توّا بعد ما اخترت ${selectedLabel}، عندك زر تنزيل واضح وأمر يدوي جاهز إذا تحب تكمل مباشرة من التيرمينال.`;
+    return `توّا بعد ما اخترت ${selectedLabel}، عندك زر تنزيل واضح وخطوات بسيطة باش تكمل التركيب من الملف اللي باش يتهبط.`;
   }
 
   if (currentStep === 3) {
-    return "في هالمرحلة عندك زوز طرق: يا إمّا OpenCode يركّب الإكستنشن وحدو داخل VS Code، يا إمّا تركّبها يدويّاً من الـ Marketplace.";
+    return "في هالمرحلة باش تركّب إكستنشن OpenCode من داخل VS Code، وبعدها تفتحو من الشريط الجانبي اليمين وتولي الخدمة جاهزة.";
   }
 
   return "آخر خطوة: شغّل OpenCode بالموديل اللي تحب عليه الخدمة وابدأ مباشرة. إذا حبيت، تنجم تبدّل الموديل من داخل OpenCode.";
@@ -434,20 +428,6 @@ function getNextLabel(currentStep: number) {
   if (currentStep === 2) return "التالي: VS Code";
   if (currentStep === 3) return "التالي: ابدأ الخدمة";
   return "عاود من الأول";
-}
-
-function getPreviewTitle(currentStep: number) {
-  if (currentStep === 1) return "معاينة الاختيار";
-  if (currentStep === 2) return "معاينة التنصيب";
-  if (currentStep === 3) return "معاينة VS Code";
-  return "معاينة التشغيل";
-}
-
-function getPreviewSubtitle(currentStep: number, selectedLabel: string) {
-  if (currentStep === 1) return "كيفاش باش تشوف اختيار السيستام";
-  if (currentStep === 2) return `شنوّة باش يبانلك وقت تنزّل سكريبت ${selectedLabel}`;
-  if (currentStep === 3) return "شكل مبسّط لواجهة VS Code والتيرمينال";
-  return "الأوامر الأولى قبل ما تبدأ تخدم";
 }
 
 function getOsOptions(siteUrl: string) {
@@ -488,6 +468,36 @@ function QuickFact({ title, text }: { title: string; text: string }) {
     <div className="rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-sm">
       <h2 className="text-sm font-bold text-slate-950">{title}</h2>
       <p className="mt-2 text-sm leading-7 text-slate-700">{text}</p>
+    </div>
+  );
+}
+
+function OsLogo({ os }: { os: OsKey }) {
+  if (os === "windows") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-7 w-7 text-sky-600" fill="currentColor" aria-hidden="true">
+        <path d="M3 4.5 10.4 3v8.2H3V4.5Zm8.6-1.7L21 1v10.2h-9.4V2.8ZM3 12.8h7.4V21L3 19.6v-6.8Zm8.6 0H21V23l-9.4-1.8v-8.4Z" />
+      </svg>
+    );
+  }
+
+  if (os === "linux") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden="true">
+        <circle cx="12" cy="7" r="3.2" fill="#111827" />
+        <ellipse cx="12" cy="13.2" rx="4.8" ry="6.1" fill="#111827" />
+        <ellipse cx="10.2" cy="8.2" rx="0.7" ry="0.9" fill="#ffffff" />
+        <ellipse cx="13.8" cy="8.2" rx="0.7" ry="0.9" fill="#ffffff" />
+        <path d="M11 9.8h2l-.7 1.1h-.6L11 9.8Z" fill="#f59e0b" />
+        <ellipse cx="9.5" cy="19.6" rx="2.1" ry="1.1" fill="#f59e0b" />
+        <ellipse cx="14.5" cy="19.6" rx="2.1" ry="1.1" fill="#f59e0b" />
+      </svg>
+    );
+  }
+
+  return (
+    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">
+      ⌘
     </div>
   );
 }
@@ -570,31 +580,6 @@ function InfoPanel({
   );
 }
 
-function OptionCard({
-  title,
-  kicker,
-  tone,
-  children,
-}: {
-  title: string;
-  kicker: string;
-  tone: "blue" | "emerald";
-  children: React.ReactNode;
-}) {
-  const tones = {
-    blue: "border-sky-200 bg-sky-50/70",
-    emerald: "border-emerald-200 bg-emerald-50/70",
-  };
-
-  return (
-    <div className={`rounded-[1.75rem] border p-4 ${tones[tone]}`}>
-      <p className="text-xs font-semibold tracking-[0.18em] text-slate-500">{kicker}</p>
-      <h3 className="mt-2 text-base font-bold text-slate-950">{title}</h3>
-      <div className="mt-3">{children}</div>
-    </div>
-  );
-}
-
 function Badge({
   tone,
   children,
@@ -643,21 +628,19 @@ function LinkButton({
   );
 }
 
-function PreviewShell({
+function PlaceholderImageCard({
   title,
-  subtitle,
-  children,
+  caption,
 }: {
   title: string;
-  subtitle: string;
-  children: React.ReactNode;
+  caption: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-slate-900/10 bg-slate-950 text-white shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+    <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div>
-          <h3 className="text-sm font-bold">{title}</h3>
-          <p className="mt-1 text-xs text-slate-300">{subtitle}</p>
+          <p className="text-sm font-bold text-slate-950">{title}</p>
+          <p className="mt-1 text-xs text-slate-500">Placeholder</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
@@ -665,102 +648,11 @@ function PreviewShell({
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
         </div>
       </div>
-      <div className="bg-[radial-gradient(circle_at_top,#1e293b,#0f172a_55%,#020617)] p-4 sm:p-5">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function WizardPreview({
-  step,
-  selectedOs,
-  current,
-  defaultDeployment,
-}: {
-  step: number;
-  selectedOs: OsKey;
-  current: {
-    label: string;
-    command: string;
-    downloadLabel: string;
-  };
-  defaultDeployment: string;
-}) {
-  if (step === 1) {
-    return (
-      <div className="space-y-3">
-        <PreviewPillRow items={["Windows", "Linux", "macOS"]} active={selectedOs} />
-        <div className="grid gap-3">
-          <PreviewChoice title="ويندوز" active={selectedOs === "windows"} />
-          <PreviewChoice title="لينكس" active={selectedOs === "linux"} />
-          <PreviewChoice title="ماك" active={selectedOs === "macos"} />
+      <div className="bg-slate-100 p-4">
+        <div className="flex aspect-[16/9] items-center justify-center rounded-[1.25rem] border-2 border-dashed border-slate-300 bg-white text-center text-sm font-semibold text-slate-500">
+          ضع screenshot هنا
         </div>
-      </div>
-    );
-  }
-
-  if (step === 2) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-4">
-          <p className="text-sm font-semibold text-white">تنزيل جاهز</p>
-          <p className="mt-2 text-xs leading-6 text-slate-300">{current.downloadLabel}</p>
-          <div className="mt-4 h-11 rounded-xl bg-sky-400/90" />
-        </div>
-        <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/60 p-4">
-          <p className="text-sm font-semibold text-white">الأمر اليدوي</p>
-          <PreviewCode>{current.command}</PreviewCode>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 3) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-3">
-          <div className="grid grid-cols-[58px_1fr] gap-3" dir="ltr">
-            <div className="rounded-xl bg-slate-900/70 p-2">
-              <PreviewBar width="70%" />
-              <PreviewBar width="55%" />
-              <PreviewBar width="65%" />
-            </div>
-            <div className="space-y-3 rounded-xl bg-slate-900/55 p-3">
-              <PreviewBar width="60%" />
-              <PreviewBar width="90%" />
-              <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
-                <PreviewCode>opencode</PreviewCode>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-4">
-          <p className="text-sm font-semibold text-white">Marketplace</p>
-          <div className="mt-3 rounded-xl bg-slate-900/60 p-3">
-            <PreviewBar width="40%" />
-            <PreviewBar width="92%" />
-            <div className="mt-3 h-10 rounded-xl bg-sky-400/90" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-[1.5rem] border border-white/10 bg-white/8 p-4">
-        <p className="text-sm font-semibold text-white">الموديل الافتراضي</p>
-        <PreviewCode>{`opencode -m azure/${defaultDeployment}`}</PreviewCode>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <PreviewTag>GPT-5.4-1 xhigh</PreviewTag>
-        <PreviewTag>GPT-5.3-Codex xhigh</PreviewTag>
-        <PreviewTag>GPT-5.4-Pro xhigh</PreviewTag>
-        <PreviewTag>Kimi</PreviewTag>
-      </div>
-      <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/60 p-4">
-        <PreviewCode>/models</PreviewCode>
+        <p className="mt-3 text-sm leading-7 text-slate-600">{caption}</p>
       </div>
     </div>
   );
@@ -830,93 +722,5 @@ function CodeBlock({ lines }: { lines: string[] }) {
     >
       <code>{lines.join("\n")}</code>
     </pre>
-  );
-}
-
-function PreviewChoice({ title, active }: { title: string; active?: boolean }) {
-  return (
-    <div
-      className={`rounded-[1.35rem] border p-4 ${
-        active ? "border-sky-300 bg-sky-400/15" : "border-white/10 bg-white/8"
-      }`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-white">{title}</span>
-        <span
-          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-            active ? "bg-emerald-400/20 text-emerald-300" : "bg-slate-800 text-slate-300"
-          }`}
-        >
-          {active ? "Selected" : "OS"}
-        </span>
-      </div>
-      <PreviewBar width="85%" className="mt-3" />
-      <PreviewBar width="62%" className="mt-2" />
-    </div>
-  );
-}
-
-function PreviewPillRow({
-  items,
-  active,
-}: {
-  items: string[];
-  active: OsKey;
-}) {
-  const activeMap = {
-    windows: "Windows",
-    linux: "Linux",
-    macos: "macOS",
-  };
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item) => {
-        const isActive = item === activeMap[active];
-
-        return (
-          <span
-            key={item}
-            className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-              isActive
-                ? "border-sky-300 bg-sky-400/15 text-sky-200"
-                : "border-white/10 bg-white/8 text-slate-300"
-            }`}
-          >
-            {item}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-function PreviewBar({
-  width,
-  className = "",
-}: {
-  width: string;
-  className?: string;
-}) {
-  return (
-    <div className={`h-2 rounded-full bg-white/10 ${className}`}>
-      <div className="h-full rounded-full bg-white/55" style={{ width }} />
-    </div>
-  );
-}
-
-function PreviewCode({ children }: { children: React.ReactNode }) {
-  return (
-    <pre className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-3 text-left text-xs leading-6 text-sky-100" dir="ltr">
-      <code>{children}</code>
-    </pre>
-  );
-}
-
-function PreviewTag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold text-slate-200">
-      {children}
-    </span>
   );
 }
