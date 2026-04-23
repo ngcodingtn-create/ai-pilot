@@ -33,7 +33,11 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
       const parsed = JSON.parse(raw) as { selectedOs?: OsKey; currentStep?: number };
 
       window.requestAnimationFrame(() => {
-        if (parsed.selectedOs && options[parsed.selectedOs]) {
+        if (
+          parsed.selectedOs === "windows" ||
+          parsed.selectedOs === "linux" ||
+          parsed.selectedOs === "macos"
+        ) {
           setSelectedOs(parsed.selectedOs);
         }
         if (typeof parsed.currentStep === "number") {
@@ -47,7 +51,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         setIsReady(true);
       });
     }
-  }, [options]);
+  }, []);
 
   useEffect(() => {
     if (!isReady) return;
@@ -60,6 +64,10 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
   function completeStep(step: number) {
     setCurrentStep((prev) => Math.max(prev, Math.min(step + 1, 4)));
+  }
+
+  function goToStep(step: number) {
+    setCurrentStep(step);
   }
 
   function resetSteps() {
@@ -99,7 +107,9 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           title="اختار السيستام متاعك"
           kicker="الخطوة 1"
           tone="blue"
-          unlocked={currentStep >= 1}
+          state={getStepState(currentStep, 1)}
+          summary={`السيستام المختار: ${current.label}`}
+          onEdit={() => goToStep(1)}
         >
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             {Object.values(options).map((option) => {
@@ -146,7 +156,9 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           title={`نزّل السكريبت متاع ${current.label}`}
           kicker="الخطوة 2"
           tone="blue"
-          unlocked={currentStep >= 2}
+          state={getStepState(currentStep, 2)}
+          summary={`جاهز لـ ${current.label}: تحميل الملف أو استعمال الطريقة اليدوية`}
+          onEdit={() => goToStep(2)}
         >
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
             <DownloadButton href={current.downloadHref} label={`نزّل ${current.downloadLabel}`} />
@@ -186,7 +198,9 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           title="افتح VS Code وكمل من غادي"
           kicker="الخطوة 3"
           tone="emerald"
-          unlocked={currentStep >= 3}
+          state={getStepState(currentStep, 3)}
+          summary="VS Code جاهز وOpenCode يتركّب من داخل التيرمينال"
+          onEdit={() => goToStep(3)}
         >
           <p className="mt-4 text-sm leading-7 text-slate-700">
             حسب دوك OpenCode للـ IDE، الإكستنشن متاع VS Code يتركّب أوتوماتيكياً
@@ -215,7 +229,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           title="ابدا الاستعمال"
           kicker="الخطوة 4"
           tone="amber"
-          unlocked={currentStep >= 4}
+          state={getStepState(currentStep, 4)}
         >
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -335,13 +349,17 @@ function StepPanel({
   title,
   kicker,
   tone,
-  unlocked,
+  state,
+  summary,
+  onEdit,
   children,
 }: {
   title: string;
   kicker: string;
   tone: "blue" | "emerald" | "amber";
-  unlocked: boolean;
+  state: "done" | "active" | "locked";
+  summary?: string;
+  onEdit?: () => void;
   children: React.ReactNode;
 }) {
   const tones = {
@@ -351,10 +369,25 @@ function StepPanel({
   };
 
   return (
-    <section className={`rounded-[2rem] border p-5 shadow-sm sm:p-6 ${tones[tone]} ${unlocked ? "" : "opacity-60"}`}>
+    <section className={`rounded-[2rem] border p-5 shadow-sm sm:p-6 ${tones[tone]} ${state === "locked" ? "opacity-60" : ""}`}>
       <SectionTitle kicker={kicker} title={title} />
-      {unlocked ? (
+      {state === "active" ? (
         children
+      ) : state === "done" ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/85 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm leading-7 text-slate-700">
+            {summary ?? "المرحلة هاذي تكمّلت."}
+          </p>
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto"
+            >
+              رجّع افتح الخطوة
+            </button>
+          ) : null}
+        </div>
       ) : (
         <p className="mt-4 text-sm leading-7 text-slate-600">
           كمّل الخطوة اللي قبلها باش تتفتح هالمرحلة.
