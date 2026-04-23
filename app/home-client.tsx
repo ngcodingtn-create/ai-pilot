@@ -232,7 +232,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   tone="emerald"
                   title={`جاهز لـ ${current.label}`}
                   text={current.key === "windows"
-                    ? "في ويندوز، الملف يتهبط بصيغة .cmd باش المستخدم ينجم يضغط عليه مباشرة، وبعدها يختار الدوسي الصحيح وين يحب يتركب OpenCode."
+                    ? "في ويندوز، الملف يتهبط بصيغة .cmd. أول ما تضغط عليه، يطلب منك تختار الدوسي الصحيح: اختار نفس الدوسي اللي إنت خدام عليه وتوا محلولو في VS Code."
                     : "المرحلة هاذي مخصصة للتنزيل فقط: نزّل ملف التنصيب المناسب للسيستام متاعك وكمل الخطوات اللي تظهرلك."}
                 />
 
@@ -249,8 +249,9 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                       <ol className="space-y-2 text-sm leading-7 text-slate-700">
                         <li>1. نزّل ملف <InlineCode>setup-opencode.cmd</InlineCode></li>
                         <li>2. بعد ما يتهبط، اضغط عليه مرتين مباشرة</li>
-                        <li>3. اختار نفس الدوسي اللي فاتحو في VS Code</li>
-                        <li>4. PowerShell يتحل وحدو ويثبت الكونفيغ داخل هذاك الدوسي</li>
+                        <li>3. كي تطلعلك نافذة اختيار الدوسي، اختار نفس الدوسي اللي فاتحو في VS Code</li>
+                        <li>4. مثال: إذا إنت خدام على <InlineCode>D:\services web</InlineCode> اختار نفس هذاك الدوسي</li>
+                        <li>5. من بعد PowerShell يتحل وحدو ويثبت الكونفيغ داخل هذاك الدوسي</li>
                       </ol>
                     ) : (
                       <ol className="space-y-2 text-sm leading-7 text-slate-700">
@@ -274,6 +275,16 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                     </ul>
                   </InfoPanel>
                 </div>
+
+                {current.key === "windows" ? (
+                  <InfoPanel title="مهم برشة" tone="blue">
+                    <p className="text-sm leading-7 text-slate-700">
+                      كان تختار الدوسي الغالط، <InlineCode>opencode.json</InlineCode> باش يتركب
+                      في بلاصة أخرى وما يبانش في البروجيه متاعك داخل VS Code. ديما اختار
+                      نفس الدوسي اللي عندك مفتوح في VS Code قبل ما تكمل.
+                    </p>
+                  </InfoPanel>
+                ) : null}
 
               </>
             ) : null}
@@ -303,12 +314,6 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                     tone="blue"
                     external
                   />
-                  <LinkButton
-                    href="https://opencode.ai/docs/ide/"
-                    label="حل OpenCode IDE docs"
-                    tone="slate"
-                    external
-                  />
                 </div>
 
                 <InfoPanel title="صور توضيحية" tone="blue">
@@ -316,10 +321,12 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                     <PlaceholderImageCard
                       title="صورة 1"
                       caption="مكان تبويب Extensions والبحث على OpenCode داخل VS Code"
+                      imageUrl="https://h3w8n96m79.ufs.sh/f/bDIUcwVinDBcqH6UZSR14hLjiKrP5ZAQWYgfMOlFpnqcvebu"
                     />
                     <PlaceholderImageCard
                       title="صورة 2"
                       caption="بعد التركيب: مكان OpenCode في الشريط الجانبي اليمين"
+                      imageUrl="https://h3w8n96m79.ufs.sh/f/bDIUcwVinDBcz13n6lEGBUJOp3jVPsrL27kvaNdRhZgtSAxH"
                     />
                   </div>
                 </InfoPanel>
@@ -331,28 +338,14 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                 <NoticeCard
                   tone="amber"
                   title="أنت حاضر توّا"
-                  text="بعد ما تفتح OpenCode، اختار الموديل اللي تحب عليه الخدمة وابدأ مباشرة من نفس التيرمينال."
+                  text="إذا وصلت لهنا، هذا يعني اللي التركيب خدم. توّا المطلوب منك كان تفتح OpenCode وتبدأ الخدمة من داخل VS Code."
                 />
-
-                <InfoPanel title="الانطلاقة العادية" tone="slate">
-                  <p className="text-sm leading-7 text-slate-700">
-                    هذا هو المسار العادي، والموديل الافتراضي مربوط على Azure.
-                  </p>
-                  <CodeBlock lines={[`opencode -m azure/${config.azureDefaultDeployment}`]} />
-                </InfoPanel>
-
-                <InfoPanel title="إذا تحب Kimi" tone="slate">
-                  <p className="text-sm leading-7 text-slate-700">
-                    إذا تحب تستعمل Kimi بدل Azure GPT، استعمل هالكوموند.
-                  </p>
-                  <CodeBlock lines={["opencode -m azure-chat/Kimi-K2.6"]} />
-                </InfoPanel>
 
                 <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-4">
                   <ul className="space-y-2 text-sm leading-7 text-slate-700">
-                    <li>- موديلات Azure GPT في هالsetup تستعمل reasoning xhigh</li>
-                    <li>- إذا تحب تبدّل الموديل بعد ما تدخل، اكتب <InlineCode>/models</InlineCode></li>
-                    <li>- إذا حبيت تعاود من الأول، استعمل الزر اللي تحت</li>
+                    <li>- افتح OpenCode من داخل VS Code</li>
+                    <li>- إذا الشاشة ظهرتلك كيما الصور اللي تحت، معناها كل شيء خدم</li>
+                    <li>- إذا حبيت تبدّل الموديل بعد، تنجم تعمل هذا من داخل OpenCode</li>
                   </ul>
                 </div>
 
@@ -361,10 +354,12 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                     <PlaceholderImageCard
                       title="صورة 1"
                       caption="مكان التيرمينال داخل VS Code وقت تكتب أمر التشغيل"
+                      imageUrl="https://h3w8n96m79.ufs.sh/f/bDIUcwVinDBcm9qnm43dOEJYeU4QvfR3mCMFcG8twSqi50Pr"
                     />
                     <PlaceholderImageCard
                       title="صورة 2"
                       caption="شكل OpenCode بعد ما يتحل وتبدأ تختار الموديل أو تبدأ الشات"
+                      imageUrl="https://h3w8n96m79.ufs.sh/f/bDIUcwVinDBc7i6wj8AownFXT9WCO2qURusS03xfPGBIvhZH"
                     />
                   </div>
                 </InfoPanel>
@@ -642,16 +637,18 @@ function LinkButton({
 function PlaceholderImageCard({
   title,
   caption,
+  imageUrl,
 }: {
   title: string;
   caption: string;
+  imageUrl?: string;
 }) {
   return (
     <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div>
           <p className="text-sm font-bold text-slate-950">{title}</p>
-          <p className="mt-1 text-xs text-slate-500">Placeholder</p>
+          <p className="mt-1 text-xs text-slate-500">{imageUrl ? "Screenshot" : "Placeholder"}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
@@ -660,9 +657,18 @@ function PlaceholderImageCard({
         </div>
       </div>
       <div className="bg-slate-100 p-4">
-        <div className="flex aspect-[16/9] items-center justify-center rounded-[1.25rem] border-2 border-dashed border-slate-300 bg-white text-center text-sm font-semibold text-slate-500">
-          ضع screenshot هنا
-        </div>
+        {imageUrl ? (
+          <div
+            role="img"
+            aria-label={caption}
+            className="aspect-[16/9] rounded-[1.25rem] border border-slate-200 bg-white bg-cover bg-top shadow-sm"
+            style={{ backgroundImage: `url(${imageUrl})` }}
+          />
+        ) : (
+          <div className="flex aspect-[16/9] items-center justify-center rounded-[1.25rem] border-2 border-dashed border-slate-300 bg-white text-center text-sm font-semibold text-slate-500">
+            ضع screenshot هنا
+          </div>
+        )}
         <p className="mt-3 text-sm leading-7 text-slate-600">{caption}</p>
       </div>
     </div>
@@ -722,16 +728,5 @@ function InlineCode({ children }: { children: React.ReactNode }) {
     <code dir="ltr" className="rounded bg-slate-100 px-1.5 py-0.5 text-[13px] text-slate-900">
       {children}
     </code>
-  );
-}
-
-function CodeBlock({ lines }: { lines: string[] }) {
-  return (
-    <pre
-      dir="ltr"
-      className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs leading-6 text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
-    >
-      <code>{lines.join("\n")}</code>
-    </pre>
   );
 }
