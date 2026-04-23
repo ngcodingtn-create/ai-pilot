@@ -18,121 +18,131 @@ export default async function DevPage() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-pilot-ten.vercel.app";
 
   return (
-    <main dir="rtl" className="mx-auto w-full max-w-6xl px-4 py-8 text-right sm:px-6 lg:px-8">
+    <main dir="ltr" className="mx-auto w-full max-w-6xl px-4 py-8 text-left sm:px-6 lg:px-8">
       <header className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <p className="text-sm font-semibold text-slate-500">Dev</p>
+        <div className="flex flex-wrap gap-3">
+          <NavLink href="/">Back to setup</NavLink>
+          <NavLink href="/admin">Open admin</NavLink>
+        </div>
+        <p className="mt-4 text-sm font-semibold text-slate-500">Developer notes</p>
         <h1 className="mt-3 text-3xl font-bold text-slate-950 sm:text-4xl">
-          صفحة الديفلوبر: كل التفاصيل التقنية
+          Technical setup details
         </h1>
         <p className="mt-4 max-w-3xl text-sm leading-8 text-slate-700">
-          هوني تلقى الإعدادات الكل: شنوّة يتركّب، شنوّة يتحطّ في الكونفيغ، كيفاش
-          يخدم VS Code، وشنوّة وضعية الـ MCP والـ admin.
+          This page explains exactly what the installer configures, which Azure
+          deployments are wired, what OpenCode downloads, and how VS Code support
+          works.
         </p>
       </header>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
         <section className="space-y-6">
-          <DevPanel title="أوامر التنصيب الرسمية">
-            <DevCode>{`powershell -ExecutionPolicy Bypass -Command "irm ${siteUrl}/api/install/windows | iex"`}</DevCode>
-            <DevCode>{`curl -fsSL ${siteUrl}/api/install/linux | bash`}</DevCode>
-            <DevCode>{`curl -fsSL ${siteUrl}/api/install/macos | bash`}</DevCode>
-          </DevPanel>
+          <Panel title="Install commands">
+            <CodeBlock>{`powershell -ExecutionPolicy Bypass -Command "irm ${siteUrl}/api/install/windows | iex"`}</CodeBlock>
+            <CodeBlock>{`curl -fsSL ${siteUrl}/api/install/linux | bash`}</CodeBlock>
+            <CodeBlock>{`curl -fsSL ${siteUrl}/api/install/macos | bash`}</CodeBlock>
+          </Panel>
 
-          <DevPanel title="شنوّة يتركّب أوتوماتيكياً">
+          <Panel title="What the installer downloads and configures">
             <ul className="space-y-2 text-sm leading-7 text-slate-700">
-              <li>- OpenCode CLI كانو موش موجود</li>
-              <li>- ملف <InlineCode>opencode.json</InlineCode> داخل البروجيه</li>
-              <li>- ملف <InlineCode>.opencode/config.json</InlineCode></li>
-              <li>- فولدر <InlineCode>external-skills</InlineCode></li>
-              <li>- متغيرات Azure في السيشن الحالية وبشكل دائم</li>
-              <li>- smoke tests للموديلات كان ما عطلتهمش</li>
+              <li>- Installs the OpenCode CLI if it is not already available</li>
+              <li>- Creates <InlineCode>opencode.json</InlineCode> in the current project</li>
+              <li>- Creates <InlineCode>.opencode/config.json</InlineCode></li>
+              <li>- Clones the shared skills repositories into <InlineCode>external-skills/</InlineCode></li>
+              <li>- Sets Azure environment variables for the current session and future sessions</li>
+              <li>- Runs model smoke tests unless they are explicitly skipped</li>
             </ul>
-          </DevPanel>
+          </Panel>
 
-          <DevPanel title="What is already configured">
+          <Panel title="Azure deployments included">
             <ul className="space-y-2 text-sm leading-7 text-slate-700">
               <li>
                 - Azure resource: <InlineCode>{config.azureResourceName}</InlineCode>
               </li>
               <li>
-                - Models: <InlineCode>{config.azureDefaultDeployment}</InlineCode>, <InlineCode>gpt-5.3-codex</InlineCode>, <InlineCode>gpt-5.4-pro</InlineCode>
+                - Default deployment: <InlineCode>{config.azureDefaultDeployment}</InlineCode>
+              </li>
+              <li>
+                - Additional deployments: <InlineCode>gpt-5.3-codex</InlineCode> and <InlineCode>gpt-5.4-pro</InlineCode>
               </li>
               <li>
                 - Kimi path: <InlineCode>azure-chat/Kimi-K2.6</InlineCode>
               </li>
-              <li>- Shared skills: Anthropic skills + Claude-skills library</li>
             </ul>
-          </DevPanel>
+          </Panel>
 
-          <DevPanel title="Skills اللي مربوطين في المشروع">
-            <ul className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+          <Panel title="OpenCode skills included">
+            <p className="text-sm leading-7 text-slate-700">
+              The setup pulls both Anthropic skills and the Claude-skills library,
+              then wires them into the generated project config.
+            </p>
+            <ul className="mt-4 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
               {SKILL_GROUPS.map((group) => (
-                <li key={group} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" dir="ltr">
+                <li
+                  key={group}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                >
                   ./external-skills/{group}
                 </li>
               ))}
             </ul>
-          </DevPanel>
+          </Panel>
 
-          <DevPanel title="VS Code / IDE">
+          <Panel title="VS Code support">
             <p className="text-sm leading-7 text-slate-700">
-              حسب دوك OpenCode IDE، الإكستنشن متاع VS Code تتركّب وحدها أول مرة
-              تشغّل <InlineCode>opencode</InlineCode> داخل الـ integrated terminal.
+              OpenCode has IDE support. In VS Code, the extension installs
+              automatically the first time you run <InlineCode>opencode</InlineCode>
+              in the integrated terminal.
             </p>
-            <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
-              <li>- افتح البروجيه في VS Code</li>
-              <li>- افتح التيرمينال من الداخل</li>
-              <li>- شغّل <InlineCode>opencode</InlineCode></li>
-              <li>- إذا ما ركبتش وحدها، قلّب على OpenCode في Marketplace وثبّتها يدوي</li>
-              <li>- إذا تحب أوامر <InlineCode>/editor</InlineCode> و <InlineCode>/export</InlineCode> يخدمو مليح، استعمل <InlineCode>code --wait</InlineCode> كـ editor command</li>
-            </ul>
-          </DevPanel>
+            <ol className="mt-4 space-y-2 text-sm leading-7 text-slate-700">
+              <li>1. Open your project folder in VS Code</li>
+              <li>2. Open the integrated terminal</li>
+              <li>3. Run <InlineCode>opencode</InlineCode></li>
+              <li>4. If needed, install the OpenCode extension manually from the VS Code Marketplace</li>
+            </ol>
+          </Panel>
         </section>
 
         <aside className="space-y-6">
-          <DevPanel title="Admin + Neon">
+          <Panel title="OpenCode overview">
             <ul className="space-y-2 text-sm leading-7 text-slate-700">
-              <li>- صفحة الإدارة موجودة في <InlineCode>/admin</InlineCode></li>
-              <li>- الإعدادات تتخزّن في Neon إذا <InlineCode>DATABASE_URL</InlineCode> موجود</li>
-              <li>- الـ API key يتشفر بـ <InlineCode>CONFIG_ENCRYPTION_KEY</InlineCode></li>
-              <li>- الحفظ في /admin يتطلب <InlineCode>ADMIN_PASSWORD</InlineCode></li>
+              <li>- OpenCode is an AI coding agent for terminal and IDE workflows</li>
+              <li>- It works with multiple models and providers</li>
+              <li>- In this setup, it is preconfigured for your Azure deployments</li>
+              <li>- The generated project config already points to the shared skills library</li>
             </ul>
-          </DevPanel>
+          </Panel>
 
-          <DevPanel title="وضعية الـ API key">
+          <Panel title="Token budget">
             <p className="text-sm leading-7 text-slate-700">
-              {config.includeApiKeyInInstaller
-                ? "توّا التنصيب العمومي ينجم يضمّن الـ API key المخزّن. هذا يعني اللي أي واحد يوصل للـ install endpoint ينجم يخرّجو."
-                : "توّا التنصيب العمومي ما يضمّنش الـ API key. المستخدم يكتبو وحدو وقت التنصيب أو يتحط من /admin إذا فعلت الخيار."}
+              Users should assume there is roughly <strong>around $100 of token usage</strong>
+              available for this setup. Heavy usage can consume that budget faster,
+              especially with larger models and long coding sessions.
             </p>
-          </DevPanel>
+          </Panel>
 
-          <DevPanel title="MCP وشنوّة مازال يدوي">
+          <Panel title="MCP and advanced integrations">
             <p className="text-sm leading-7 text-slate-700">
-              OpenCode يدعم MCP servers، أما الـ setup الحالي متاعنا ما يركّب حتى
-              MCP server أوتوماتيكياً. يعني skills جاهزين، أما MCP يلزمك تزيدو
-              وحدك من بعد حسب حاجتك.
+              OpenCode supports MCP servers and advanced integrations, but this
+              installer does not auto-install custom MCP servers. It prepares the
+              main OpenCode setup, Azure models, and shared skills.
             </p>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
-              نفس الشيء لحاجات متقدمة كيف custom tools، rules إضافية، ولا editor
-              integrationات خاصة بخدمة الفريق.
-            </p>
-          </DevPanel>
+          </Panel>
 
-          <DevPanel title="روابط سريعة">
-            <div className="flex flex-wrap justify-end gap-3 text-sm">
-              <DevLink href="/">الرجوع للصفحة الرئيسية</DevLink>
-              <DevLink href="/admin">فتح /admin</DevLink>
-              <DevLink href="https://opencode.ai/docs/ide/">دوك VS Code</DevLink>
+          <Panel title="Quick links">
+            <div className="flex flex-wrap gap-3 text-sm">
+              <NavLink href="/">Back to setup</NavLink>
+              <NavLink href="/admin">Admin</NavLink>
+              <NavLink href="https://opencode.ai/docs/ide/">OpenCode IDE docs</NavLink>
             </div>
-          </DevPanel>
+          </Panel>
         </aside>
       </div>
     </main>
   );
 }
 
-function DevPanel({
+function Panel({
   title,
   children,
 }: {
@@ -147,19 +157,19 @@ function DevPanel({
   );
 }
 
-function DevCode({ children }: { children: string }) {
+function CodeBlock({ children }: { children: string }) {
   return (
-    <pre dir="ltr" className="mb-3 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs leading-6 text-slate-800 last:mb-0">
+    <pre className="mb-3 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-800 last:mb-0">
       <code>{children}</code>
     </pre>
   );
 }
 
-function DevLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a
       href={href}
-      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
     >
       {children}
     </a>
@@ -168,7 +178,7 @@ function DevLink({ href, children }: { href: string; children: React.ReactNode }
 
 function InlineCode({ children }: { children: React.ReactNode }) {
   return (
-    <code dir="ltr" className="rounded bg-slate-100 px-1.5 py-0.5 text-[13px] text-slate-900">
+    <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[13px] text-slate-900">
       {children}
     </code>
   );

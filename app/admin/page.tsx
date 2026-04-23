@@ -11,6 +11,10 @@ export default async function AdminPage({
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap gap-3">
+          <NavLink href="/">Back to setup</NavLink>
+          <NavLink href="/dev">Developer page</NavLink>
+        </div>
         <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">
           Admin
         </p>
@@ -99,5 +103,16 @@ function Field({
         type={type ?? "text"}
       />
     </label>
+  );
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+    >
+      {children}
+    </a>
   );
 }
