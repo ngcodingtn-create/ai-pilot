@@ -120,7 +120,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         <StepperItem step="4" title="ابدأ الخدمة" state={getStepState(currentStep, 4)} />
       </section>
 
-      <div className="mt-6 space-y-6">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
         <StepPanel
           title="اختار السيستام متاعك"
           kicker="الخطوة 1"
@@ -387,7 +387,7 @@ function StepPanel({
   };
 
   return (
-    <section className={`rounded-[2rem] border p-5 shadow-sm sm:p-6 ${tones[tone]} ${state === "locked" ? "opacity-60" : ""}`}>
+    <section className={`h-fit rounded-[2rem] border p-5 shadow-sm sm:p-6 ${tones[tone]} ${state === "locked" ? "opacity-60" : ""}`}>
       <SectionTitle kicker={kicker} title={title} />
       {state === "active" ? (
         children
