@@ -113,7 +113,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         </div>
       </header>
 
-      <section className="mt-6 grid gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
+      <section className="mt-6 grid grid-cols-2 gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-4 sm:p-5">
         <StepperItem step="1" title="اختار السيستام" state={getStepState(currentStep, 1)} />
         <StepperItem step="2" title="نزّل ولا استعمل الطريقة اليدوية" state={getStepState(currentStep, 2)} />
         <StepperItem step="3" title="افتح VS Code" state={getStepState(currentStep, 3)} />
@@ -353,12 +353,12 @@ function StepperItem({
   };
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${styles[state]}`}>
+    <div className={`flex min-h-24 flex-col justify-between rounded-2xl border px-4 py-3 ${styles[state]}`}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-semibold">الخطوة {step}</p>
         <span className="text-[11px] font-semibold">{labels[state]}</span>
       </div>
-      <p className="mt-1 text-sm font-medium">{title}</p>
+      <p className="mt-3 text-sm font-medium leading-6">{title}</p>
     </div>
   );
 }
