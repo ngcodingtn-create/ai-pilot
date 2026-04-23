@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OpenCode Azure Setup Guide",
+  title: "AI Pilot | حضّر OpenCode بسهولة",
   description:
-    "Step-by-step setup guide for OpenCode with Azure OpenAI and VS Code.",
+    "بوابة تنصيب OpenCode بخطوات بسيطة، مع صفحة خاصة بالديفلوبر وشرح VS Code.",
 };
 
 export default function RootLayout({
@@ -24,10 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+      <html lang="ar" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

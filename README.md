@@ -1,8 +1,9 @@
 This project is a hosted OpenCode setup portal with:
 
 - one-command installers for Windows, Linux, and macOS
-- a public setup page at `https://ai-pilot-five.vercel.app`
+- a public setup page at `https://ai-pilot-ten.vercel.app`
 - an admin page at `/admin` for saving Azure config server-side
+- a developer page at `/dev` for the full technical setup details
 - optional Neon-backed encrypted storage for installer configuration
 
 ## Local Development
@@ -21,7 +22,7 @@ bun dev
 
 Open `http://localhost:3000` locally, or use the deployed site:
 
-- `https://ai-pilot-five.vercel.app`
+- `https://ai-pilot-ten.vercel.app`
 
 Main files:
 
@@ -38,7 +39,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 - `DATABASE_URL` - Neon connection string
 - `CONFIG_ENCRYPTION_KEY` - used to encrypt stored API keys
 - `ADMIN_PASSWORD` - required on `/admin` saves
-- `NEXT_PUBLIC_SITE_URL` - set to `https://ai-pilot-five.vercel.app`
+- `NEXT_PUBLIC_SITE_URL` - set to `https://ai-pilot-ten.vercel.app`
 - `NEXT_PUBLIC_AZURE_RESOURCE_NAME` - optional default resource name
 - `NEXT_PUBLIC_DEFAULT_DEPLOYMENT` - optional default deployment
 
@@ -50,19 +51,19 @@ If not, the app falls back to env/default values.
 Windows:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "irm https://ai-pilot-five.vercel.app/api/install/windows | iex"
+powershell -ExecutionPolicy Bypass -Command "irm https://ai-pilot-ten.vercel.app/api/install/windows | iex"
 ```
 
 Linux:
 
 ```bash
-curl -fsSL https://ai-pilot-five.vercel.app/api/install/linux | bash
+curl -fsSL https://ai-pilot-ten.vercel.app/api/install/linux | bash
 ```
 
 macOS:
 
 ```bash
-curl -fsSL https://ai-pilot-five.vercel.app/api/install/macos | bash
+curl -fsSL https://ai-pilot-ten.vercel.app/api/install/macos | bash
 ```
 
 The public install flow can either:

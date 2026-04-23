@@ -163,4 +163,6 @@ Write-Host "  opencode -m azure/gpt-5.4-1"
 Write-Host "  opencode -m azure/gpt-5.3-codex"
 Write-Host "  opencode -m azure/gpt-5.4-pro"
 Write-Host "  opencode -m azure-chat/Kimi-K2.6"
+Write-Host "VS Code tip: open this folder in VS Code, open the integrated terminal, and run: opencode" -ForegroundColor Cyan
+Write-Host "The OpenCode VS Code extension installs automatically the first time you do that." -ForegroundColor Cyan
 Write-Host "Note: restart terminal once to load persistent vars from setx." -ForegroundColor Yellow
