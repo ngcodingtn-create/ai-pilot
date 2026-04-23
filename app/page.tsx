@@ -1,4 +1,9 @@
-export default function Home() {
+import { getStoredConfig } from "@/lib/config-store";
+
+export default async function Home() {
+  const config = await getStoredConfig();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-pilot-five.vercel.app";
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
       <header className="rounded-3xl border border-sky-200 bg-linear-to-br from-sky-50 to-white p-6 shadow-sm">
@@ -16,6 +21,12 @@ export default function Home() {
           <Badge tone="blue">Beginner friendly</Badge>
           <Badge tone="emerald">Scripts included</Badge>
           <Badge tone="violet">Shared skills loaded</Badge>
+          <a
+            className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700 hover:bg-slate-50"
+            href="/admin"
+          >
+            Admin
+          </a>
         </div>
       </header>
 
@@ -31,21 +42,21 @@ export default function Home() {
             <div className="grid gap-4 md:grid-cols-3">
               <StepCard
                 title="Windows"
-                command={'powershell -ExecutionPolicy Bypass -Command "irm http://localhost:3000/api/install/windows | iex"'}
+                command={`powershell -ExecutionPolicy Bypass -Command "irm ${siteUrl}/api/install/windows | iex"`}
                 downloadHref="/api/download/windows"
                 downloadLabel="Download .ps1 instead"
                 tone="blue"
               />
               <StepCard
                 title="Linux"
-                command="curl -fsSL http://localhost:3000/api/install/linux | bash"
+                command={`curl -fsSL ${siteUrl}/api/install/linux | bash`}
                 downloadHref="/api/download/linux"
                 downloadLabel="Download .sh instead"
                 tone="emerald"
               />
               <StepCard
                 title="macOS"
-                command="curl -fsSL http://localhost:3000/api/install/macos | bash"
+                command={`curl -fsSL ${siteUrl}/api/install/macos | bash`}
                 downloadHref="/api/download/macos"
                 downloadLabel="Download .sh instead"
                 tone="violet"
@@ -56,7 +67,11 @@ export default function Home() {
               The installer will:
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 <li>install OpenCode if missing</li>
-                <li>ask for your Azure API key</li>
+                <li>
+                  {config.includeApiKeyInInstaller
+                    ? "use the stored Azure API key automatically"
+                    : "ask for your Azure API key"}
+                </li>
                 <li>write <InlineCode>opencode.json</InlineCode> in the current project</li>
                 <li>write <InlineCode>.opencode/config.json</InlineCode></li>
                 <li>clone shared skills repos</li>
@@ -93,9 +108,11 @@ export default function Home() {
           <Panel title="What is already configured" tone="slate">
             <ul className="space-y-2 text-sm leading-7 text-slate-700">
               <li>
-                Azure resource: <InlineCode>admin-3342-resource</InlineCode>
+                Azure resource: <InlineCode>{config.azureResourceName}</InlineCode>
               </li>
-              <li>Models: GPT-5.4-1, GPT-5.3-Codex, GPT-5.4-Pro</li>
+              <li>
+                Models: {config.azureDefaultDeployment}, GPT-5.3-Codex, GPT-5.4-Pro
+              </li>
               <li>
                 Kimi path: <InlineCode>azure-chat/Kimi-K2.6</InlineCode>
               </li>
@@ -106,9 +123,9 @@ export default function Home() {
 
         <aside className="space-y-6">
           <Panel title="Quick facts" tone="slate">
-            <Fact label="Default model" value="azure/gpt-5.4-1" />
+            <Fact label="Default model" value={`azure/${config.azureDefaultDeployment}`} />
             <Fact label="Kimi model" value="azure-chat/Kimi-K2.6" />
-            <Fact label="Resource" value="admin-3342-resource" />
+            <Fact label="Resource" value={config.azureResourceName} />
           </Panel>
 
           <Panel title="Why Kimi uses a different provider" tone="violet">
@@ -144,9 +161,9 @@ export default function Home() {
 
           <Panel title="Security note" tone="amber">
             <p className="text-sm leading-7 text-slate-700">
-              The installer prompts for the API key and writes it into the local
-              project config. For team rollout, rotate keys regularly and prefer
-              managed secrets or environment variables.
+              {config.includeApiKeyInInstaller
+                ? "The installer currently injects the stored API key. Anyone who can access the install endpoint can retrieve it."
+                : "The installer prompts for the API key and writes it into the local project config."}
             </p>
           </Panel>
         </aside>
@@ -257,6 +274,7 @@ function DownloadLink({ href, label }: { href: string; label: string }) {
     <a
       className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
       href={href}
+      download
     >
       {label}
     </a>

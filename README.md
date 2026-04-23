@@ -1,6 +1,11 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This project is a hosted OpenCode setup portal with:
 
-## Getting Started
+- one-command installers for Windows, Linux, and macOS
+- a public setup page at `https://ai-pilot-five.vercel.app`
+- an admin page at `/admin` for saving Azure config server-side
+- optional Neon-backed encrypted storage for installer configuration
+
+## Local Development
 
 First, run the development server:
 
@@ -14,23 +19,53 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000` locally, or use the deployed site:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `https://ai-pilot-five.vercel.app`
+
+Main files:
+
+- `app/page.tsx` - public setup guide
+- `app/admin/page.tsx` - admin configuration UI
+- `app/api/install/*` - one-command installer endpoints
+- `app/api/download/*` - downloadable scripts
+- `setup/` - script templates served by the app
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+## Vercel Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+- `DATABASE_URL` - Neon connection string
+- `CONFIG_ENCRYPTION_KEY` - used to encrypt stored API keys
+- `ADMIN_PASSWORD` - required on `/admin` saves
+- `NEXT_PUBLIC_SITE_URL` - set to `https://ai-pilot-five.vercel.app`
+- `NEXT_PUBLIC_AZURE_RESOURCE_NAME` - optional default resource name
+- `NEXT_PUBLIC_DEFAULT_DEPLOYMENT` - optional default deployment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+If `DATABASE_URL` is configured, `/admin` stores installer settings in Neon.
+If not, the app falls back to env/default values.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Install Commands
 
-## Deploy on Vercel
+Windows:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```powershell
+powershell -ExecutionPolicy Bypass -Command "irm https://ai-pilot-five.vercel.app/api/install/windows | iex"
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Linux:
+
+```bash
+curl -fsSL https://ai-pilot-five.vercel.app/api/install/linux | bash
+```
+
+macOS:
+
+```bash
+curl -fsSL https://ai-pilot-five.vercel.app/api/install/macos | bash
+```
+
+The public install flow can either:
+
+- prompt the user for the Azure API key
+- or inject the stored key if enabled in `/admin`
