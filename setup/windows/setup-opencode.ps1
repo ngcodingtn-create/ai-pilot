@@ -96,15 +96,24 @@ $ProjectConfig = @"
       "models": {
         "gpt-5.4-1": {
           "id": "gpt-5.4-1",
-          "name": "GPT-5.4-1 (Azure deployment)"
+          "name": "GPT-5.4-1 (Azure deployment, xhigh)",
+          "options": {
+            "reasoningEffort": "xhigh"
+          }
         },
         "gpt-5.3-codex": {
           "id": "gpt-5.3-codex",
-          "name": "GPT-5.3-Codex (Azure deployment)"
+          "name": "GPT-5.3-Codex (Azure deployment, xhigh)",
+          "options": {
+            "reasoningEffort": "xhigh"
+          }
         },
         "gpt-5.4-pro": {
           "id": "gpt-5.4-pro",
-          "name": "GPT-5.4-Pro (Azure deployment)"
+          "name": "GPT-5.4-Pro (Azure deployment, xhigh)",
+          "options": {
+            "reasoningEffort": "xhigh"
+          }
         }
       },
       "env": ["AZURE_RESOURCE_NAME", "AZURE_OPENAI_API_KEY"]

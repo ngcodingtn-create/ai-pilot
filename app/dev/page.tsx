@@ -1,4 +1,5 @@
 import { getStoredConfig } from "@/lib/config-store";
+import { normalizeSiteUrl } from "@/lib/site-url";
 
 const SKILL_GROUPS = [
   "anthropic-skills/skills",
@@ -15,7 +16,9 @@ const SKILL_GROUPS = [
 
 export default async function DevPage() {
   const config = await getStoredConfig();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-pilot-ten.vercel.app";
+  const siteUrl = normalizeSiteUrl(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-pilot-ten.vercel.app",
+  );
 
   return (
     <main dir="ltr" className="mx-auto w-full max-w-6xl px-4 py-8 text-left sm:px-6 lg:px-8">
@@ -64,6 +67,9 @@ export default async function DevPage() {
               </li>
               <li>
                 - Additional deployments: <InlineCode>gpt-5.3-codex</InlineCode> and <InlineCode>gpt-5.4-pro</InlineCode>
+              </li>
+              <li>
+                - Reasoning mode for all Azure GPT deployments: <InlineCode>xhigh</InlineCode>
               </li>
               <li>
                 - Kimi path: <InlineCode>azure-chat/Kimi-K2.6</InlineCode>
