@@ -389,6 +389,133 @@ async function commandExists(command) {
   }
 }
 
+async function runPowerShell(script) {
+  return runCommand("powershell", ["-NoProfile", "-Command", script]);
+}
+
+async function installWingetPackage(id, logs, options = {}) {
+  ensureCommandOrThrow(
+    await commandExists("winget"),
+    "winget est requis sur Windows pour installer cette application.",
+  );
+
+  const args = ["install", "-e", "--id", id];
+  if (options.source) {
+    args.push("--source", options.source);
+  }
+  args.push(
+    "--accept-package-agreements",
+    "--accept-source-agreements",
+    "--disable-interactivity",
+  );
+
+  logs.push(`Installation via winget: ${id}`);
+  await runCommand("winget", args);
+}
+
+async function getWindowsStartApps() {
+  if (process.platform !== "win32") {
+    return [];
+  }
+
+  try {
+    const { stdout } = await runPowerShell(
+      "Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress",
+    );
+    const parsed = JSON.parse(stdout.trim() || "[]");
+    return Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  } catch {
+    return [];
+  }
+}
+
+async function findWindowsStartApp(nameCandidates) {
+  const apps = await getWindowsStartApps();
+  const normalizedApps = apps.map((app) => ({
+    name: String(app?.Name ?? ""),
+    appId: String(app?.AppID ?? ""),
+    raw: app,
+  }));
+
+  for (const candidate of nameCandidates) {
+    const exact = normalizedApps.find(
+      (app) => app.name.toLowerCase() === candidate.toLowerCase(),
+    );
+    if (exact) {
+      return exact.raw;
+    }
+  }
+
+  for (const candidate of nameCandidates) {
+    const partial = normalizedApps.find((app) =>
+      app.name.toLowerCase().includes(candidate.toLowerCase()),
+    );
+    if (partial) {
+      return partial.raw;
+    }
+  }
+
+  return null;
+}
+
+async function launchWindowsStartApp(appId) {
+  await runPowerShell(`Start-Process "shell:AppsFolder\\${appId}"`);
+}
+
+async function launchMacApplication(nameCandidates) {
+  for (const candidate of nameCandidates) {
+    try {
+      await runCommand("open", ["-a", candidate]);
+      return true;
+    } catch {
+      // Try next candidate
+    }
+  }
+
+  return false;
+}
+
+async function macApplicationExists(nameCandidates) {
+  for (const candidate of nameCandidates) {
+    const roots = [
+      path.join("/Applications", `${candidate}.app`),
+      path.join(os.homedir(), "Applications", `${candidate}.app`),
+    ];
+
+    for (const root of roots) {
+      if (await fileExists(root)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+async function isDesktopAppInstalled(environment) {
+  if (process.platform === "win32") {
+    if (environment === "codex") {
+      return Boolean(await findWindowsStartApp(["Codex"]));
+    }
+    if (environment === "t3code") {
+      return Boolean(await findWindowsStartApp(["T3 Code"]));
+    }
+    return Boolean(await findWindowsStartApp(["OpenCode"]));
+  }
+
+  if (process.platform === "darwin") {
+    if (environment === "codex") {
+      return macApplicationExists(["Codex"]);
+    }
+    if (environment === "t3code") {
+      return macApplicationExists(["T3 Code"]);
+    }
+    return macApplicationExists(["OpenCode"]);
+  }
+
+  return false;
+}
+
 async function updateShellFile(filePath, exportsMap) {
   let current = "";
 
@@ -524,7 +651,39 @@ function ensureCommandOrThrow(available, message) {
 }
 
 async function installCodex(logs) {
-  if (await commandExists("codex")) {
+  if (process.platform === "win32") {
+    if (!(await isDesktopAppInstalled("codex"))) {
+      try {
+        await installWingetPackage("9PLM9XGG6VKS", logs, { source: "msstore" });
+      } catch (error) {
+        logs.push(
+          `L'app Codex Windows n'a pas pu être installée automatiquement. ${
+            error instanceof Error ? error.message : ""
+          }`.trim(),
+        );
+      }
+    } else {
+      logs.push("L'app Codex Windows est déjà disponible.");
+    }
+
+    if (await commandExists("codex")) {
+      logs.push("Codex CLI est déjà disponible.");
+      return;
+    }
+
+    try {
+      await installWingetPackage("OpenAI.Codex", logs);
+      if (await commandExists("codex")) {
+        return;
+      }
+    } catch (error) {
+      logs.push(
+        `winget n'a pas terminé l'installation de Codex CLI. Fallback npm: ${
+          error instanceof Error ? error.message : ""
+        }`.trim(),
+      );
+    }
+  } else if (await commandExists("codex")) {
     logs.push("Codex CLI est déjà disponible.");
     return;
   }
@@ -561,12 +720,35 @@ async function installCodex(logs) {
 async function installT3Code(logs) {
   await installCodex(logs);
 
-  if (await commandExists("t3")) {
-    logs.push("La commande t3 est déjà disponible.");
-    return;
-  }
-
   if (process.platform === "win32" && (await commandExists("winget"))) {
+    if (!(await isDesktopAppInstalled("t3code"))) {
+      try {
+        logs.push("Installation de l'app T3 Code via winget...");
+        await runCommand("winget", [
+          "install",
+          "-e",
+          "--id",
+          "T3Tools.T3Code",
+          "--accept-package-agreements",
+          "--accept-source-agreements",
+          "--disable-interactivity",
+        ]);
+      } catch (error) {
+        logs.push(
+          `winget n'a pas terminé l'installation de l'app T3 Code. ${
+            error instanceof Error ? error.message : ""
+          }`.trim(),
+        );
+      }
+    } else {
+      logs.push("L'app T3 Code Windows est déjà disponible.");
+    }
+
+    if (await commandExists("t3")) {
+      logs.push("La commande t3 est déjà disponible.");
+      return;
+    }
+
     try {
       logs.push("Installation de T3 Code via winget...");
       await runCommand("winget", [
@@ -592,7 +774,7 @@ async function installT3Code(logs) {
       logs.push("Installation de T3 Code via Homebrew...");
       await runCommand("brew", ["install", "--cask", "t3-code"], {
         cwd: os.homedir(),
-      });
+        });
     } catch (error) {
       logs.push(
         `Homebrew n'a pas terminé l'installation de T3 Code. Le fallback npx restera disponible. ${
@@ -602,6 +784,11 @@ async function installT3Code(logs) {
     }
   }
 
+  if (await commandExists("t3")) {
+    logs.push("La commande t3 est déjà disponible.");
+    return;
+  }
+
   ensureCommandOrThrow(
     (await commandExists("t3")) || (await commandExists("npx")),
     "T3 Code nécessite soit une commande t3 locale, soit npx.",
@@ -609,9 +796,56 @@ async function installT3Code(logs) {
 }
 
 async function installOpenCode(logs) {
-  if (await commandExists("opencode")) {
+  if (process.platform === "win32") {
+    if (!(await isDesktopAppInstalled("opencode"))) {
+      try {
+        await installWingetPackage("SST.OpenCodeDesktop", logs);
+      } catch (error) {
+        logs.push(
+          `L'app OpenCode Windows n'a pas pu être installée automatiquement. ${
+            error instanceof Error ? error.message : ""
+          }`.trim(),
+        );
+      }
+    } else {
+      logs.push("L'app OpenCode Windows est déjà disponible.");
+    }
+
+    if (await commandExists("opencode")) {
+      logs.push("La commande OpenCode est déjà disponible.");
+      return;
+    }
+
+    try {
+      await installWingetPackage("SST.opencode", logs);
+      if (await commandExists("opencode")) {
+        return;
+      }
+    } catch (error) {
+      logs.push(
+        `winget n'a pas terminé l'installation d'OpenCode CLI. Fallback npm: ${
+          error instanceof Error ? error.message : ""
+        }`.trim(),
+      );
+    }
+  } else if (await commandExists("opencode")) {
     logs.push("OpenCode est déjà disponible.");
     return;
+  }
+
+  if (process.platform === "darwin" && (await commandExists("brew"))) {
+    try {
+      logs.push("Tentative d'installation de l'app OpenCode via Homebrew...");
+      await runCommand("brew", ["install", "--cask", "opencode"], {
+        cwd: os.homedir(),
+      });
+    } catch (error) {
+      logs.push(
+        `Le cask OpenCode n'a pas été installé automatiquement. Le CLI sera quand même configuré. ${
+          error instanceof Error ? error.message : ""
+        }`.trim(),
+      );
+    }
   }
 
   ensureCommandOrThrow(
@@ -637,6 +871,39 @@ async function installTool(manifest, logs) {
   }
 
   await installOpenCode(logs);
+}
+
+async function tryLaunchDesktopApp(environment, logs) {
+  if (process.platform === "win32") {
+    const startApp =
+      environment === "codex"
+        ? await findWindowsStartApp(["Codex"])
+        : environment === "t3code"
+          ? await findWindowsStartApp(["T3 Code"])
+          : await findWindowsStartApp(["OpenCode"]);
+
+    if (startApp?.AppID) {
+      logs.push(`Ouverture de l'app desktop ${startApp.Name}...`);
+      await launchWindowsStartApp(startApp.AppID);
+      return true;
+    }
+  }
+
+  if (process.platform === "darwin") {
+    const names =
+      environment === "codex"
+        ? ["Codex"]
+        : environment === "t3code"
+          ? ["T3 Code"]
+          : ["OpenCode"];
+
+    if (await launchMacApplication(names)) {
+      logs.push(`Ouverture de l'app desktop ${names[0]}...`);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function getLaunchCommand(environment) {
@@ -674,6 +941,7 @@ async function buildDiagnostics(manifest, projectRoot) {
   const t3Available = await commandExists("t3");
   const npxAvailable = await commandExists("npx");
   const opencodeAvailable = await commandExists("opencode");
+  const desktopAppAvailable = await isDesktopAppInstalled(manifest.tool.environment);
   const codexConfigPath = getCodexConfigPath();
   const openCodeGlobalConfigPath = getOpenCodeGlobalConfigPath();
   const openCodeAuthPath = getOpenCodeAuthPath();
@@ -703,6 +971,12 @@ async function buildDiagnostics(manifest, projectRoot) {
 
     checks.push(
       {
+        label: "App OpenCode",
+        ok: desktopAppAvailable,
+        optional: true,
+        details: desktopAppAvailable ? "Installée" : "CLI uniquement pour l'instant",
+      },
+      {
         label: "Commande OpenCode",
         ok: opencodeAvailable,
         optional: false,
@@ -725,6 +999,12 @@ async function buildDiagnostics(manifest, projectRoot) {
     );
   } else {
     checks.push(
+      {
+        label: manifest.tool.environment === "codex" ? "App Codex" : "App T3 Code",
+        ok: desktopAppAvailable,
+        optional: true,
+        details: desktopAppAvailable ? "Installée" : "CLI uniquement pour l'instant",
+      },
       {
         label: "Commande Codex",
         ok: codexAvailable,
@@ -786,6 +1066,10 @@ async function configureTool(manifest, projectRoot, logs) {
 }
 
 async function launchTool(manifest, projectRoot, logs) {
+  if (await tryLaunchDesktopApp(manifest.tool.environment, logs)) {
+    return;
+  }
+
   const launchCommand = await getLaunchCommand(manifest.tool.environment);
   const [command, ...args] = launchCommand;
   const cwd = projectRoot || os.homedir();
