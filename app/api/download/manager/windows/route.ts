@@ -1,4 +1,4 @@
-import { normalizeSiteUrl } from "@/lib/site-url";
+import { resolveSiteUrlFromRequest } from "@/lib/site-url";
 import {
   downloadBinaryArtifact,
   downloadTextFile,
@@ -32,7 +32,8 @@ export async function GET(request: Request) {
     return downloadBinaryArtifact(packagedArtifact);
   }
 
-  const siteUrl = normalizeSiteUrl(
+  const siteUrl = resolveSiteUrlFromRequest(
+    request.url,
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-pilot-ten.vercel.app",
   );
   const { searchParams } = new URL(request.url);

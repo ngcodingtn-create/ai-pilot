@@ -41,6 +41,7 @@ If you deploy this app on Vercel, set these environment variables:
 - `CONFIG_ENCRYPTION_KEY` - used to encrypt stored API keys
 - `ADMIN_PASSWORD` - password required on `/admin`
 - `NEXT_PUBLIC_SITE_URL` - public site URL, e.g. `https://ai-pilot-ten.vercel.app`
+- `MANAGER_UPDATE_URL` - optional Electron release feed URL
 
 Then open `/admin` to save:
 
@@ -48,5 +49,7 @@ Then open `/admin` to save:
 - default deployment
 - Azure API key
 - whether installer endpoints should include the API key automatically
+- support video URL
+- manager update URL
 
 If `DATABASE_URL` is not set, local saves fall back to `.opencode/portal-config.json` on that machine.

@@ -49,6 +49,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 - `NEXT_PUBLIC_SITE_URL` - set to `https://ai-pilot-ten.vercel.app`
 - `NEXT_PUBLIC_AZURE_RESOURCE_NAME` - optional default resource name
 - `NEXT_PUBLIC_DEFAULT_DEPLOYMENT` - optional default deployment
+- `MANAGER_UPDATE_URL` - optional release feed URL for Electron auto-updates
 
 If `DATABASE_URL` is configured, `/admin` stores installer settings in Neon.
 If not, the app falls back to `.opencode/portal-config.json` locally, seeded by env/default values.
@@ -86,6 +87,8 @@ npm run dist:mac
 ```
 
 The repo also includes a GitHub Actions workflow at `.github/workflows/build-aipilot-manager.yml` to build native artifacts on Windows, Ubuntu, and macOS runners.
+
+If you want Electron auto-updates in production, configure `MANAGER_UPDATE_URL` or set the same value from `/admin` in the "URL des mises à jour du manager" field.
 
 The public install flow can either:
 
