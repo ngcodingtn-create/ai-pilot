@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const environment = readEnvironment(searchParams.get("environment"));
   const licenseKey = readLicenseKey(searchParams.get("licenseKey"));
   const releaseAsset = await findManagerReleaseAsset((asset) =>
-    /^AIPilot Manager-Setup-.*-x64\.exe$/i.test(asset.name),
+    /^AIPilot[- ]Manager-Setup-.*-x64\.exe$/i.test(asset.name),
   );
   const installerUrl =
     releaseAsset?.browser_download_url ??
