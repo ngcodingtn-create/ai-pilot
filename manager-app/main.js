@@ -924,7 +924,9 @@ async function setWindowsEnvironmentVariables(vars, logs) {
 
   for (const [name, value] of Object.entries(vars)) {
     logs.push(`Mise à jour de la variable utilisateur ${name}`);
-    await runCommand("setx", [name, value]);
+    await runPowerShell(
+      `[System.Environment]::SetEnvironmentVariable('${escapePowerShellSingleQuoted(name)}', '${escapePowerShellSingleQuoted(value)}', 'User')`,
+    );
   }
 
   await writeFileWithDirs(scriptPath, `${scriptContent}\r\n`);
