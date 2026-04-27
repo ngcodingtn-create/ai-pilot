@@ -105,10 +105,10 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       label: "T3 Code",
       projectRootRecommended: false,
       notes: [
-        "Installez d'abord l'app desktop T3 Code officielle. Ensuite AIPilot vérifie sa présence, prépare Codex CLI comme prérequis et injecte la configuration Azure.",
+        "Installez d'abord l'app desktop T3 Code officielle depuis t3.codes. Ensuite AIPilot vérifie sa présence, prépare Codex CLI comme prérequis et injecte la configuration Azure.",
         "Si le binaire T3 local n'est pas disponible, le manager peut lancer le fallback officiel via npx.",
       ],
-      officialAppUrl: "https://github.com/pingdotgg/t3code/releases",
+      officialAppUrl: "https://t3.codes/",
       officialCliUrl: "https://github.com/openai/codex/releases",
     };
   }
