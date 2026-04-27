@@ -3,6 +3,7 @@ name: Publish AIPilot Manager
 on:
   push:
     tags:
+      - "v*"
       - "manager-v*"
 
 permissions:
@@ -16,9 +17,6 @@ jobs:
     defaults:
       run:
         working-directory: manager-app
-
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -34,5 +32,16 @@ jobs:
       - name: Install manager dependencies
         run: npm ci
 
-      - name: Publish release artifacts
-        run: npm run release:win
+      - name: Build Windows release artifacts
+        run: npm run dist:win
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            manager-app/dist/AIPilot Manager-Setup-*.exe
+            manager-app/dist/AIPilot Manager-Setup-*.exe.blockmap
+            manager-app/dist/latest.yml
