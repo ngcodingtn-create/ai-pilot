@@ -10,37 +10,108 @@ export type HomeConfig = {
 };
 
 type OsKey = "windows" | "linux" | "macos";
+type EnvironmentKey = "codex" | "t3code" | "opencode";
+type PersistedState = {
+  currentStep?: number;
+  licenseKey?: string;
+  selectedEnvironment?: EnvironmentKey;
+  selectedOs?: OsKey;
+};
+
+type LicenseValidation =
+  | {
+      status: "idle" | "checking";
+      customerName?: undefined;
+      message?: undefined;
+      preferredEnvironment?: undefined;
+      tier?: undefined;
+    }
+  | {
+      status: "valid";
+      customerName?: string;
+      message?: string;
+      preferredEnvironment?: EnvironmentKey;
+      tier?: string;
+    }
+  | {
+      status: "invalid" | "error";
+      customerName?: undefined;
+      message?: string;
+      preferredEnvironment?: undefined;
+      tier?: undefined;
+    };
 
 const STORAGE_KEY = "ai-pilot-home-state";
 const TOTAL_STEPS = 4;
+const LICENSE_KEY_LENGTH = 16;
+const LICENSE_PATTERN = /^[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}$/;
 
 export default function HomeClient({ config }: { config: HomeConfig }) {
   const [selectedOs, setSelectedOs] = useState<OsKey>("windows");
+  const [selectedEnvironment, setSelectedEnvironment] =
+    useState<EnvironmentKey>("opencode");
+  const [licenseKey, setLicenseKey] = useState("");
+  const [licenseValidation, setLicenseValidation] = useState<LicenseValidation>({
+    status: "idle",
+  });
+  const [detectedOs, setDetectedOs] = useState<OsKey | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isReady, setIsReady] = useState(false);
-  const options = getOsOptions(config.siteUrl);
-  const current = options[selectedOs];
+
+  const osOptions = getOsOptions();
+  const environmentOptions = getEnvironmentOptions();
+  const currentOs = osOptions[selectedOs];
+  const currentEnvironment = environmentOptions[selectedEnvironment];
+  const normalizedLicenseKey = normalizeLicenseKey(licenseKey);
+  const isLicenseFormatValid = LICENSE_PATTERN.test(normalizedLicenseKey);
+  const isLicenseVerified = licenseValidation.status === "valid";
+  const canAdvance = canAdvanceFromStep(currentStep, isLicenseVerified, selectedEnvironment);
+  const currentDownloadHref = buildManagerDownloadHref(
+    currentOs.downloadHref,
+    normalizedLicenseKey,
+    selectedEnvironment,
+  );
+  const currentDownloadCommand = buildManagerDownloadCommand(
+    selectedOs,
+    config.siteUrl,
+    currentOs.downloadHref,
+    normalizedLicenseKey,
+    selectedEnvironment,
+  );
 
   useEffect(() => {
+    const fallbackOs = detectOs(window.navigator.userAgent);
+
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       window.requestAnimationFrame(() => {
+        setDetectedOs(fallbackOs);
+        setSelectedOs(fallbackOs);
         setIsReady(true);
       });
       return;
     }
 
     try {
-      const parsed = JSON.parse(raw) as { selectedOs?: OsKey; currentStep?: number };
+      const parsed = JSON.parse(raw) as PersistedState;
 
       window.requestAnimationFrame(() => {
-        if (
+        setDetectedOs(fallbackOs);
+        setSelectedOs(
           parsed.selectedOs === "windows" ||
-          parsed.selectedOs === "linux" ||
-          parsed.selectedOs === "macos"
-        ) {
-          setSelectedOs(parsed.selectedOs);
-        }
+            parsed.selectedOs === "linux" ||
+            parsed.selectedOs === "macos"
+            ? parsed.selectedOs
+            : fallbackOs,
+        );
+        setSelectedEnvironment(
+          parsed.selectedEnvironment === "codex" ||
+            parsed.selectedEnvironment === "t3code" ||
+            parsed.selectedEnvironment === "opencode"
+            ? parsed.selectedEnvironment
+            : "opencode",
+        );
+        setLicenseKey(normalizeLicenseKey(parsed.licenseKey ?? ""));
         if (typeof parsed.currentStep === "number") {
           setCurrentStep(Math.min(Math.max(parsed.currentStep, 1), TOTAL_STEPS));
         }
@@ -49,6 +120,8 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
       window.requestAnimationFrame(() => {
+        setDetectedOs(fallbackOs);
+        setSelectedOs(fallbackOs);
         setIsReady(true);
       });
     }
@@ -57,13 +130,92 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
   useEffect(() => {
     if (!isReady) return;
 
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ selectedOs, currentStep }),
-    );
-  }, [currentStep, isReady, selectedOs]);
+    const state: PersistedState = {
+      currentStep,
+      licenseKey: normalizedLicenseKey,
+      selectedEnvironment,
+      selectedOs,
+    };
+
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [currentStep, isReady, normalizedLicenseKey, selectedEnvironment, selectedOs]);
+
+  useEffect(() => {
+    if (!normalizedLicenseKey || !isLicenseFormatValid) {
+      window.requestAnimationFrame(() => {
+        setLicenseValidation({ status: "idle" });
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setLicenseValidation({ status: "checking" });
+
+      try {
+        const response = await fetch("/api/licenses/validate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ licenseKey: normalizedLicenseKey }),
+          signal: controller.signal,
+        });
+
+        const payload = (await response.json()) as {
+          customerName?: string;
+          message?: string;
+          preferredEnvironment?: EnvironmentKey;
+          tier?: string;
+          valid?: boolean;
+        };
+
+        if (!response.ok || !payload.valid) {
+          setLicenseValidation({
+            status: "invalid",
+            message: payload.message ?? "Licence introuvable ou désactivée.",
+          });
+          return;
+        }
+
+        if (
+          payload.preferredEnvironment === "codex" ||
+          payload.preferredEnvironment === "t3code" ||
+          payload.preferredEnvironment === "opencode"
+        ) {
+          setSelectedEnvironment(payload.preferredEnvironment);
+        }
+
+        setLicenseValidation({
+          status: "valid",
+          customerName: payload.customerName,
+          message: "Licence reconnue avec succès.",
+          preferredEnvironment: payload.preferredEnvironment,
+          tier: payload.tier,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setLicenseValidation({
+          status: "error",
+          message:
+            error instanceof Error
+              ? "Impossible de vérifier la licence pour le moment."
+              : "Erreur de vérification de licence.",
+        });
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [isLicenseFormatValid, normalizedLicenseKey]);
 
   function nextStep() {
+    if (!canAdvance) return;
     setCurrentStep((prev) => Math.min(prev + 1, TOTAL_STEPS));
   }
 
@@ -72,326 +224,449 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
   }
 
   function resetSteps() {
-    setSelectedOs("windows");
-    setCurrentStep(1);
     window.localStorage.removeItem(STORAGE_KEY);
+    setSelectedOs(detectedOs ?? "windows");
+    setSelectedEnvironment("opencode");
+    setLicenseKey("");
+    setCurrentStep(1);
+  }
+
+  function selectEnvironment(environment: EnvironmentKey) {
+    setSelectedEnvironment(environment);
+    if (currentStep < 3) {
+      setCurrentStep(3);
+    }
   }
 
   return (
-    <main dir="rtl" className="mx-auto w-full max-w-6xl px-4 py-8 text-right sm:px-6 lg:px-8">
-      <header className="rounded-[2.25rem] border border-sky-200 bg-linear-to-br from-sky-100 via-white to-emerald-50 p-6 shadow-sm sm:p-8">
-        <p className="text-sm font-semibold text-sky-700">AI Pilot</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">
-          ركّب OpenCode خطوة بخطوة ومن غير تعقيد
-        </h1>
-        <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700">
-          هالصفحة معمولة للناس اللي تحب تشوف خطوة واحدة واضحة كل مرة. اختار
-          السيستام، كمّل التنصيب، وبعدها استعمل OpenCode داخل VS Code ولا من
-          التيرمينال.
-        </p>
+    <main
+      dir="ltr"
+      className="mx-auto w-full max-w-7xl px-4 py-8 text-left sm:px-6 lg:px-8"
+    >
+      <header className="overflow-hidden rounded-[2.5rem] border border-slate-200 bg-[radial-gradient(circle_at_top_right,_rgba(14,165,233,0.18),_transparent_35%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.14),_transparent_30%),linear-gradient(135deg,#ffffff_0%,#f8fafc_52%,#eefbf5_100%)] p-6 shadow-[0_28px_80px_rgba(15,23,42,0.08)] sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.22em] text-sky-700">
+              AIPILOT
+            </p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+              Portail de téléchargement AIPilot pour les développeurs en Tunisie
+            </h1>
+            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700">
+              Choisissez votre système, entrez votre clé de licence, sélectionnez
+              l’environnement qui vous convient, puis téléchargez l’installateur
+              adapté. L’objectif: accéder à des outils de coding IA de niveau
+              mondial, payables en dinars via D17, avec une configuration Azure
+              prête dès le départ.
+            </p>
+          </div>
 
-        <div className="mt-5 flex flex-wrap justify-end gap-2 text-sm">
-          <Badge tone="blue">ساهلة لغير التقنيين</Badge>
-          <Badge tone="emerald">يشبه Claude Code</Badge>
-          <Badge tone="violet">موديلات Azure جاهزين</Badge>
+          <div className="rounded-[1.75rem] border border-white/70 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
+            <p className="text-xs font-semibold text-slate-500">Modèle par défaut</p>
+            <p className="mt-1 text-lg font-bold text-slate-950">
+              {config.azureDefaultDeployment}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Préconfiguré pour Azure OpenAI
+            </p>
+          </div>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="mt-5 flex flex-wrap gap-2 text-sm">
+          <Badge tone="blue">Paiement en dinars via D17</Badge>
+          <Badge tone="emerald">Azure configuré dès le départ</Badge>
+          <Badge tone="amber">Téléchargement selon votre OS</Badge>
+        </div>
+
+        <div className="mt-6 grid gap-3 lg:grid-cols-3">
           <QuickFact
-            title="كيفاش يخدم؟"
-            text="مساعد برمجة كيما Claude Code، أما هنا محضّر بإعداداتك وموديلاتك من الأول."
+            title="Que fait ce portail ?"
+            text="Le portail organise votre parcours de téléchargement selon votre système, votre licence et l'environnement choisi."
           />
           <QuickFact
-            title="شنوّة الموديلات؟"
-            text={`${config.azureDefaultDeployment} هو الافتراضي، ومعاه GPT-5.3-Codex و GPT-5.4-Pro و Kimi.`}
+            title="Quels environnements ?"
+            text="Codex, T3 Code et OpenCode passent tous par AIPilot Manager, qui récupère ensuite la bonne configuration Azure côté serveur."
           />
           <QuickFact
-            title="شنوّة يتثبت؟"
-            text="OpenCode CLI، ملفات الكونفيغ، Azure setup، والـ skills المشتركة." 
+            title="Qu'est-ce qui est prêt maintenant ?"
+            text="Le repo gère maintenant le parcours licence, l'espace admin Neon, le téléchargement du manager et la configuration/réparation des outils depuis la même expérience."
           />
         </div>
       </header>
 
-        <section className="mt-6 grid grid-cols-2 gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-4 sm:p-5">
-          <StepperItem step="1" title="اختار السيستام" state={getStepState(currentStep, 1)} />
-          <StepperItem step="2" title="نزّل ملف التنصيب" state={getStepState(currentStep, 2)} />
-          <StepperItem step="3" title="افتح VS Code" state={getStepState(currentStep, 3)} />
-          <StepperItem step="4" title="ابدأ الخدمة" state={getStepState(currentStep, 4)} />
-        </section>
+      <section className="mt-6 grid grid-cols-2 gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-4 sm:p-5">
+        <StepperItem step="1" title="Système" state={getStepState(currentStep, 1)} />
+        <StepperItem step="2" title="Licence" state={getStepState(currentStep, 2)} />
+        <StepperItem step="3" title="Environnement" state={getStepState(currentStep, 3)} />
+        <StepperItem step="4" title="Téléchargement" state={getStepState(currentStep, 4)} />
+      </section>
 
       <section className="mt-6 overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
         <div className="border-b border-slate-200 bg-slate-50/90 p-5 sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row-reverse lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold tracking-[0.18em] text-slate-500">
-                الخطوة {currentStep} من {TOTAL_STEPS}
+                Étape {currentStep} sur {TOTAL_STEPS}
               </p>
               <h2 className="mt-2 text-2xl font-bold text-slate-950 sm:text-4xl">
-                {getWizardTitle(currentStep, current.label)}
+                {getWizardTitle(currentStep, currentOs.label, currentEnvironment.label)}
               </h2>
               <p className="mt-3 text-sm leading-8 text-slate-700 sm:text-base">
-                {getWizardDescription(currentStep, current.label)}
+                {getWizardDescription(
+                  currentStep,
+                  currentOs.label,
+                  currentEnvironment.label,
+                )}
               </p>
             </div>
 
-            <div className="inline-flex items-center gap-3 self-start rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-900">
-                {currentStep}
-              </span>
-              <div>
-                <p className="text-xs font-semibold text-slate-500">التقدّم</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {Math.round((currentStep / TOTAL_STEPS) * 100)}%
-                </p>
-              </div>
+            <div className="grid min-w-[17rem] gap-2 self-start rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+              <SummaryRow label="Système" value={currentOs.label} />
+              <SummaryRow
+                label="Licence"
+                value={normalizedLicenseKey || "Non renseignée"}
+                dim={!normalizedLicenseKey}
+              />
+              <SummaryRow label="Environnement" value={currentEnvironment.label} />
             </div>
           </div>
         </div>
 
-        <div className="space-y-4 p-5 sm:p-6">
-          <div className="space-y-4">
-            {currentStep === 1 ? (
-              <>
-                <NoticeCard
-                  tone="blue"
-                  title="اختار سيستام واحد"
-                  text="كانك موش متأكد، خليك على ويندوز. تنجم ديما ترجع وتبدّل قبل ما تكمل."
-                />
+        <div className="space-y-5 p-5 sm:p-6">
+          {currentStep === 1 ? (
+            <>
+              <NoticeCard
+                tone="blue"
+                title="Le système est détecté automatiquement, mais vous pouvez le changer"
+                text={
+                  detectedOs
+                    ? `D'après votre appareil, nous avons détecté ${osOptions[detectedOs].label}. Si ce n'est pas le bon choix, sélectionnez simplement une autre carte ci-dessous.`
+                    : "Si vous hésitez, choisissez le système que vous utilisez au quotidien pour le projet où vous voulez installer l'outil."
+                }
+              />
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {Object.values(options).map((option) => {
-                    const isSelected = option.key === selectedOs;
+              <div className="grid gap-3 sm:grid-cols-3">
+                {Object.values(osOptions).map((option) => {
+                  const isSelected = option.key === selectedOs;
 
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => setSelectedOs(option.key)}
-                        className={`group rounded-[1.75rem] border p-5 text-right transition ${
-                          isSelected
-                            ? "border-sky-400 bg-sky-100 shadow-md"
-                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${
-                                isSelected
-                                  ? "border-sky-200 bg-white/90"
-                                  : "border-slate-200 bg-slate-50"
-                              }`}
-                            >
-                              <OsLogo os={option.key} />
-                            </div>
-                            <div>
-                              <p className="text-xs font-semibold tracking-wide text-slate-500">
-                                سيستام
-                              </p>
-                              <h3 className="mt-2 text-xl font-bold text-slate-950">
-                                {option.label}
-                              </h3>
-                            </div>
-                          </div>
-
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setSelectedOs(option.key)}
+                      className={`rounded-[1.75rem] border p-5 text-left transition ${
+                        isSelected
+                          ? "border-sky-400 bg-sky-100 shadow-md"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${
                               isSelected
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-slate-100 text-slate-600"
+                                ? "border-sky-200 bg-white/90"
+                                : "border-slate-200 bg-slate-50"
                             }`}
                           >
-                            {isSelected ? "مختار" : option.tag}
-                          </span>
+                            <OsLogo os={option.key} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold tracking-wide text-slate-500">
+                              Système
+                            </p>
+                            <h3 className="mt-2 text-xl font-bold text-slate-950">
+                              {option.label}
+                            </h3>
+                          </div>
                         </div>
 
-                        <p className="mt-4 text-sm leading-7 text-slate-600">
-                          {option.description}
-                        </p>
-                      </button>
-                    );
-                  })}
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            isSelected
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {isSelected ? "Sélectionné" : option.tag}
+                        </span>
+                      </div>
+
+                      <p className="mt-4 text-sm leading-7 text-slate-600">
+                        {option.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+
+          {currentStep === 2 ? (
+            <>
+              <NoticeCard
+                tone="emerald"
+                title="Entrez votre clé de licence telle que vous l'avez reçue"
+                text="Utilisez le format habituel: XXXX-XXXX-XXXX-XXXX. Dès que le format est correct, le portail vérifie la licence côté serveur avant de vous laisser continuer."
+              />
+
+              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
+                  <label className="block">
+                    <span className="text-sm font-bold text-slate-950">Clé de licence</span>
+                    <input
+                      dir="ltr"
+                      type="text"
+                      inputMode="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={normalizedLicenseKey}
+                      onChange={(event) => {
+                        setLicenseKey(normalizeLicenseKey(event.target.value));
+                      }}
+                      placeholder="ABCD-1234-EFGH-5678"
+                      className="mt-3 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-left text-base tracking-[0.18em] text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    />
+                  </label>
+
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-slate-600">
+                      {isLicenseFormatValid
+                        ? "Le format est correct. Vérification de la licence en cours ou terminée."
+                        : "Complétez les 16 caractères alphanumériques pour valider le format."}
+                    </p>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        isLicenseFormatValid
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {isLicenseFormatValid
+                        ? "Format correct"
+                        : `${countLicenseCharacters(normalizedLicenseKey)}/${LICENSE_KEY_LENGTH}`}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {getLicenseValidationTitle(licenseValidation.status)}
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      {getLicenseValidationDescription(
+                        licenseValidation,
+                        isLicenseFormatValid,
+                      )}
+                    </p>
+
+                    {licenseValidation.status === "valid" ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {licenseValidation.customerName ? (
+                          <Badge tone="emerald">
+                            Client: {licenseValidation.customerName}
+                          </Badge>
+                        ) : null}
+                        {licenseValidation.tier ? (
+                          <Badge tone="blue">
+                            Tier: {licenseValidation.tier.toUpperCase()}
+                          </Badge>
+                        ) : null}
+                        {licenseValidation.preferredEnvironment ? (
+                          <Badge tone="amber">
+                            Environnement recommandé: {environmentOptions[licenseValidation.preferredEnvironment].label}
+                          </Badge>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
-                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="text-sm font-bold text-slate-950">
-                    شنوّة باش تلقى بعد هالخطوة؟
-                  </h3>
-                  <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
-                    <li>- رابط تحميل واضح للسيستام اللي اخترتو</li>
-                    <li>- خطوات مبسّطة باش تكمل التنصيب من غير تعقيد</li>
-                    <li>- شرح مبسّط باش تستعمل OpenCode داخل VS Code</li>
+                <InfoPanel title="Notes rapides" tone="slate">
+                  <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                    <li>- La clé vous est envoyée après le paiement via D17</li>
+                    <li>- Gardez les tirets si le message les contient déjà</li>
+                    <li>- En cas de doute, copiez-collez la clé complète au lieu de la retaper</li>
+                    <li>- Une licence active valide automatiquement l’accès à l’étape suivante</li>
                   </ul>
+                </InfoPanel>
+              </div>
+            </>
+          ) : null}
+
+          {currentStep === 3 ? (
+            <>
+              <NoticeCard
+                tone="amber"
+                title="Choisissez l'environnement qui correspond à votre façon de travailler"
+                text="Le portail montre clairement ce qui est déjà disponible dans le MVP et ce qui fait encore partie de la feuille de route."
+              />
+
+              <div className="grid gap-3 xl:grid-cols-3">
+                {Object.values(environmentOptions).map((option) => {
+                  const isSelected = option.key === selectedEnvironment;
+
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setSelectedEnvironment(option.key)}
+                      className={`rounded-[1.75rem] border p-5 text-left transition ${
+                        isSelected
+                          ? "border-emerald-400 bg-emerald-50 shadow-md"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold tracking-wide text-slate-500">
+                            Environnement
+                          </p>
+                          <h3 className="mt-2 text-xl font-bold text-slate-950">
+                            {option.label}
+                          </h3>
+                        </div>
+                        <StatusPill status={option.status}>{option.statusLabel}</StatusPill>
+                      </div>
+
+                      <p className="mt-4 text-sm leading-7 text-slate-700">
+                        {option.description}
+                      </p>
+
+                      <ul className="mt-4 space-y-2 text-sm leading-7 text-slate-600">
+                        <li>- {option.positioning}</li>
+                        <li>- {option.compatibility}</li>
+                        <li>- {option.installState}</li>
+                      </ul>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <InfoPanel title="État actuel du MVP" tone="blue">
+                <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                  <li>- OpenCode, Codex et T3 Code passent désormais tous par AIPilot Manager</li>
+                  <li>- T3 Code s’appuie sur Codex CLI, donc le manager prépare et vérifie Codex avant le lancement</li>
+                  <li>- OpenCode reste le parcours le plus direct pour les utilisateurs terminal-first, mais les trois chemins sont désormais câblés dans le MVP</li>
+                </ul>
+              </InfoPanel>
+            </>
+          ) : null}
+
+          {currentStep === 4 ? (
+            <>
+              <NoticeCard
+                tone={currentEnvironment.status === "available" ? "emerald" : "amber"}
+                title={
+                  currentEnvironment.status === "available"
+                    ? `AIPilot Manager est prêt pour ${currentOs.label}`
+                    : `${currentEnvironment.label} arrive bientôt`
+                }
+                text={
+                  currentEnvironment.status === "available"
+                    ? "Le parcours recommandé télécharge maintenant AIPilot Manager. Cette app locale se charge ensuite d’installer, configurer, diagnostiquer et réparer OpenCode, Codex ou T3 Code avec votre licence."
+                    : `Le parcours complet ${currentEnvironment.label} fait bien partie de la vision AIPilot, mais son installateur de production n’est pas encore branché dans ce repo.`
+                }
+              />
+
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
+                  <h3 className="text-lg font-bold text-slate-950">Résumé du téléchargement</h3>
+                  <div className="mt-4 space-y-3">
+                    <SummaryRow label="Système" value={currentOs.label} />
+                    <SummaryRow label="Environnement" value={currentEnvironment.label} />
+                    <SummaryRow
+                      label="Clé de licence"
+                      value={normalizedLicenseKey || "Non renseignée"}
+                      dim={!normalizedLicenseKey}
+                    />
+                    <SummaryRow
+                      label="État de la licence"
+                      value={getLicenseSummaryLabel(licenseValidation.status)}
+                      dim={licenseValidation.status !== "valid"}
+                    />
+                    <SummaryRow
+                      label="Modèle par défaut"
+                      value={config.azureDefaultDeployment}
+                    />
+                  </div>
+
+                  {currentEnvironment.status === "available" ? (
+                    <>
+                      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                        <DownloadButton
+                          href={currentDownloadHref}
+                          label={`Télécharger ${currentOs.downloadLabel}`}
+                        />
+                        <SecondaryButton onClick={() => selectEnvironment("opencode")}>
+                          Revenir sur OpenCode
+                        </SecondaryButton>
+                      </div>
+
+                      <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-sm font-bold text-slate-950">
+                          Commande directe
+                        </p>
+                        <InlineCommand>{currentDownloadCommand}</InlineCommand>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                      <PrimaryButton onClick={() => selectEnvironment("opencode")}>
+                        Utiliser OpenCode maintenant
+                      </PrimaryButton>
+                      <SecondaryButton onClick={previousStep}>
+                        Revenir au choix des environnements
+                      </SecondaryButton>
+                    </div>
+                  )}
                 </div>
-              </>
-            ) : null}
 
-            {currentStep === 2 ? (
-              <>
-                <NoticeCard
-                  tone="emerald"
-                  title={`جاهز لـ ${current.label}`}
-                  text={current.key === "windows"
-                    ? "في ويندوز، الملف يتهبط بصيغة .cmd. أول ما تضغط عليه، يطلب منك تختار الدوسي الصحيح: اختار نفس الدوسي اللي إنت خدام عليه وتوا محلولو في VS Code."
-                    : "المرحلة هاذي مخصصة للتنزيل فقط: نزّل ملف التنصيب المناسب للسيستام متاعك وكمل الخطوات اللي تظهرلك."}
-                />
-
-                <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
-                  <DownloadButton
-                    href={current.downloadHref}
-                    label={`نزّل ${current.downloadLabel}`}
-                  />
-                </div>
-
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <InfoPanel title="طريقة التحميل" tone="slate">
-                    {current.key === "windows" ? (
-                      <ol className="space-y-2 text-sm leading-7 text-slate-700">
-                        <li>1. نزّل ملف <InlineCode>setup-opencode.cmd</InlineCode></li>
-                        <li>2. بعد ما يتهبط، اضغط عليه مرتين مباشرة</li>
-                        <li>3. كي تطلعلك نافذة اختيار الدوسي، اختار نفس الدوسي اللي فاتحو في VS Code</li>
-                        <li>4. مثال: إذا إنت خدام على <InlineCode>D:\services web</InlineCode> اختار نفس هذاك الدوسي</li>
-                        <li>5. من بعد PowerShell يتحل وحدو ويثبت الكونفيغ داخل هذاك الدوسي</li>
-                      </ol>
-                    ) : (
-                      <ol className="space-y-2 text-sm leading-7 text-slate-700">
-                        <li>1. نزّل الملف على جهازك</li>
-                        <li>2. افتح الملف من الدوسي اللي تهبّط فيه</li>
-                        <li>3. كمّل الخطوات اللي تظهرلك على الشاشة</li>
-                      </ol>
-                    )}
+                <div className="space-y-4">
+                  <InfoPanel title="Que fait l’installateur actuel ?" tone="slate">
+                    <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                      <li>- Il télécharge le launcher AIPilot Manager adapté au système choisi</li>
+                      <li>- Il récupère ensuite l’application manager, préremplie avec votre licence et l’outil sélectionné</li>
+                      <li>
+                        -{" "}
+                        {config.includeApiKeyInInstaller
+                          ? "Le manager peut utiliser la clé Azure globale ou la clé spécifique de la licence côté serveur"
+                          : "Le manager s’appuie sur la licence pour récupérer la bonne configuration côté serveur"}
+                      </li>
+                      <li>- Il sait installer, configurer et réparer OpenCode, Codex, et T3 Code via Codex CLI</li>
+                    </ul>
                   </InfoPanel>
 
-                  <InfoPanel title="شنوّة يصير وقت التنصيب؟" tone="slate">
+                  <InfoPanel title="Points importants" tone="blue">
                     <ul className="space-y-2 text-sm leading-7 text-slate-700">
-                      <li>- يركّب OpenCode كانو موش موجود</li>
-                      <li>
-                        - {config.includeApiKeyInInstaller
-                          ? "الـ API key يتزاد وحدو من الإعدادات اللي خزّنتهم"
-                          : "إذا يلزم، باش يطلب منك الـ API key مرة وحدة"}
-                      </li>
-                      <li>- يخلق ملفات الإعدادات داخل البروجيه</li>
-                      <li>- يهبّط الـ skills المشتركة ويحضّر الموديلات</li>
+                      <li>- Windows utilise un launcher <InlineCode>.cmd</InlineCode> pour installer et lancer AIPilot Manager</li>
+                      <li>- Linux et macOS utilisent un script shell qui récupère puis lance le manager</li>
+                      <li>- T3 Code est configuré à partir de Codex CLI, donc le manager traite Codex comme prérequis quand vous choisissez T3 Code</li>
                     </ul>
                   </InfoPanel>
                 </div>
-
-                {current.key === "windows" ? (
-                  <InfoPanel title="مهم برشة" tone="blue">
-                    <p className="text-sm leading-7 text-slate-700">
-                      كان تختار الدوسي الغالط، <InlineCode>opencode.json</InlineCode> باش يتركب
-                      في بلاصة أخرى وما يبانش في البروجيه متاعك داخل VS Code. ديما اختار
-                      نفس الدوسي اللي عندك مفتوح في VS Code قبل ما تكمل.
-                    </p>
-                  </InfoPanel>
-                ) : null}
-
-              </>
-            ) : null}
-
-            {currentStep === 3 ? (
-              <>
-                <NoticeCard
-                  tone="violet"
-                  title="ركّب OpenCode داخل VS Code"
-                  text="هوني نمشيو بالطريقة الأسهل لغير التقنيين: افتح Extensions داخل VS Code، ركّب OpenCode، وبعدها اضغط عليه من الشريط الجانبي اليمين باش يتحل." 
-                />
-
-                <InfoPanel title="الخطوات داخل VS Code" tone="slate">
-                  <ol className="space-y-2 text-sm leading-7 text-slate-700">
-                    <li>1. افتح البروجيه متاعك في VS Code</li>
-                    <li>2. من الشريط الجانبي افتح <InlineCode>Extensions</InlineCode></li>
-                    <li>3. قلّب على <InlineCode>OpenCode</InlineCode></li>
-                    <li>4. اضغط <InlineCode>Install</InlineCode></li>
-                    <li>5. بعد التركيب، اضغط على <InlineCode>OpenCode</InlineCode> من الشريط الجانبي اليمين</li>
-                  </ol>
-                </InfoPanel>
-
-                <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
-                  <LinkButton
-                    href="https://marketplace.visualstudio.com/search?term=OpenCode&target=VSCode&category=All%20categories&sortBy=Relevance"
-                    label="حل VS Code Marketplace"
-                    tone="blue"
-                    external
-                  />
-                </div>
-
-                <InfoPanel title="صور توضيحية" tone="blue">
-                  <div className="space-y-4">
-                    <PlaceholderImageCard
-                      title="صورة 1"
-                      caption="مكان تبويب Extensions والبحث على OpenCode داخل VS Code"
-                      imageUrl="https://h3w8n96m79.ufs.sh/f/bDIUcwVinDBcqH6UZSR14hLjiKrP5ZAQWYgfMOlFpnqcvebu"
-                    />
-                    <PlaceholderImageCard
-                      title="صورة 2"
-                      caption="بعد التركيب: مكان OpenCode في الشريط الجانبي اليمين"
-                      imageUrl="https://h3w8n96m79.ufs.sh/f/bDIUcwVinDBcz13n6lEGBUJOp3jVPsrL27kvaNdRhZgtSAxH"
-                    />
-                  </div>
-                </InfoPanel>
-              </>
-            ) : null}
-
-            {currentStep === 4 ? (
-              <>
-                <NoticeCard
-                  tone="amber"
-                  title="أنت حاضر توّا"
-                  text="إذا وصلت لهنا، هذا يعني اللي التركيب خدم. توّا المطلوب منك كان تفتح OpenCode وتبدأ الخدمة من داخل VS Code."
-                />
-
-                <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-4">
-                  <ul className="space-y-2 text-sm leading-7 text-slate-700">
-                    <li>- افتح OpenCode من داخل VS Code</li>
-                    <li>- إذا الشاشة ظهرتلك كيما الصور اللي تحت، معناها كل شيء خدم</li>
-                    <li>- إذا حبيت تبدّل الموديل بعد، تنجم تعمل هذا من داخل OpenCode</li>
-                  </ul>
-                </div>
-
-                <InfoPanel title="صور توضيحية" tone="blue">
-                  <div className="space-y-4">
-                    <PlaceholderImageCard
-                      title="صورة 1"
-                      caption="مكان التيرمينال داخل VS Code وقت تكتب أمر التشغيل"
-                      imageUrl="https://h3w8n96m79.ufs.sh/f/bDIUcwVinDBcm9qnm43dOEJYeU4QvfR3mCMFcG8twSqi50Pr"
-                    />
-                    <PlaceholderImageCard
-                      title="صورة 2"
-                      caption="شكل OpenCode بعد ما يتحل وتبدأ تختار الموديل أو تبدأ الشات"
-                      imageUrl="https://h3w8n96m79.ufs.sh/f/bDIUcwVinDBc7i6wj8AownFXT9WCO2qURusS03xfPGBIvhZH"
-                    />
-                  </div>
-                </InfoPanel>
-
-                <div className="flex flex-col gap-3 sm:flex-row-reverse sm:flex-wrap">
-                  <LinkButton href="/dev" label="حل صفحة الديفلوبر" tone="violet" />
-                  <LinkButton href="/admin" label="حل /admin" tone="emerald" />
-                </div>
-              </>
-            ) : null}
-          </div>
-
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="border-t border-slate-200 bg-slate-50/80 p-5 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row-reverse sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row-reverse">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               {currentStep < TOTAL_STEPS ? (
-                <PrimaryButton onClick={nextStep}>{getNextLabel(currentStep)}</PrimaryButton>
+                <PrimaryButton onClick={nextStep} disabled={!canAdvance}>
+                  {getNextLabel(currentStep, canAdvance)}
+                </PrimaryButton>
               ) : (
-                <PrimaryButton onClick={resetSteps}>عاود من الأول</PrimaryButton>
+                <PrimaryButton onClick={resetSteps}>Recommencer</PrimaryButton>
               )}
 
               {currentStep > 1 ? (
-                <SecondaryButton onClick={previousStep}>ارجع للخطوة اللي قبل</SecondaryButton>
+                <SecondaryButton onClick={previousStep}>Étape précédente</SecondaryButton>
               ) : null}
             </div>
 
             <p className="text-sm leading-7 text-slate-600">
-              {currentStep < TOTAL_STEPS
-                ? "كل مرة كمّل خطوة واحدة فقط، والصفحة تبدّل وحدها للمرحلة اللي بعدها."
-                : "إذا كل شيء خدم، افتح التيرمينال واكتب opencode وابدأ الخدمة."}
+              {getFooterMessage(currentStep, canAdvance, currentEnvironment.status)}
             </p>
           </div>
         </div>
@@ -400,71 +675,257 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
   );
 }
 
+function detectOs(userAgent: string): OsKey {
+  const ua = userAgent.toLowerCase();
+
+  if (ua.includes("mac os") || ua.includes("macintosh")) {
+    return "macos";
+  }
+
+  if (ua.includes("linux") || ua.includes("x11")) {
+    return "linux";
+  }
+
+  return "windows";
+}
+
+function normalizeLicenseKey(value: string) {
+  const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, LICENSE_KEY_LENGTH);
+  const groups = clean.match(/.{1,4}/g);
+  return groups ? groups.join("-") : "";
+}
+
+function countLicenseCharacters(value: string) {
+  return value.replace(/-/g, "").length;
+}
+
+function canAdvanceFromStep(
+  currentStep: number,
+  isLicenseVerified: boolean,
+  selectedEnvironment: EnvironmentKey,
+) {
+  if (currentStep === 1) return true;
+  if (currentStep === 2) return isLicenseVerified;
+  if (currentStep === 3) return Boolean(selectedEnvironment);
+  return true;
+}
+
 function getStepState(currentStep: number, step: number) {
   if (currentStep > step) return "done";
   if (currentStep === step) return "active";
   return "locked";
 }
 
-function getWizardTitle(currentStep: number, selectedLabel: string) {
-  if (currentStep === 1) return "اختار السيستام متاعك";
-  if (currentStep === 2) return `نزّل السكريبت متاع ${selectedLabel}`;
-  if (currentStep === 3) return "ركّب الإكستنشن داخل VS Code";
-  return "ابدا الاستعمال";
+function getWizardTitle(
+  currentStep: number,
+  selectedOsLabel: string,
+  selectedEnvironmentLabel: string,
+) {
+  if (currentStep === 1) return "Choisissez votre système";
+  if (currentStep === 2) return "Entrez votre clé de licence";
+  if (currentStep === 3) return "Choisissez votre environnement de coding";
+  return `Téléchargez ${selectedEnvironmentLabel} pour ${selectedOsLabel}`;
 }
 
-function getWizardDescription(currentStep: number, selectedLabel: string) {
+function getWizardDescription(
+  currentStep: number,
+  selectedOsLabel: string,
+  selectedEnvironmentLabel: string,
+) {
   if (currentStep === 1) {
-    return "بداية سهلة: اختار السيستام اللي تخدم عليه. من بعدك الصفحة تبدّل وحدها وتوريك الخطوة الجاية فقط.";
+    return "On commence ici: choisissez le système sur lequel vous allez installer l'outil. Ce choix détermine le type de fichier téléchargé et la méthode d'installation.";
   }
 
   if (currentStep === 2) {
-    return `توّا بعد ما اخترت ${selectedLabel}، عندك زر تنزيل واضح وخطوات بسيطة باش تكمل التركيب من الملف اللي باش يتهبط.`;
+    return "Après le choix du système, la clé de licence est vérifiée côté serveur. Une licence valide permet ensuite au manager de récupérer automatiquement la bonne configuration client.";
   }
 
   if (currentStep === 3) {
-    return "في هالمرحلة باش تركّب إكستنشن OpenCode من داخل VS Code، وبعدها تفتحو من الشريط الجانبي اليمين وتولي الخدمة جاهزة.";
+    return `Décidez maintenant quel environnement vous convient le mieux: officiel, interface légère, ou approche terminal-first. Votre sélection actuelle est ${selectedEnvironmentLabel}.`;
   }
 
-  return "آخر خطوة: شغّل OpenCode بالموديل اللي تحب عليه الخدمة وابدأ مباشرة. إذا حبيت، تنجم تبدّل الموديل من داخل OpenCode.";
+  return `Sur la base de ${selectedOsLabel} et ${selectedEnvironmentLabel}, vous récupérez ici un téléchargement prérempli qui ouvre AIPilot Manager avec votre licence et le bon outil.`;
 }
 
-function getNextLabel(currentStep: number) {
-  if (currentStep === 1) return "التالي: التنصيب";
-  if (currentStep === 2) return "التالي: VS Code";
-  if (currentStep === 3) return "التالي: ابدأ الخدمة";
-  return "عاود من الأول";
+function getNextLabel(currentStep: number, canAdvance: boolean) {
+  if (currentStep === 1) return "Suivant: licence";
+  if (currentStep === 2) {
+    return canAdvance ? "Suivant: environnement" : "Vérifiez la licence";
+  }
+  if (currentStep === 3) return "Suivant: téléchargement";
+  return "Recommencer";
 }
 
-function getOsOptions(siteUrl: string) {
+function getFooterMessage(
+  currentStep: number,
+  canAdvance: boolean,
+  environmentStatus: "available" | "comingSoon",
+) {
+  if (currentStep === 2 && !canAdvance) {
+    return "Il vous faut une licence active et vérifiée pour passer à l’étape suivante.";
+  }
+
+  if (currentStep === 4 && environmentStatus === "comingSoon") {
+    return "Le parcours est déjà visible dans le portail, mais le téléchargement réellement opérationnel dans ce repo reste OpenCode pour l’instant.";
+  }
+
+  if (currentStep < TOTAL_STEPS) {
+    return "Avancez étape par étape. Chaque choix est mémorisé dans le navigateur pour vous permettre de reprendre là où vous vous êtes arrêté.";
+  }
+
+  return "Une fois le téléchargement terminé, lancez le fichier récupéré: AIPilot Manager s’ouvrira avec votre licence et votre environnement déjà préchargés.";
+}
+
+function getLicenseValidationTitle(status: LicenseValidation["status"]) {
+  if (status === "checking") return "Vérification en cours";
+  if (status === "valid") return "Licence active";
+  if (status === "invalid") return "Licence invalide";
+  if (status === "error") return "Vérification indisponible";
+  return "Vérification de licence";
+}
+
+function getLicenseValidationDescription(
+  validation: LicenseValidation,
+  isLicenseFormatValid: boolean,
+) {
+  if (!isLicenseFormatValid) {
+    return "Commencez par saisir une clé complète au format XXXX-XXXX-XXXX-XXXX.";
+  }
+
+  if (validation.status === "checking") {
+    return "AIPilot interroge actuellement la base de licences pour confirmer que la clé est active.";
+  }
+
+  if (validation.status === "valid") {
+    return validation.message ?? "La licence a bien été reconnue.";
+  }
+
+  if (validation.status === "invalid" || validation.status === "error") {
+    return validation.message ?? "Impossible de valider cette licence.";
+  }
+
+  return "La licence sera vérifiée automatiquement dès que son format sera complet.";
+}
+
+function getLicenseSummaryLabel(status: LicenseValidation["status"]) {
+  if (status === "checking") return "Vérification...";
+  if (status === "valid") return "Active";
+  if (status === "invalid") return "Invalide";
+  if (status === "error") return "Indisponible";
+  return "En attente";
+}
+
+function getOsOptions() {
   return {
     windows: {
       key: "windows" as const,
-      label: "ويندوز",
-      tag: "الأكثر استعمالاً",
-      description: "إذا تخدم على Windows، هاذا هو الاختيار اللي ننصحوا بيه في العادة.",
-      command:
-        `powershell -ExecutionPolicy Bypass -Command "irm ${siteUrl}/api/install/windows | iex"`,
-      downloadHref: "/api/download/windows",
-      downloadLabel: "ملف Windows (.cmd)",
+      label: "Windows",
+      tag: "Le plus courant",
+      description:
+        "Windows 10/11. Le téléchargement actuel fournit un launcher `.cmd` pour récupérer et lancer AIPilot Manager.",
+      downloadHref: "/api/download/manager/windows",
+      downloadLabel: "AIPilot Manager pour Windows (.cmd)",
     },
     linux: {
       key: "linux" as const,
-      label: "لينكس",
-      tag: "للسيرفرات والديف",
-      description: "إذا تستعمل Ubuntu ولا توزيعة Linux أخرى، هاذا هو الاختيار المناسب.",
-      command: `curl -fsSL ${siteUrl}/api/install/linux | bash`,
-      downloadHref: "/api/download/linux",
-      downloadLabel: "ملف Linux (.sh)",
+      label: "Linux",
+      tag: "Dev & serveurs",
+      description:
+        "Ubuntu, Debian et autres distributions Linux. Le téléchargement actuel fournit un script shell qui installe puis lance AIPilot Manager.",
+      downloadHref: "/api/download/manager/linux",
+      downloadLabel: "AIPilot Manager pour Linux (.sh)",
     },
     macos: {
       key: "macos" as const,
-      label: "ماك",
+      label: "macOS",
       tag: "MacBook / iMac",
-      description: "إذا عندك macOS، نفس الفكرة لكن بملف مناسب للماك.",
-      command: `curl -fsSL ${siteUrl}/api/install/macos | bash`,
-      downloadHref: "/api/download/macos",
-      downloadLabel: "ملف macOS (.sh)",
+      description:
+        "macOS Intel ou Apple Silicon. Le téléchargement actuel fournit un script qui récupère et lance AIPilot Manager.",
+      downloadHref: "/api/download/manager/macos",
+      downloadLabel: "AIPilot Manager pour macOS (.sh)",
+    },
+  };
+}
+
+function buildManagerDownloadHref(
+  routePath: string,
+  licenseKey: string,
+  environment: EnvironmentKey,
+) {
+  const params = new URLSearchParams();
+
+  if (LICENSE_PATTERN.test(licenseKey)) {
+    params.set("licenseKey", licenseKey);
+  }
+
+  params.set("environment", environment);
+
+  const query = params.toString();
+  return query ? `${routePath}?${query}` : routePath;
+}
+
+function buildManagerDownloadCommand(
+  os: OsKey,
+  siteUrl: string,
+  routePath: string,
+  licenseKey: string,
+  environment: EnvironmentKey,
+) {
+  const downloadUrl = `${siteUrl}${buildManagerDownloadHref(
+    routePath,
+    licenseKey,
+    environment,
+  )}`;
+
+  if (os === "windows") {
+    return (
+      `powershell -ExecutionPolicy Bypass -Command "$file = Join-Path $env:TEMP 'setup-aipilot-manager.cmd'; ` +
+      `Invoke-WebRequest -UseBasicParsing '${downloadUrl}' -OutFile $file; ` +
+      `Start-Process $file"`
+    );
+  }
+
+  if (os === "linux") {
+    return `curl -fsSL ${downloadUrl} | bash`;
+  }
+
+  return `curl -fsSL ${downloadUrl} | bash`;
+}
+
+function getEnvironmentOptions() {
+  return {
+    codex: {
+      key: "codex" as const,
+      label: "Codex",
+      status: "available" as const,
+      statusLabel: "Disponible aujourd’hui",
+      description:
+        "L’agent officiel d’OpenAI pour lire le code, écrire des changements et exécuter des commandes.",
+      positioning: "Idéal pour celles et ceux qui veulent l'outil officiel et le workflow agentique le plus fort",
+      compatibility: "Totalement aligné avec la vision AIPilot et la configuration Azure documentée dans le dossier",
+      installState: "AIPilot Manager sait maintenant installer et configurer le parcours Codex CLI dans ce repo",
+    },
+    t3code: {
+      key: "t3code" as const,
+      label: "T3 Code",
+      status: "available" as const,
+      statusLabel: "Disponible aujourd’hui",
+      description:
+        "Une interface légère au-dessus de Codex CLI pour les personnes qui préfèrent une expérience plus visuelle que le terminal.",
+      positioning: "Très adapté à celles et ceux qui veulent une UI légère avec un ressenti proche d'une app desktop",
+      compatibility: "Prévu dans la roadmap AIPilot comme option intermédiaire entre l'outil officiel et le terminal-first",
+      installState: "AIPilot Manager traite Codex CLI comme prérequis, puis lance T3 Code via le chemin supporté par le manager",
+    },
+    opencode: {
+      key: "opencode" as const,
+      label: "OpenCode",
+      status: "available" as const,
+      statusLabel: "Disponible aujourd'hui",
+      description:
+        "L’agent open source sur lequel le MVP actuel est réellement branché dans ce repo, avec des téléchargements prêts pour chaque OS.",
+      positioning: "Le meilleur choix si vous voulez démarrer vite avec une installation claire dès maintenant",
+      compatibility: "C'est le parcours effectivement connecté aujourd'hui aux scripts de téléchargement et aux routes `/api/install`",
+      installState: "Le téléchargement et les scripts sont déjà opérationnels, avec les réglages Azure issus de `/admin`",
     },
   };
 }
@@ -481,7 +942,12 @@ function QuickFact({ title, text }: { title: string; text: string }) {
 function OsLogo({ os }: { os: OsKey }) {
   if (os === "windows") {
     return (
-      <svg viewBox="0 0 24 24" className="h-7 w-7 text-sky-600" fill="currentColor" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-7 w-7 text-sky-600"
+        fill="currentColor"
+        aria-hidden="true"
+      >
         <path d="M3 4.5 10.4 3v8.2H3V4.5Zm8.6-1.7L21 1v10.2h-9.4V2.8ZM3 12.8h7.4V21L3 19.6v-6.8Zm8.6 0H21V23l-9.4-1.8v-8.4Z" />
       </svg>
     );
@@ -503,7 +969,7 @@ function OsLogo({ os }: { os: OsKey }) {
 
   return (
     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">
-      ⌘
+      M
     </div>
   );
 }
@@ -524,15 +990,17 @@ function StepperItem({
   };
 
   const labels = {
-    done: "مكمّلة",
-    active: "توّا",
-    locked: "بعد",
+    done: "Terminé",
+    active: "En cours",
+    locked: "À venir",
   };
 
   return (
-    <div className={`flex min-h-24 flex-col justify-between rounded-2xl border px-4 py-3 ${styles[state]}`}>
+    <div
+      className={`flex min-h-24 flex-col justify-between rounded-2xl border px-4 py-3 ${styles[state]}`}
+    >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold">الخطوة {step}</p>
+        <p className="text-xs font-semibold">Étape {step}</p>
         <span className="text-[11px] font-semibold">{labels[state]}</span>
       </div>
       <p className="mt-3 text-sm font-medium leading-6">{title}</p>
@@ -547,12 +1015,11 @@ function NoticeCard({
 }: {
   title: string;
   text: string;
-  tone: "blue" | "emerald" | "violet" | "amber";
+  tone: "blue" | "emerald" | "amber";
 }) {
   const tones = {
     blue: "border-sky-200 bg-sky-50",
     emerald: "border-emerald-200 bg-emerald-50",
-    violet: "border-violet-200 bg-violet-50",
     amber: "border-amber-200 bg-amber-50",
   };
 
@@ -586,92 +1053,62 @@ function InfoPanel({
   );
 }
 
+function SummaryRow({
+  label,
+  value,
+  dim = false,
+}: {
+  label: string;
+  value: string;
+  dim?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+      <span className="text-xs font-semibold text-slate-500">{label}</span>
+      <span className={`text-sm font-semibold ${dim ? "text-slate-500" : "text-slate-950"}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function StatusPill({
+  status,
+  children,
+}: {
+  status: "available" | "comingSoon";
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+        status === "available"
+          ? "bg-emerald-100 text-emerald-800"
+          : "bg-amber-100 text-amber-800"
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
 function Badge({
   tone,
   children,
 }: {
-  tone: "blue" | "emerald" | "violet";
+  tone: "blue" | "emerald" | "amber";
   children: React.ReactNode;
 }) {
   const tones = {
     blue: "border-sky-200 bg-sky-100 text-sky-800",
     emerald: "border-emerald-200 bg-emerald-100 text-emerald-800",
-    violet: "border-violet-200 bg-violet-100 text-violet-800",
-  };
-
-  return <span className={`rounded-full border px-3 py-1 font-medium ${tones[tone]}`}>{children}</span>;
-}
-
-function LinkButton({
-  href,
-  label,
-  tone,
-  external = false,
-}: {
-  href: string;
-  label: string;
-  tone: "slate" | "blue" | "emerald" | "violet";
-  external?: boolean;
-}) {
-  const tones = {
-    slate: "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50",
-    blue: "border-sky-200 bg-sky-100 text-sky-900 hover:border-sky-300 hover:bg-sky-50",
-    emerald:
-      "border-emerald-200 bg-emerald-100 text-emerald-900 hover:border-emerald-300 hover:bg-emerald-50",
-    violet:
-      "border-violet-200 bg-violet-100 text-violet-900 hover:border-violet-300 hover:bg-violet-50",
+    amber: "border-amber-200 bg-amber-100 text-amber-800",
   };
 
   return (
-    <a
-      href={href}
-      target={external ? "_blank" : undefined}
-      rel={external ? "noreferrer" : undefined}
-      className={`inline-flex w-full items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition sm:w-auto ${tones[tone]}`}
-    >
-      {label}
-    </a>
-  );
-}
-
-function PlaceholderImageCard({
-  title,
-  caption,
-  imageUrl,
-}: {
-  title: string;
-  caption: string;
-  imageUrl?: string;
-}) {
-  return (
-    <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <div>
-          <p className="text-sm font-bold text-slate-950">{title}</p>
-          <p className="mt-1 text-xs text-slate-500">{imageUrl ? "Screenshot" : "Placeholder"}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-        </div>
-      </div>
-      <div className="bg-slate-100 p-4">
-        {imageUrl ? (
-          <div
-            role="img"
-            aria-label={caption}
-            className="aspect-[16/9] rounded-[1.25rem] border border-slate-200 bg-white bg-cover bg-top shadow-sm"
-            style={{ backgroundImage: `url(${imageUrl})` }}
-          />
-        ) : (
-          <div className="flex aspect-[16/9] items-center justify-center rounded-[1.25rem] border-2 border-dashed border-slate-300 bg-white text-center text-sm font-semibold text-slate-500">
-            ضع screenshot هنا
-          </div>
-        )}
-        <p className="mt-3 text-sm leading-7 text-slate-600">{caption}</p>
-      </div>
-    </div>
+    <span className={`rounded-full border px-3 py-1 font-medium ${tones[tone]}`}>
+      {children}
+    </span>
   );
 }
 
@@ -690,15 +1127,22 @@ function DownloadButton({ href, label }: { href: string; label: string }) {
 function PrimaryButton({
   onClick,
   children,
+  disabled = false,
 }: {
   onClick: () => void;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-900 transition hover:border-emerald-300 hover:bg-emerald-50 sm:w-auto"
+      disabled={disabled}
+      className={`inline-flex w-full items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition sm:w-auto ${
+        disabled
+          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+          : "border-emerald-200 bg-emerald-100 text-emerald-900 hover:border-emerald-300 hover:bg-emerald-50"
+      }`}
     >
       {children}
     </button>
@@ -726,6 +1170,17 @@ function SecondaryButton({
 function InlineCode({ children }: { children: React.ReactNode }) {
   return (
     <code dir="ltr" className="rounded bg-slate-100 px-1.5 py-0.5 text-[13px] text-slate-900">
+      {children}
+    </code>
+  );
+}
+
+function InlineCommand({ children }: { children: React.ReactNode }) {
+  return (
+    <code
+      dir="ltr"
+      className="mt-3 block overflow-x-auto rounded-xl bg-slate-950 px-4 py-3 text-left text-[13px] leading-6 text-slate-100"
+    >
       {children}
     </code>
   );

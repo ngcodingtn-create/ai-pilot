@@ -1,6 +1,13 @@
-# One-command OpenCode installer
+# AIPilot installer templates
 
-Run one command inside the project folder you want to configure.
+These templates are the script layer behind the public AIPilot portal.
+
+Current implementation status:
+
+- The portal UI describes a broader AIPilot flow with multiple environments.
+- The scripts in `setup/` are still the concrete OpenCode installer implementation used by `/api/install/*` and `/api/download/*`.
+
+Run one command inside the project folder you want to configure if you want the currently implemented OpenCode path.
 
 ## Windows
 
@@ -41,3 +48,5 @@ Then open `/admin` to save:
 - default deployment
 - Azure API key
 - whether installer endpoints should include the API key automatically
+
+If `DATABASE_URL` is not set, local saves fall back to `.opencode/portal-config.json` on that machine.

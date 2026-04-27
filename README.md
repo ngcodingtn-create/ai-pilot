@@ -1,10 +1,14 @@
-This project is a hosted OpenCode setup portal with:
+This project is the AIPilot download portal MVP. It currently exposes:
 
-- one-command installers for Windows, Linux, and macOS
-- a public setup page at `https://ai-pilot-ten.vercel.app`
-- an admin page at `/admin` for saving Azure config server-side
+- a public download flow at `https://ai-pilot-ten.vercel.app`
+- OS-aware install/download endpoints for Windows, Linux, and macOS
+- a public wizard that now reflects the broader AIPilot vision: OS, license key, environment choice, then download
+- an admin page at `/admin` for saving Azure config and managing licenses server-side
 - a developer page at `/dev` for the full technical setup details
 - optional Neon-backed encrypted storage for installer configuration
+- a desktop manager in `manager-app/` that can install, configure, diagnose, and repair Codex, T3 Code, and OpenCode
+
+Important current scope: the web portal now downloads AIPilot Manager. The manager is the component that applies the environment-specific setup for Codex, T3 Code, and OpenCode.
 
 ## Local Development
 
@@ -26,10 +30,13 @@ Open `http://localhost:3000` locally, or use the deployed site:
 
 Main files:
 
-- `app/page.tsx` - public setup guide
+- `app/page.tsx` - public download entry
+- `app/home-client.tsx` - French AIPilot wizard for OS, license, environment, and download
 - `app/admin/page.tsx` - admin configuration UI
 - `app/api/install/*` - one-command installer endpoints
-- `app/api/download/*` - downloadable scripts
+- `app/api/download/*` - downloadable scripts and packaged manager artifacts
+- `app/api/manager/session` - server-side manager manifest bootstrap
+- `manager-app/` - Electron-based AIPilot Manager app
 - `setup/` - script templates served by the app
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
@@ -44,27 +51,41 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 - `NEXT_PUBLIC_DEFAULT_DEPLOYMENT` - optional default deployment
 
 If `DATABASE_URL` is configured, `/admin` stores installer settings in Neon.
-If not, the app falls back to env/default values.
+If not, the app falls back to `.opencode/portal-config.json` locally, seeded by env/default values.
 
 ## Install Commands
+
+These commands download AIPilot Manager for the current platform:
 
 Windows:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "irm https://ai-pilot-ten.vercel.app/api/install/windows | iex"
+powershell -ExecutionPolicy Bypass -Command "$file = Join-Path $env:TEMP 'setup-aipilot-manager.cmd'; Invoke-WebRequest -UseBasicParsing https://ai-pilot-ten.vercel.app/api/download/manager/windows -OutFile $file; Start-Process $file"
 ```
 
 Linux:
 
 ```bash
-curl -fsSL https://ai-pilot-ten.vercel.app/api/install/linux | bash
+curl -fsSL https://ai-pilot-ten.vercel.app/api/download/manager/linux | bash
 ```
 
 macOS:
 
 ```bash
-curl -fsSL https://ai-pilot-ten.vercel.app/api/install/macos | bash
+curl -fsSL https://ai-pilot-ten.vercel.app/api/download/manager/macos | bash
 ```
+
+## Manager Packaging
+
+Build commands from `manager-app/`:
+
+```bash
+npm run dist:win
+npm run dist:linux
+npm run dist:mac
+```
+
+The repo also includes a GitHub Actions workflow at `.github/workflows/build-aipilot-manager.yml` to build native artifacts on Windows, Ubuntu, and macOS runners.
 
 The public install flow can either:
 

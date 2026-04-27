@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Pilot | حضّر OpenCode بسهولة",
+  title: "AIPilot | Portail de téléchargement d'outils de coding IA",
   description:
-    "بوابة تنصيب OpenCode بخطوات بسيطة، مع صفحة خاصة بالديفلوبر وشرح VS Code.",
+    "Portail AIPilot pour choisir votre système, entrer votre clé de licence, sélectionner votre environnement de coding IA, puis télécharger le bon installateur.",
 };
 
 export default function RootLayout({
@@ -24,7 +24,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-      <html lang="ar" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang="fr"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIPilot Manager</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">AIPILOT MANAGER</p>
+          <h1>Installation et support</h1>
+        </div>
+        <div class="topbar-meta">
+          <span id="platform-chip" class="chip">Plateforme</span>
+          <span id="version-chip" class="chip chip-muted">v0.0.0</span>
+        </div>
+      </header>
+
+      <section class="layout">
+        <section class="panel panel-form">
+          <div class="section-head">
+            <h2>Connexion</h2>
+            <p>Licence, outil et dossier projet.</p>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Portail</span>
+              <input id="backend-url" type="url" />
+            </label>
+
+            <label class="field">
+              <span>Licence</span>
+              <input id="license-key" type="text" placeholder="ABCD-1234-EFGH-5678" />
+            </label>
+
+            <label class="field">
+              <span>Outil</span>
+              <select id="environment">
+                <option value="opencode">OpenCode</option>
+                <option value="codex">Codex</option>
+                <option value="t3code">T3 Code</option>
+              </select>
+            </label>
+
+            <div class="field">
+              <span>Dossier projet</span>
+              <div class="inline-field">
+                <input id="project-root" type="text" readonly />
+                <button id="choose-folder" class="button button-secondary" type="button">
+                  Choisir
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="connect" class="button" type="button">Connecter</button>
+            <button id="install-configure" class="button button-success" type="button" disabled>
+              Installer
+            </button>
+            <button id="repair" class="button button-secondary" type="button" disabled>
+              Réparer
+            </button>
+            <button id="launch" class="button button-secondary" type="button" disabled>
+              Lancer
+            </button>
+          </div>
+        </section>
+
+        <section class="panel panel-side">
+          <div class="section-head">
+            <h2>Mises à jour</h2>
+            <p id="update-message">Chargement…</p>
+          </div>
+
+          <div id="update-summary" class="summary-block"></div>
+
+          <div class="action-row compact">
+            <button id="check-updates" class="button button-secondary" type="button">
+              Vérifier
+            </button>
+            <button id="install-update" class="button button-success" type="button" disabled>
+              Redémarrer et installer
+            </button>
+          </div>
+
+          <div class="action-row compact">
+            <button id="diagnose" class="button button-secondary" type="button" disabled>
+              Diagnostic
+            </button>
+            <button id="watch-video" class="button button-secondary" type="button" disabled>
+              Vidéo
+            </button>
+          </div>
+        </section>
+      </section>
+
+      <section class="layout bottom">
+        <section class="panel">
+          <div class="section-head">
+            <h2>Session</h2>
+            <p>Configuration reçue depuis le portail.</p>
+          </div>
+          <div id="session-summary" class="summary-block">
+            <p>Connectez une licence pour récupérer le manifest.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h2>Diagnostic</h2>
+            <p>État réel de la machine.</p>
+          </div>
+          <div id="diagnostics" class="summary-block">
+            <p>Aucun diagnostic exécuté.</p>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>Journal</h2>
+          <p>Actions et erreurs du manager.</p>
+        </div>
+        <pre id="logs" class="logs">AIPilot Manager prêt.</pre>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

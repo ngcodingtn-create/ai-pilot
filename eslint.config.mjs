@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local installer outputs / vendored repos:
+    ".opencode/**",
+    "external-skills/**",
+    "opencode.json",
   ]),
 ]);
 

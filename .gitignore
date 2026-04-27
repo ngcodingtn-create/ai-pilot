@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/manager-app/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,14 +16,19 @@
 
 # next.js
 /.next/
+/.next-dev-logs/
 /out/
 
 # production
 /build
+/manager-app/dist/
 
 # misc
 .DS_Store
 *.pem
+/.opencode/
+/external-skills/
+/opencode.json
 
 # debug
 npm-debug.log*

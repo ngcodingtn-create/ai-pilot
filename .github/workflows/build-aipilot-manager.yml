@@ -1,0 +1,54 @@
+name: Build AIPilot Manager
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "manager-app/**"
+      - ".github/workflows/build-aipilot-manager.yml"
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            artifact: aipilot-manager-windows
+          - os: ubuntu-latest
+            script: dist:linux
+            artifact: aipilot-manager-linux
+          - os: macos-latest
+            script: dist:mac
+            artifact: aipilot-manager-macos
+
+    defaults:
+      run:
+        working-directory: manager-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: manager-app/package-lock.json
+
+      - name: Install manager dependencies
+        run: npm ci
+
+      - name: Build packaged artifacts
+        run: npm run ${{ matrix.script }}
+
+      - name: Upload manager artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: manager-app/dist/*
+          if-no-files-found: error

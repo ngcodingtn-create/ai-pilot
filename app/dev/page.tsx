@@ -24,63 +24,73 @@ export default async function DevPage() {
     <main dir="ltr" className="mx-auto w-full max-w-6xl px-4 py-8 text-left sm:px-6 lg:px-8">
       <header className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-wrap gap-3">
-          <NavLink href="/">Back to setup</NavLink>
-          <NavLink href="/admin">Open admin</NavLink>
+          <NavLink href="/">Retour au portail</NavLink>
+          <NavLink href="/admin">Ouvrir l’admin</NavLink>
         </div>
-        <p className="mt-4 text-sm font-semibold text-slate-500">Developer notes</p>
+        <p className="mt-4 text-sm font-semibold text-slate-500">Notes techniques</p>
         <h1 className="mt-3 text-3xl font-bold text-slate-950 sm:text-4xl">
-          Technical setup details
+          Détails techniques de l’installation
         </h1>
         <p className="mt-4 max-w-3xl text-sm leading-8 text-slate-700">
-          This page explains exactly what the installer configures, which Azure
-          deployments are wired, what OpenCode downloads, and how VS Code support
-          works.
+          Cette page explique l’implémentation actuelle de l’installateur, les
+          déploiements Azure qu’il relie, ce que le parcours OpenCode télécharge
+          aujourd’hui, et où la vision produit AIPilot va plus loin que les scripts
+          déjà livrés.
         </p>
       </header>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
         <section className="space-y-6">
-          <Panel title="Install commands">
+          <Panel title="Périmètre actuel du MVP">
+            <ul className="space-y-2 text-sm leading-7 text-slate-700">
+              <li>- La page publique présente maintenant le vrai parcours AIPilot: OS, clé de licence, environnement, puis téléchargement</li>
+              <li>- Les routes d’installation réellement branchées dans ce repo provisionnent encore uniquement le parcours OpenCode</li>
+              <li>- Codex et T3 Code sont déjà visibles dans l’UI comme options roadmap, mais ne sont pas encore câblés côté installateur</li>
+            </ul>
+          </Panel>
+
+          <Panel title="Commandes d’installation">
             <CodeBlock>{`powershell -ExecutionPolicy Bypass -Command "irm ${siteUrl}/api/install/windows | iex"`}</CodeBlock>
             <CodeBlock>{`curl -fsSL ${siteUrl}/api/install/linux | bash`}</CodeBlock>
             <CodeBlock>{`curl -fsSL ${siteUrl}/api/install/macos | bash`}</CodeBlock>
           </Panel>
 
-          <Panel title="What the installer downloads and configures">
+          <Panel title="Ce que l’installateur télécharge et configure">
             <ul className="space-y-2 text-sm leading-7 text-slate-700">
-              <li>- Installs the OpenCode CLI if it is not already available</li>
-              <li>- Creates <InlineCode>opencode.json</InlineCode> in the current project</li>
-              <li>- Creates <InlineCode>.opencode/config.json</InlineCode></li>
-              <li>- Clones the shared skills repositories into <InlineCode>external-skills/</InlineCode></li>
-              <li>- Sets Azure environment variables for the current session and future sessions</li>
-              <li>- Runs model smoke tests unless they are explicitly skipped</li>
+              <li>- Installe OpenCode CLI s’il n’est pas déjà disponible</li>
+              <li>- Crée <InlineCode>opencode.json</InlineCode> dans le projet courant</li>
+              <li>- Crée <InlineCode>.opencode/config.json</InlineCode></li>
+              <li>- Clone les bibliothèques de skills partagées dans <InlineCode>external-skills/</InlineCode></li>
+              <li>- Définit les variables d’environnement Azure pour la session en cours et les suivantes</li>
+              <li>- Lance des smoke tests de modèles sauf si on les désactive explicitement</li>
             </ul>
           </Panel>
 
-          <Panel title="Azure deployments included">
+          <Panel title="Déploiements Azure inclus">
             <ul className="space-y-2 text-sm leading-7 text-slate-700">
               <li>
-                - Azure resource: <InlineCode>{config.azureResourceName}</InlineCode>
+                - Ressource Azure: <InlineCode>{config.azureResourceName}</InlineCode>
               </li>
               <li>
-                - Default deployment: <InlineCode>{config.azureDefaultDeployment}</InlineCode>
+                - Déploiement par défaut: <InlineCode>{config.azureDefaultDeployment}</InlineCode>
               </li>
               <li>
-                - Additional deployments: <InlineCode>gpt-5.3-codex</InlineCode> and <InlineCode>gpt-5.4-pro</InlineCode>
+                - Déploiements additionnels: <InlineCode>gpt-5.3-codex</InlineCode> et <InlineCode>gpt-5.4-pro</InlineCode>
               </li>
               <li>
-                - Reasoning mode for all Azure GPT deployments: <InlineCode>xhigh</InlineCode>
+                - Niveau de raisonnement pour tous les déploiements Azure GPT: <InlineCode>xhigh</InlineCode>
               </li>
               <li>
-                - Kimi path: <InlineCode>azure-chat/Kimi-K2.6</InlineCode>
+                - Chemin Kimi: <InlineCode>azure-chat/Kimi-K2.6</InlineCode>
               </li>
             </ul>
           </Panel>
 
-          <Panel title="OpenCode skills included">
+          <Panel title="Skills OpenCode inclus">
             <p className="text-sm leading-7 text-slate-700">
-              The setup pulls both Anthropic skills and the Claude-skills library,
-              then wires them into the generated project config.
+              L’installation récupère à la fois les skills Anthropic et la
+              bibliothèque Claude-skills, puis les relie à la configuration
+              générée du projet.
             </p>
             <ul className="mt-4 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
               {SKILL_GROUPS.map((group) => (
@@ -94,52 +104,55 @@ export default async function DevPage() {
             </ul>
           </Panel>
 
-          <Panel title="VS Code support">
+          <Panel title="Support VS Code">
             <p className="text-sm leading-7 text-slate-700">
-              OpenCode has IDE support. In VS Code, the extension installs
-              automatically the first time you run <InlineCode>opencode</InlineCode>
-              in the integrated terminal.
+              OpenCode dispose d’un support IDE. Dans VS Code, l’extension
+              s’installe automatiquement la première fois que vous lancez{" "}
+              <InlineCode>opencode</InlineCode> dans le terminal intégré.
             </p>
             <ol className="mt-4 space-y-2 text-sm leading-7 text-slate-700">
-              <li>1. Open your project folder in VS Code</li>
-              <li>2. Open the integrated terminal</li>
-              <li>3. Run <InlineCode>opencode</InlineCode></li>
-              <li>4. If needed, install the OpenCode extension manually from the VS Code Marketplace</li>
+              <li>1. Ouvrez votre dossier projet dans VS Code</li>
+              <li>2. Ouvrez le terminal intégré</li>
+              <li>3. Lancez <InlineCode>opencode</InlineCode></li>
+              <li>4. Si besoin, installez l’extension OpenCode manuellement depuis le Marketplace VS Code</li>
             </ol>
           </Panel>
         </section>
 
         <aside className="space-y-6">
-          <Panel title="OpenCode overview">
+          <Panel title="Vue d’ensemble d’OpenCode">
             <ul className="space-y-2 text-sm leading-7 text-slate-700">
-              <li>- OpenCode is an AI coding agent for terminal and IDE workflows</li>
-              <li>- It works with multiple models and providers</li>
-              <li>- In this setup, it is preconfigured for your Azure deployments</li>
-              <li>- The generated project config already points to the shared skills library</li>
+              <li>- OpenCode est un agent de coding IA pensé pour les workflows terminal et IDE</li>
+              <li>- Il fonctionne avec plusieurs modèles et fournisseurs</li>
+              <li>- Dans cette installation, il est préconfiguré pour vos déploiements Azure</li>
+              <li>- La configuration projet générée pointe déjà vers la bibliothèque de skills partagés</li>
             </ul>
           </Panel>
 
-          <Panel title="Token budget">
+          <Panel title="Budget de tokens">
             <p className="text-sm leading-7 text-slate-700">
-              Users should assume there is roughly <strong>around $100 of token usage</strong>
-              available for this setup. Heavy usage can consume that budget faster,
-              especially with larger models and long coding sessions.
+              L’expérience AIPilot évolue vers des plans par palier, mais
+              l’implémentation actuelle n’applique pas encore de budget de tokens
+              par licence directement dans ces routes d’installation. Cette partie
+              doit encore être gérée hors de ce repo ou ajoutée dans une phase
+              backend ultérieure.
             </p>
           </Panel>
 
-          <Panel title="MCP and advanced integrations">
+          <Panel title="MCP et intégrations avancées">
             <p className="text-sm leading-7 text-slate-700">
-              OpenCode supports MCP servers and advanced integrations, but this
-              installer does not auto-install custom MCP servers. It prepares the
-              main OpenCode setup, Azure models, and shared skills.
+              OpenCode supporte les serveurs MCP et les intégrations avancées,
+              mais cet installateur n’installe pas automatiquement de serveurs MCP
+              personnalisés. Il prépare surtout le socle OpenCode, les modèles
+              Azure et les skills partagés.
             </p>
           </Panel>
 
-          <Panel title="Quick links">
+          <Panel title="Liens rapides">
             <div className="flex flex-wrap gap-3 text-sm">
-              <NavLink href="/">Back to setup</NavLink>
+              <NavLink href="/">Retour au portail</NavLink>
               <NavLink href="/admin">Admin</NavLink>
-              <NavLink href="https://opencode.ai/docs/ide/">OpenCode IDE docs</NavLink>
+              <NavLink href="https://opencode.ai/docs/ide/">Docs IDE OpenCode</NavLink>
             </div>
           </Panel>
         </aside>
