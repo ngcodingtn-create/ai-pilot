@@ -87,7 +87,7 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       label: "Codex",
       projectRootRecommended: false,
       notes: [
-        "Le manager installe ou répare Codex CLI, écrit ~/.codex/config.toml, puis injecte la configuration Azure AIPilot.",
+        "Installez d'abord l'app desktop Codex officielle. Ensuite AIPilot vérifie sa présence, répare Codex CLI, écrit ~/.codex/config.toml et injecte la configuration Azure.",
         "Sur Windows, un terminal WSL2 reste recommandé si l'utilisateur veut un workflow CLI plus stable.",
       ],
       officialAppUrl: "https://developers.openai.com/codex/app/windows",
@@ -100,7 +100,7 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       label: "T3 Code",
       projectRootRecommended: false,
       notes: [
-        "T3 Code repose sur Codex CLI. Le manager traite donc Codex comme prérequis avant toute réparation ou lancement.",
+        "Installez d'abord l'app desktop T3 Code officielle. Ensuite AIPilot vérifie sa présence, prépare Codex CLI comme prérequis et injecte la configuration Azure.",
         "Si le binaire T3 local n'est pas disponible, le manager peut lancer le fallback officiel via npx.",
       ],
       officialAppUrl: "https://github.com/pingdotgg/t3code/releases",

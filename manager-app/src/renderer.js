@@ -281,6 +281,36 @@ async function runManagerAction(action, logAction = true) {
   renderDiagnostics(result.diagnostics);
 }
 
+async function ensureDesktopAppReadyBeforeInstall() {
+  if (!state.manifest) {
+    return false;
+  }
+
+  const environment = state.manifest.tool.environment;
+  const desktopStatus = await window.aipilotManager.getDesktopAppStatus(environment);
+
+  if (!desktopStatus.required || desktopStatus.installed) {
+    return true;
+  }
+
+  const label = state.manifest.tool.label || environment;
+  const wantsOpen = window.confirm(
+    `${label} doit d'abord être installé comme app desktop officielle avant que AIPilot ne répare le CLI et la configuration.\n\nCliquez sur OK pour ouvrir la page officielle de téléchargement, installez l'app, puis revenez ici et cliquez à nouveau sur Installer.`,
+  );
+
+  appendLog(
+    `${label} n'est pas encore installé. Installez l'app officielle puis relancez l'installation AIPilot.`,
+  );
+
+  if (wantsOpen && state.manifest.tool.officialAppUrl) {
+    await window.aipilotManager.openExternal(state.manifest.tool.officialAppUrl);
+    appendLog(`Ouverture de la page officielle ${label}.`);
+  }
+
+  await runManagerAction("diagnose", false);
+  return false;
+}
+
 async function setupUpdates() {
   const updateState = await window.aipilotManager.configureUpdates({
     backendUrl: state.defaults.backendUrl,
@@ -366,6 +396,10 @@ async function bootstrap() {
   elements.installConfigure.addEventListener("click", async () => {
     setBusy(true);
     try {
+      const canProceed = await ensureDesktopAppReadyBeforeInstall();
+      if (!canProceed) {
+        return;
+      }
       await runManagerAction("install-configure");
     } catch (error) {
       appendLog(error instanceof Error ? error.message : "Erreur d’installation.");
@@ -497,9 +531,12 @@ async function bootstrap() {
       await connectSession();
       if (state.defaults.autoSetup && !state.autoSetupStarted) {
         state.autoSetupStarted = true;
-        appendLog("Mode automatique: installation, configuration, puis lancement...");
-        await runManagerAction("install-configure");
-        await runManagerAction("launch");
+        const canProceed = await ensureDesktopAppReadyBeforeInstall();
+        if (canProceed) {
+          appendLog("Mode automatique: installation, configuration, puis lancement...");
+          await runManagerAction("install-configure");
+          await runManagerAction("launch");
+        }
       }
     } catch (error) {
       appendLog(

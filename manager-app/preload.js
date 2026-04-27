@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("aipilotManager", {
   getDefaults: () => ipcRenderer.invoke("manager:get-defaults"),
   getUpdateState: () => ipcRenderer.invoke("manager:get-update-state"),
+  getDesktopAppStatus: (environment) =>
+    ipcRenderer.invoke("manager:get-desktop-app-status", environment),
   configureUpdates: (payload) =>
     ipcRenderer.invoke("manager:configure-updates", payload),
   checkForUpdates: () => ipcRenderer.invoke("manager:check-for-updates"),

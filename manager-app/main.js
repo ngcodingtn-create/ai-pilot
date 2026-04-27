@@ -41,6 +41,8 @@ let mainWindow = null;
 let updatesConfigured = false;
 let updatesAutoChecked = false;
 let persistedState = null;
+let updateAvailablePromptVersion = "";
+let updateDownloadedPromptVersion = "";
 
 const updateState = {
   enabled: false,
@@ -157,14 +159,33 @@ function initAutoUpdaterEvents() {
   });
 
   autoUpdater.on("update-available", (info) => {
+    const version = info?.version ?? "";
     setUpdateState({
       checking: false,
       downloading: true,
       downloaded: false,
-      availableVersion: info?.version ?? "",
+      availableVersion: version,
       error: "",
-      message: `Version ${info?.version ?? "nouvelle"} disponible. Téléchargement en cours…`,
+      message: `Version ${version || "nouvelle"} disponible. Téléchargement en cours…`,
     });
+
+    if (
+      mainWindow &&
+      !mainWindow.isDestroyed() &&
+      version &&
+      updateAvailablePromptVersion !== version
+    ) {
+      updateAvailablePromptVersion = version;
+      void dialog.showMessageBox(mainWindow, {
+        type: "info",
+        buttons: ["OK"],
+        defaultId: 0,
+        title: "Mise à jour disponible",
+        message: `La version ${version} de AIPilot Manager est disponible.`,
+        detail:
+          "Le téléchargement commence automatiquement. Vous pourrez installer la mise à jour dès qu'elle sera prête.",
+      });
+    }
   });
 
   autoUpdater.on("update-not-available", () => {
@@ -190,14 +211,43 @@ function initAutoUpdaterEvents() {
   });
 
   autoUpdater.on("update-downloaded", (info) => {
+    const version = info?.version ?? updateState.availableVersion;
     setUpdateState({
       checking: false,
       downloading: false,
       downloaded: true,
-      availableVersion: info?.version ?? updateState.availableVersion,
+      availableVersion: version,
       error: "",
       message: "Mise à jour prête. Redémarrez l’application pour l’installer.",
     });
+
+    if (
+      mainWindow &&
+      !mainWindow.isDestroyed() &&
+      version &&
+      updateDownloadedPromptVersion !== version
+    ) {
+      updateDownloadedPromptVersion = version;
+      void dialog
+        .showMessageBox(mainWindow, {
+          type: "question",
+          buttons: ["Installer maintenant", "Plus tard"],
+          defaultId: 0,
+          cancelId: 1,
+          title: "Mise à jour prête",
+          message: `La version ${version} est prête à être installée.`,
+          detail:
+            "AIPilot Manager peut redémarrer maintenant pour terminer la mise à jour.",
+        })
+        .then((result) => {
+          if (result.response === 0) {
+            installDownloadedUpdate();
+          }
+        })
+        .catch(() => {
+          // Ignore prompt failures.
+        });
+    }
   });
 
   autoUpdater.on("error", (error) => {
@@ -645,6 +695,10 @@ async function isDesktopAppInstalled(environment) {
   return false;
 }
 
+function requiresDesktopApp(environment) {
+  return environment === "codex" || environment === "t3code";
+}
+
 async function updateShellFile(filePath, exportsMap) {
   let current = "";
 
@@ -831,83 +885,9 @@ async function installT3Code(logs) {
   logs.push("Préparation de l'installation T3 Code...");
   await installCodex(logs);
 
-  if (process.platform === "win32" && (await commandExists("winget"))) {
-    if (!(await isDesktopAppInstalled("t3code"))) {
-      try {
-        logs.push("Installation de l'app T3 Code via winget...");
-        await runCommand("winget", [
-          "install",
-          "-e",
-          "--id",
-          "T3Tools.T3Code",
-          "--silent",
-          "--scope",
-          "user",
-          "--accept-package-agreements",
-          "--accept-source-agreements",
-          "--disable-interactivity",
-        ], {
-          timeoutMs: 480000,
-          timeoutMessage:
-            "L'installation winget de l'app T3 Code prend trop de temps. Le manager va continuer avec les alternatives disponibles.",
-        });
-      } catch (error) {
-        logs.push(
-          `winget n'a pas terminé l'installation de l'app T3 Code. ${
-            error instanceof Error ? error.message : ""
-          }`.trim(),
-        );
-      }
-    } else {
-      logs.push("L'app T3 Code Windows est déjà disponible.");
-    }
-
-    if (await commandExists("t3")) {
-      logs.push("La commande t3 est déjà disponible.");
-      return;
-    }
-
-    try {
-      logs.push("Installation de T3 Code via winget...");
-      await runCommand("winget", [
-        "install",
-        "-e",
-        "--id",
-        "T3Tools.T3Code",
-        "--silent",
-        "--scope",
-        "user",
-        "--accept-package-agreements",
-        "--accept-source-agreements",
-        "--disable-interactivity",
-      ], {
-        timeoutMs: 480000,
-        timeoutMessage:
-          "L'installation winget de T3 Code prend trop de temps. Le fallback npx restera disponible.",
-      });
-    } catch (error) {
-      logs.push(
-        `winget n'a pas terminé l'installation de T3 Code. Le fallback npx restera disponible. ${
-          error instanceof Error ? error.message : ""
-        }`.trim(),
-      );
-    }
-  }
-
-  if (process.platform === "darwin" && (await commandExists("brew"))) {
-    try {
-      logs.push("Installation de T3 Code via Homebrew...");
-      await runCommand("brew", ["install", "--cask", "t3-code"], {
-        cwd: os.homedir(),
-        });
-    } catch (error) {
-      logs.push(
-        `Homebrew n'a pas terminé l'installation de T3 Code. Le fallback npx restera disponible. ${
-          error instanceof Error ? error.message : ""
-        }`.trim(),
-      );
-    }
-  }
+  logs.push(
+    "AIPilot attend que l'app T3 Code officielle soit déjà installée. Il prépare ensuite Codex CLI et la configuration Azure.",
+  );
 
   if (await commandExists("t3")) {
     logs.push("La commande t3 est déjà disponible.");
@@ -989,6 +969,15 @@ async function installOpenCode(logs) {
 }
 
 async function installTool(manifest, logs) {
+  if (
+    requiresDesktopApp(manifest.tool.environment) &&
+    !(await isDesktopAppInstalled(manifest.tool.environment))
+  ) {
+    throw new Error(
+      `Installez d'abord l'app ${manifest.tool.label} officielle, puis relancez l'installation AIPilot pour réparer le CLI et la configuration.`,
+    );
+  }
+
   if (manifest.tool.environment === "codex") {
     logs.push("Étape 1/2: installation des composants Codex...");
     await installCodex(logs);
@@ -1134,8 +1123,8 @@ async function buildDiagnostics(manifest, projectRoot) {
       {
         label: manifest.tool.environment === "codex" ? "App Codex" : "App T3 Code",
         ok: desktopAppAvailable,
-        optional: true,
-        details: desktopAppAvailable ? "Installée" : "CLI uniquement pour l'instant",
+        optional: false,
+        details: desktopAppAvailable ? "Installée" : "Installez l'app officielle avant de continuer",
       },
       {
         label: "Commande Codex",
@@ -1301,6 +1290,15 @@ ipcMain.handle("manager:get-defaults", async () => {
 });
 
 ipcMain.handle("manager:get-update-state", async () => updateState);
+
+ipcMain.handle("manager:get-desktop-app-status", async (_event, environment) => {
+  const value = String(environment ?? "");
+  const installed = await isDesktopAppInstalled(value);
+  return {
+    installed,
+    required: requiresDesktopApp(value),
+  };
+});
 
 ipcMain.handle("manager:configure-updates", async (_event, payload) => {
   const defaults = await getEffectiveDefaults();
