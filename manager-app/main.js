@@ -907,15 +907,54 @@ async function updateShellFile(filePath, exportsMap) {
   await writeFileWithDirs(filePath, next);
 }
 
-async function setUserEnvironmentVariables(vars, logs) {
-  Object.assign(process.env, vars);
+function escapePowerShellSingleQuoted(value) {
+  return String(value).replaceAll("'", "''");
+}
 
-  if (process.platform === "win32") {
-    for (const [name, value] of Object.entries(vars)) {
-      logs.push(`Mise à jour de la variable utilisateur ${name}`);
-      await runCommand("setx", [name, value]);
+async function setWindowsEnvironmentVariables(vars, logs) {
+  Object.assign(process.env, vars);
+  const scriptPath = path.join(app.getPath("temp"), "aipilot-set-machine-env.ps1");
+  const scriptContent = [
+    '$ErrorActionPreference = "Stop"',
+    ...Object.entries(vars).map(
+      ([name, value]) =>
+        `[System.Environment]::SetEnvironmentVariable('${escapePowerShellSingleQuoted(name)}', '${escapePowerShellSingleQuoted(value)}', 'Machine')`,
+    ),
+  ].join("\r\n");
+
+  for (const [name, value] of Object.entries(vars)) {
+    logs.push(`Mise à jour de la variable utilisateur ${name}`);
+    await runCommand("setx", [name, value]);
+  }
+
+  await writeFileWithDirs(scriptPath, `${scriptContent}\r\n`);
+
+  try {
+    logs.push("Demande d'élévation Windows pour écrire les variables Azure au niveau machine...");
+    await runPowerShell(
+      `$p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -PassThru -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','${escapePowerShellSingleQuoted(scriptPath)}'); exit $p.ExitCode`,
+    );
+    logs.push("Variables Azure enregistrées globalement au niveau machine.");
+    return true;
+  } catch (error) {
+    logs.push(
+      `Impossible d'écrire les variables Azure au niveau machine. Les variables utilisateur restent présentes pour la session courante. ${
+        error instanceof Error ? error.message : ""
+      }`.trim(),
+    );
+    return false;
+  } finally {
+    try {
+      await fs.unlink(scriptPath);
+    } catch {
+      // Ignore temp cleanup failures.
     }
-    return;
+  }
+}
+
+async function setUserEnvironmentVariables(vars, logs) {
+  if (process.platform === "win32") {
+    return setWindowsEnvironmentVariables(vars, logs);
   }
 
   const shellFiles = [
@@ -928,6 +967,8 @@ async function setUserEnvironmentVariables(vars, logs) {
     logs.push(`Mise à jour des exports dans ${shellFile}`);
     await updateShellFile(shellFile, vars);
   }
+
+  return false;
 }
 
 function buildOpenCodeRuntimeConfig(manifest) {
@@ -948,7 +989,7 @@ async function configureCodex(manifest, logs) {
   logs.push(`Écriture de la configuration Codex dans ${configPath}`);
   await writeFileWithDirs(configPath, manifest.azure.codex.configToml);
 
-  await setUserEnvironmentVariables(
+  const machineScopeApplied = await setUserEnvironmentVariables(
     {
       AZURE_OPENAI_API_KEY: manifest.azure.apiKey,
       AZURE_RESOURCE_NAME: manifest.azure.resourceName,
@@ -956,6 +997,11 @@ async function configureCodex(manifest, logs) {
     },
     logs,
   );
+
+  return {
+    restartRecommended: process.platform === "win32",
+    machineScopeApplied,
+  };
 }
 
 async function configureOpenCode(manifest, projectRoot, logs) {
@@ -996,7 +1042,7 @@ async function configureOpenCode(manifest, projectRoot, logs) {
     );
   }
 
-  await setUserEnvironmentVariables(
+  const machineScopeApplied = await setUserEnvironmentVariables(
     {
       AZURE_OPENAI_API_KEY: manifest.azure.apiKey,
       AZURE_RESOURCE_NAME: manifest.azure.resourceName,
@@ -1004,6 +1050,11 @@ async function configureOpenCode(manifest, projectRoot, logs) {
     },
     logs,
   );
+
+  return {
+    restartRecommended: process.platform === "win32",
+    machineScopeApplied,
+  };
 }
 
 function ensureCommandOrThrow(available, message) {
@@ -1298,11 +1349,29 @@ async function buildDiagnostics(manifest, projectRoot) {
 async function configureTool(manifest, projectRoot, logs) {
   logs.push("Étape 2/2: écriture de la configuration AIPilot...");
   if (manifest.tool.environment === "opencode") {
-    await configureOpenCode(manifest, projectRoot, logs);
+    return configureOpenCode(manifest, projectRoot, logs);
+  }
+
+  return configureCodex(manifest, logs);
+}
+
+async function promptRestartRecommendation(configurationResult) {
+  if (process.platform !== "win32" || !mainWindow || mainWindow.isDestroyed()) {
     return;
   }
 
-  await configureCodex(manifest, logs);
+  const detail = configurationResult?.machineScopeApplied
+    ? "Les variables Azure ont été écrites au niveau machine. Un redémarrage complet du PC est recommandé avant d’ouvrir Codex ou T3 Code."
+    : "Les variables Azure ont été mises à jour pour l’utilisateur courant. Redémarrer le PC reste recommandé pour que toutes les apps GUI reprennent proprement l’environnement.";
+
+  await dialog.showMessageBox(mainWindow, {
+    type: "info",
+    buttons: ["OK"],
+    defaultId: 0,
+    title: "Redémarrage recommandé",
+    message: "AIPilot recommande de redémarrer votre PC.",
+    detail,
+  });
 }
 
 async function launchTool(manifest, projectRoot, logs) {
@@ -1360,10 +1429,14 @@ async function executeManagerAction(action, payload, event) {
   if (action === "install-configure") {
     logSink.push("Installation et configuration démarrées. Cela peut prendre quelques minutes selon votre connexion.");
     await installTool(manifest, logSink);
-    await configureTool(manifest, projectRoot, logSink);
+    const configurationResult = await configureTool(manifest, projectRoot, logSink);
     logSink.push("Installation et configuration terminées.");
     logSink.push(`Configuration prête: ${getSetupGuidance(manifest, projectRoot).primaryConfigPath}`);
     logSink.push("Vous pouvez ouvrir le fichier de configuration ou le dossier associé directement depuis le manager.");
+    if (process.platform === "win32") {
+      logSink.push("Windows: redémarrez le PC avant d’ouvrir l’outil pour garantir la prise en compte des variables Azure.");
+      await promptRestartRecommendation(configurationResult);
+    }
     return {
       logs,
       diagnostics: await buildDiagnostics(manifest, projectRoot),
@@ -1371,10 +1444,15 @@ async function executeManagerAction(action, payload, event) {
   }
 
   if (action === "repair") {
-    logSink.push("Réparation de la configuration en cours...");
-    await configureTool(manifest, projectRoot, logSink);
+    logSink.push("Réparation complète en cours: vérification du runtime, du CLI, de l’app et de la configuration...");
+    await installTool(manifest, logSink);
+    const configurationResult = await configureTool(manifest, projectRoot, logSink);
     logSink.push("Réparation terminée.");
     logSink.push(`Configuration prête: ${getSetupGuidance(manifest, projectRoot).primaryConfigPath}`);
+    if (process.platform === "win32") {
+      logSink.push("Windows: redémarrez le PC avant d’ouvrir l’outil pour garantir la prise en compte des variables Azure.");
+      await promptRestartRecommendation(configurationResult);
+    }
     return {
       logs,
       diagnostics: await buildDiagnostics(manifest, projectRoot),
