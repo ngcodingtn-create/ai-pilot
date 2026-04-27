@@ -1,6 +1,6 @@
 {
   "name": "aipilot-manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "AIPilot Manager desktop app",
   "author": "NGCoding",
@@ -8,14 +8,28 @@
   "scripts": {
     "app": "electron .",
     "start": "electron .",
+    "deps:check": "npm outdated",
+    "deps:update:electron": "npm install electron@latest --save-dev && npm install electron-builder@latest --save-dev && npm install electron-updater@latest",
+    "assets:brand": "powershell -ExecutionPolicy Bypass -File .\\scripts\\generate-brand-assets.ps1",
     "dist": "electron-builder --publish never",
     "dist:win": "electron-builder --win nsis portable --publish never",
     "dist:linux": "electron-builder --linux AppImage deb --publish never",
-    "dist:mac": "electron-builder --mac dmg zip --publish never"
+    "dist:mac": "electron-builder --mac dmg zip --publish never",
+    "release:win": "electron-builder --win nsis portable --publish always",
+    "release:linux": "electron-builder --linux AppImage deb --publish always",
+    "release:mac": "electron-builder --mac dmg zip --publish always"
   },
   "build": {
     "appId": "tn.aipilot.manager",
     "productName": "AIPilot Manager",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ngcodingtn-create",
+        "repo": "ai-pilot",
+        "releaseType": "release"
+      }
+    ],
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -23,11 +37,13 @@
     "files": [
       "main.js",
       "preload.js",
+      "build/icon.png",
       "src/**/*",
       "package.json"
     ],
     "asar": true,
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis",
         "portable"
@@ -37,13 +53,22 @@
       "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false
+      "allowElevation": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "AIPilot Manager",
+      "menuCategory": "NGCoding",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/installerHeaderIcon.ico"
     },
     "portable": {
       "artifactName": "${productName}-Portable-${version}-${arch}.${ext}"
     },
     "linux": {
       "category": "Development",
+      "icon": "build/icons",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         "AppImage",
@@ -51,6 +76,7 @@
       ]
     },
     "mac": {
+      "icon": "build/icon.png",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         "dmg",
@@ -59,10 +85,10 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
-    "electron": "^37.2.0",
+    "electron": "^41.3.0",
     "electron-builder": "^26.0.12"
   }
 }

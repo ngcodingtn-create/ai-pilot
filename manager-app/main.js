@@ -19,6 +19,7 @@ const PLATFORM_KEY =
 
 let mainWindow = null;
 let updatesConfigured = false;
+let updatesAutoChecked = false;
 
 const updateState = {
   enabled: false,
@@ -44,6 +45,7 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
     },
+    icon: path.join(__dirname, "build", "icon.png"),
     title: "AIPilot Manager",
   });
 
@@ -156,30 +158,56 @@ async function configureAutoUpdates(backendUrl) {
   }
 
   const updateUrl = String(payload.updateUrl ?? "").trim();
-  if (!payload.enabled || !updateUrl) {
-    setUpdateState({
-      enabled: false,
-      configured: false,
-      updateUrl: "",
-      message: "Aucune URL de mise à jour n’est encore configurée.",
-      error: "",
+  if (payload.enabled && updateUrl) {
+    autoUpdater.setFeedURL({
+      provider: "generic",
+      url: updateUrl,
     });
+
+    updatesConfigured = true;
+    setUpdateState({
+      enabled: true,
+      configured: true,
+      updateUrl,
+      error: "",
+      message: "Canal de mise à jour distant prêt.",
+    });
+
+    if (!updatesAutoChecked) {
+      updatesAutoChecked = true;
+      void checkForUpdates().catch((error) => {
+        setUpdateState({
+          checking: false,
+          downloading: false,
+          error: error instanceof Error ? error.message : "Erreur de mise à jour.",
+          message: "Impossible de vérifier les mises à jour.",
+        });
+      });
+    }
+
     return updateState;
   }
-
-  autoUpdater.setFeedURL({
-    provider: "generic",
-    url: updateUrl,
-  });
 
   updatesConfigured = true;
   setUpdateState({
     enabled: true,
     configured: true,
-    updateUrl,
+    updateUrl: "GitHub Releases (canal intégré)",
     error: "",
-    message: "Canal de mise à jour prêt.",
+    message: "Canal de mise à jour intégré prêt.",
   });
+
+  if (!updatesAutoChecked) {
+    updatesAutoChecked = true;
+    void checkForUpdates().catch((error) => {
+      setUpdateState({
+        checking: false,
+        downloading: false,
+        error: error instanceof Error ? error.message : "Erreur de mise à jour.",
+        message: "Impossible de vérifier les mises à jour.",
+      });
+    });
+  }
 
   return updateState;
 }
@@ -868,6 +896,11 @@ ipcMain.handle("manager:open-external", async (_event, url) => {
 });
 
 app.whenReady().then(() => {
+  app.setName("AIPilot Manager");
+  if (process.platform === "win32") {
+    app.setAppUserModelId("tn.aipilot.manager");
+  }
+
   initAutoUpdaterEvents();
   createWindow();
 

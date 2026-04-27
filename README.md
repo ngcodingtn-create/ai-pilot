@@ -81,14 +81,38 @@ curl -fsSL https://ai-pilot-ten.vercel.app/api/download/manager/macos | bash
 Build commands from `manager-app/`:
 
 ```bash
+npm run assets:brand
 npm run dist:win
 npm run dist:linux
 npm run dist:mac
 ```
 
-The repo also includes a GitHub Actions workflow at `.github/workflows/build-aipilot-manager.yml` to build native artifacts on Windows, Ubuntu, and macOS runners.
+The repo includes:
 
-If you want Electron auto-updates in production, configure `MANAGER_UPDATE_URL` or set the same value from `/admin` in the "URL des mises à jour du manager" field.
+- `.github/workflows/build-aipilot-manager.yml` for validation builds on Windows, Ubuntu, and macOS
+- `.github/workflows/publish-aipilot-manager.yml` for real release publishing on GitHub Releases
+
+## Manager Updates
+
+The desktop manager now ships with a built-in GitHub Releases update channel. The `/admin` field `URL des mises à jour du manager` remains available as an override if you want to switch later to your own generic file host.
+
+Release flow:
+
+```bash
+cd manager-app
+npm install
+npm run assets:brand
+npm version patch --no-git-tag-version
+cd ..
+git add manager-app/package.json manager-app/package-lock.json
+git commit -m "Bump manager version"
+git tag manager-vX.Y.Z
+git push origin main --follow-tags
+```
+
+When the `manager-vX.Y.Z` tag reaches GitHub, the publish workflow builds and uploads the native artifacts to the repository releases page. Installed clients will then detect the higher version and update automatically.
+
+If you want to override the built-in GitHub update channel, configure `MANAGER_UPDATE_URL` or set the same value from `/admin` in the "URL des mises à jour du manager" field.
 
 The public install flow can either:
 

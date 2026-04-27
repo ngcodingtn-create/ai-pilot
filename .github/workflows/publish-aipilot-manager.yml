@@ -1,33 +1,34 @@
-name: Build AIPilot Manager
+name: Publish AIPilot Manager
 
 on:
-  workflow_dispatch:
   push:
-    paths:
-      - "manager-app/**"
-      - ".github/workflows/build-aipilot-manager.yml"
+    tags:
+      - "manager-v*"
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
+  publish:
+    name: Publish on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            script: dist:win
-            artifact: aipilot-manager-windows
+            script: release:win
           - os: ubuntu-latest
-            script: dist:linux
-            artifact: aipilot-manager-linux
+            script: release:linux
           - os: macos-latest
-            script: dist:mac
-            artifact: aipilot-manager-macos
+            script: release:mac
 
     defaults:
       run:
         working-directory: manager-app
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -46,12 +47,5 @@ jobs:
       - name: Generate brand assets
         run: npm run assets:brand
 
-      - name: Build packaged artifacts
+      - name: Publish release artifacts
         run: npm run ${{ matrix.script }}
-
-      - name: Upload manager artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: manager-app/dist/*
-          if-no-files-found: error
