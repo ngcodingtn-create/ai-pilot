@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("aipilotManager", {
   installUpdate: () => ipcRenderer.invoke("manager:install-update"),
   pickProjectDirectory: () => ipcRenderer.invoke("manager:pick-project-directory"),
   createSession: (payload) => ipcRenderer.invoke("manager:create-session", payload),
+  saveState: (payload) => ipcRenderer.invoke("manager:save-state", payload),
   runAction: (payload) => ipcRenderer.invoke("manager:run-action", payload),
   openExternal: (url) => ipcRenderer.invoke("manager:open-external", url),
   onUpdateState: (callback) => {

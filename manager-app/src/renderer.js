@@ -8,12 +8,12 @@ const state = {
 };
 
 const elements = {
-  backendUrl: document.querySelector("#backend-url"),
   licenseKey: document.querySelector("#license-key"),
   environment: document.querySelector("#environment"),
   projectRoot: document.querySelector("#project-root"),
   platformChip: document.querySelector("#platform-chip"),
   versionChip: document.querySelector("#version-chip"),
+  portalText: document.querySelector("#portal-text"),
   updateMessage: document.querySelector("#update-message"),
   updateSummary: document.querySelector("#update-summary"),
   connect: document.querySelector("#connect"),
@@ -71,6 +71,19 @@ function syncButtons() {
 function setBusy(busy) {
   state.busy = busy;
   syncButtons();
+}
+
+async function persistState() {
+  if (!state.defaults) {
+    return;
+  }
+
+  await window.aipilotManager.saveState({
+    backendUrl: state.defaults.backendUrl,
+    licenseKey: normalizeLicenseKey(elements.licenseKey.value),
+    environment: elements.environment.value,
+    projectRoot: state.projectRoot,
+  });
 }
 
 function badge(ok, optional) {
@@ -178,9 +191,13 @@ function renderDiagnostics(diagnostics) {
 }
 
 async function connectSession({ autoDiagnose = true } = {}) {
-  const backendUrl = elements.backendUrl.value.trim();
+  const backendUrl = state.defaults.backendUrl;
   const licenseKey = normalizeLicenseKey(elements.licenseKey.value);
   const environment = elements.environment.value;
+
+  if (!licenseKey) {
+    throw new Error("Saisissez d’abord votre clé de licence.");
+  }
 
   elements.licenseKey.value = licenseKey;
   appendLog(`Connexion de la licence ${licenseKey || "(vide)"}...`);
@@ -198,6 +215,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
 
   renderSessionSummary(manifest);
   appendLog(`Licence connectée pour ${manifest.license.customerName}.`);
+  await persistState();
   syncButtons();
 
   if (autoDiagnose) {
@@ -229,7 +247,7 @@ async function runManagerAction(action, logAction = true) {
 
 async function setupUpdates() {
   const updateState = await window.aipilotManager.configureUpdates({
-    backendUrl: elements.backendUrl.value.trim(),
+    backendUrl: state.defaults.backendUrl,
   });
 
   renderUpdateState(updateState);
@@ -237,9 +255,9 @@ async function setupUpdates() {
 
 async function bootstrap() {
   state.defaults = await window.aipilotManager.getDefaults();
-  elements.backendUrl.value = state.defaults.backendUrl;
   elements.platformChip.textContent = `Plateforme ${state.defaults.platform}`;
   elements.versionChip.textContent = `v${state.defaults.version}`;
+  elements.portalText.textContent = `Portail: ${state.defaults.backendUrl}`;
 
   if (state.defaults.licenseKey) {
     elements.licenseKey.value = normalizeLicenseKey(state.defaults.licenseKey);
@@ -247,6 +265,11 @@ async function bootstrap() {
 
   if (state.defaults.environment) {
     elements.environment.value = state.defaults.environment;
+  }
+
+  if (state.defaults.projectRoot) {
+    state.projectRoot = state.defaults.projectRoot;
+    elements.projectRoot.value = state.defaults.projectRoot;
   }
 
   const initialUpdateState = await window.aipilotManager.getUpdateState();
@@ -267,6 +290,7 @@ async function bootstrap() {
     state.projectRoot = directory;
     elements.projectRoot.value = directory;
     appendLog(`Dossier projet: ${directory}`);
+    await persistState();
   });
 
   elements.connect.addEventListener("click", async () => {
@@ -365,17 +389,8 @@ async function bootstrap() {
     }
   });
 
-  elements.backendUrl.addEventListener("change", async () => {
-    try {
-      await setupUpdates();
-    } catch (error) {
-      appendLog(
-        error instanceof Error
-          ? error.message
-          : "Impossible de charger la configuration de mise à jour.",
-      );
-    }
-  });
+  elements.licenseKey.addEventListener("change", persistState);
+  elements.environment.addEventListener("change", persistState);
 
   syncButtons();
 

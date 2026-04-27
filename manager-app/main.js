@@ -5,6 +5,8 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 
+const PRODUCTION_BACKEND_URL = "https://ai-pilot-ten.vercel.app";
+
 function readCliArg(flag) {
   const args = process.argv.slice(app.isPackaged ? 1 : 2);
   const flagIndex = args.indexOf(flag);
@@ -20,10 +22,6 @@ function hasCliFlag(flag) {
   return args.includes(flag);
 }
 
-const DEFAULT_BACKEND_URL =
-  readCliArg("--backend-url") ||
-  process.env.AIPILOT_MANAGER_BACKEND_URL ||
-  "http://localhost:3000";
 const DEFAULT_LICENSE_KEY =
   readCliArg("--license-key") || process.env.AIPILOT_MANAGER_DEFAULT_LICENSE_KEY || "";
 const DEFAULT_ENVIRONMENT =
@@ -42,6 +40,7 @@ const PLATFORM_KEY =
 let mainWindow = null;
 let updatesConfigured = false;
 let updatesAutoChecked = false;
+let persistedState = null;
 
 const updateState = {
   enabled: false,
@@ -55,6 +54,64 @@ const updateState = {
   message: "Mises à jour non configurées.",
   error: "",
 };
+
+function getStatePath() {
+  return path.join(app.getPath("userData"), "manager-state.json");
+}
+
+async function loadPersistedState() {
+  if (persistedState) {
+    return persistedState;
+  }
+
+  try {
+    const raw = await fs.readFile(getStatePath(), "utf8");
+    persistedState = JSON.parse(raw);
+  } catch {
+    persistedState = {};
+  }
+
+  return persistedState;
+}
+
+async function savePersistedState(patch) {
+  const current = await loadPersistedState();
+  persistedState = { ...current, ...patch };
+  await writeFileWithDirs(getStatePath(), `${JSON.stringify(persistedState, null, 2)}\n`);
+  return persistedState;
+}
+
+function normalizeBackendUrl(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed.replace(/\/+$/, "");
+}
+
+async function getEffectiveDefaults() {
+  const saved = await loadPersistedState();
+  const backendUrl =
+    normalizeBackendUrl(readCliArg("--backend-url")) ||
+    normalizeBackendUrl(process.env.AIPILOT_MANAGER_BACKEND_URL) ||
+    normalizeBackendUrl(saved.backendUrl) ||
+    PRODUCTION_BACKEND_URL;
+
+  const licenseKey =
+    DEFAULT_LICENSE_KEY || String(saved.licenseKey ?? "");
+  const environment =
+    DEFAULT_ENVIRONMENT || String(saved.environment ?? "opencode");
+  const projectRoot = String(saved.projectRoot ?? "");
+
+  return {
+    backendUrl,
+    licenseKey,
+    environment,
+    projectRoot,
+    autoSetup: DEFAULT_AUTO_SETUP,
+  };
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -154,6 +211,8 @@ function initAutoUpdaterEvents() {
 }
 
 async function configureAutoUpdates(backendUrl) {
+  const normalizedBackendUrl = normalizeBackendUrl(backendUrl) || PRODUCTION_BACKEND_URL;
+
   if (!app.isPackaged) {
     setUpdateState({
       enabled: false,
@@ -165,11 +224,18 @@ async function configureAutoUpdates(backendUrl) {
     return updateState;
   }
 
-  const response = await fetch(`${backendUrl}/api/manager/update-config`, {
-    headers: {
-      Accept: "application/json",
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${normalizedBackendUrl}/api/manager/update-config`, {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      `Impossible de joindre le portail AIPilot (${normalizedBackendUrl}). Vérifiez votre connexion ou réinstallez la dernière version du manager.`,
+    );
+  }
 
   const payload = await response.json().catch(() => ({}));
 
@@ -1137,12 +1203,14 @@ async function executeManagerAction(action, payload) {
 }
 
 ipcMain.handle("manager:get-defaults", async () => {
+  const defaults = await getEffectiveDefaults();
   return {
-    backendUrl: DEFAULT_BACKEND_URL,
+    backendUrl: defaults.backendUrl,
     platform: PLATFORM_KEY,
-    licenseKey: DEFAULT_LICENSE_KEY,
-    environment: DEFAULT_ENVIRONMENT,
-    autoSetup: DEFAULT_AUTO_SETUP,
+    licenseKey: defaults.licenseKey,
+    environment: defaults.environment,
+    projectRoot: defaults.projectRoot,
+    autoSetup: defaults.autoSetup,
     version: app.getVersion(),
     packaged: app.isPackaged,
   };
@@ -1151,7 +1219,8 @@ ipcMain.handle("manager:get-defaults", async () => {
 ipcMain.handle("manager:get-update-state", async () => updateState);
 
 ipcMain.handle("manager:configure-updates", async (_event, payload) => {
-  return configureAutoUpdates(String(payload?.backendUrl ?? DEFAULT_BACKEND_URL));
+  const defaults = await getEffectiveDefaults();
+  return configureAutoUpdates(String(payload?.backendUrl ?? defaults.backendUrl));
 });
 
 ipcMain.handle("manager:check-for-updates", async () => {
@@ -1172,16 +1241,26 @@ ipcMain.handle("manager:pick-project-directory", async () => {
 });
 
 ipcMain.handle("manager:create-session", async (_event, payload) => {
-  const response = await fetch(`${payload.backendUrl}/api/manager/session`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      licenseKey: payload.licenseKey,
-      environment: payload.environment,
-    }),
-  });
+  const defaults = await getEffectiveDefaults();
+  const backendUrl = normalizeBackendUrl(payload?.backendUrl) || defaults.backendUrl;
+  let response;
+
+  try {
+    response = await fetch(`${backendUrl}/api/manager/session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        licenseKey: payload.licenseKey,
+        environment: payload.environment,
+      }),
+    });
+  } catch {
+    throw new Error(
+      `Impossible de joindre le portail AIPilot (${backendUrl}). Vérifiez votre connexion internet ou mettez à jour le manager.`,
+    );
+  }
 
   const data = await response.json();
 
@@ -1189,7 +1268,24 @@ ipcMain.handle("manager:create-session", async (_event, payload) => {
     throw new Error(data.error || "Impossible de récupérer la session manager.");
   }
 
+  await savePersistedState({
+    backendUrl,
+    licenseKey: String(payload.licenseKey ?? ""),
+    environment: String(payload.environment ?? "opencode"),
+  });
+
   return data;
+});
+
+ipcMain.handle("manager:save-state", async (_event, payload) => {
+  await savePersistedState({
+    backendUrl: normalizeBackendUrl(payload?.backendUrl),
+    licenseKey: String(payload?.licenseKey ?? ""),
+    environment: String(payload?.environment ?? "opencode"),
+    projectRoot: String(payload?.projectRoot ?? ""),
+  });
+
+  return { ok: true };
 });
 
 ipcMain.handle("manager:run-action", async (_event, payload) => {
