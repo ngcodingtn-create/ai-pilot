@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const installerUrl =
     releaseAsset?.browser_download_url ??
     "https://github.com/ngcodingtn-create/ai-pilot/releases/latest/download/AIPilot%20Manager-Setup-0.2.0-x64.exe";
-  const safeInstallerUrl = installerUrl.replaceAll(" ", "%20");
+  const safeInstallerUrlForCmd = encodeURI(installerUrl).replaceAll("%", "%%");
 
   const launcher = [
     "@echo off",
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     "echo   AIPilot Manager - Installation Windows",
     "echo ==============================================",
     "echo.",
-    `set "INSTALLER_URL=${safeInstallerUrl}"`,
+    `set "INSTALLER_URL=${safeInstallerUrlForCmd}"`,
     'set "INSTALLER=%TEMP%\\AIPilot-Manager-Setup.exe"',
     `set "BACKEND_URL=${siteUrl}"`,
     `set "TARGET_ENVIRONMENT=${environment}"`,
