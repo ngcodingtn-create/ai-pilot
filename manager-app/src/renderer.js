@@ -281,6 +281,44 @@ async function runManagerAction(action, logAction = true) {
   renderDiagnostics(result.diagnostics);
 }
 
+async function ensureNodeRuntimeReadyBeforeInstall() {
+  if (!state.manifest) {
+    return false;
+  }
+
+  const readiness = await window.aipilotManager.getInstallReadiness(
+    state.manifest.tool.environment,
+  );
+
+  if (readiness.nodeInstalled && readiness.npmInstalled) {
+    return true;
+  }
+
+  const wantsInstall = window.confirm(
+    "Node.js et npm sont requis pour continuer. Voulez-vous laisser AIPilot Manager les installer automatiquement maintenant ?",
+  );
+
+  if (!wantsInstall) {
+    appendLog("Installation annulée: Node.js et npm sont requis.");
+    return false;
+  }
+
+  appendLog("Installation automatique de Node.js et npm en cours...");
+  const result = await window.aipilotManager.installNodeRuntime();
+  for (const line of result.logs || []) {
+    appendLog(line);
+  }
+
+  if (!result.readiness?.nodeInstalled || !result.readiness?.npmInstalled) {
+    throw new Error(
+      "Node.js et npm ne sont toujours pas disponibles après l'installation automatique.",
+    );
+  }
+
+  appendLog("Node.js et npm sont prêts.");
+  return true;
+}
+
 async function ensureDesktopAppReadyBeforeInstall() {
   if (!state.manifest) {
     return false;
@@ -396,6 +434,10 @@ async function bootstrap() {
   elements.installConfigure.addEventListener("click", async () => {
     setBusy(true);
     try {
+      const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
+      if (!nodeReady) {
+        return;
+      }
       const canProceed = await ensureDesktopAppReadyBeforeInstall();
       if (!canProceed) {
         return;
@@ -531,7 +573,10 @@ async function bootstrap() {
       await connectSession();
       if (state.defaults.autoSetup && !state.autoSetupStarted) {
         state.autoSetupStarted = true;
-        const canProceed = await ensureDesktopAppReadyBeforeInstall();
+        const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
+        const canProceed = nodeReady
+          ? await ensureDesktopAppReadyBeforeInstall()
+          : false;
         if (canProceed) {
           appendLog("Mode automatique: installation, configuration, puis lancement...");
           await runManagerAction("install-configure");

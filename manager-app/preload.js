@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld("aipilotManager", {
   getUpdateState: () => ipcRenderer.invoke("manager:get-update-state"),
   getDesktopAppStatus: (environment) =>
     ipcRenderer.invoke("manager:get-desktop-app-status", environment),
+  getInstallReadiness: (environment) =>
+    ipcRenderer.invoke("manager:get-install-readiness", environment),
+  installNodeRuntime: () => ipcRenderer.invoke("manager:install-node-runtime"),
   configureUpdates: (payload) =>
     ipcRenderer.invoke("manager:configure-updates", payload),
   checkForUpdates: () => ipcRenderer.invoke("manager:check-for-updates"),

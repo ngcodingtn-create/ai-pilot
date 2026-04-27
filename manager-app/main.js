@@ -57,6 +57,10 @@ const updateState = {
   error: "",
 };
 
+const OFFICIAL_DOWNLOAD_URLS = {
+  nodejs: "https://nodejs.org/en/download",
+};
+
 function getStatePath() {
   return path.join(app.getPath("userData"), "manager-state.json");
 }
@@ -419,9 +423,9 @@ function getSetupGuidance(manifest, projectRoot) {
       primaryConfigPath: getOpenCodeGlobalConfigPath(),
       configDirectoryPath: path.dirname(getOpenCodeGlobalConfigPath()),
       prompt:
-        "La configuration OpenCode a déjà été préparée par AIPilot. Vérifiez votre dossier projet puis lancez OpenCode.",
+        "La configuration OpenCode CLI a déjà été préparée par AIPilot. Vérifiez votre dossier projet puis lancez la commande opencode.",
       nextSteps: [
-        "AIPilot écrit la configuration globale OpenCode et le fichier d'authentification Azure.",
+        "AIPilot écrit la configuration globale OpenCode CLI et le fichier d'authentification Azure.",
         projectRoot
           ? `La configuration projet sera utilisée dans ${projectRoot}.`
           : "Choisissez un dossier projet si vous voulez aussi générer la configuration locale OpenCode.",
@@ -699,6 +703,100 @@ function requiresDesktopApp(environment) {
   return environment === "codex" || environment === "t3code";
 }
 
+async function getInstallReadiness(environment) {
+  return {
+    nodeInstalled: await commandExists("node"),
+    npmInstalled: await commandExists("npm"),
+    desktopRequired: requiresDesktopApp(environment),
+    desktopInstalled: requiresDesktopApp(environment)
+      ? await isDesktopAppInstalled(environment)
+      : false,
+    nodeDownloadUrl: OFFICIAL_DOWNLOAD_URLS.nodejs,
+  };
+}
+
+function prependPathsToEnvironment(paths) {
+  const existing = String(process.env.PATH ?? "")
+    .split(path.delimiter)
+    .filter(Boolean);
+  const normalizedExisting = new Set(existing.map((entry) => entry.toLowerCase()));
+  const additions = paths.filter(
+    (entry) => entry && !normalizedExisting.has(String(entry).toLowerCase()),
+  );
+
+  if (additions.length > 0) {
+    process.env.PATH = [...additions, ...existing].join(path.delimiter);
+  }
+}
+
+async function refreshNodeRuntimePath() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const candidates = [
+    path.join(process.env.ProgramFiles || "", "nodejs"),
+    path.join(process.env["ProgramFiles(x86)"] || "", "nodejs"),
+    path.join(process.env.LOCALAPPDATA || "", "Programs", "nodejs"),
+  ].filter(Boolean);
+
+  const existing = [];
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) {
+      existing.push(candidate);
+    }
+  }
+
+  prependPathsToEnvironment(existing);
+}
+
+async function ensureNodeRuntime(logs) {
+  const nodeInstalled = await commandExists("node");
+  const npmInstalled = await commandExists("npm");
+
+  if (nodeInstalled && npmInstalled) {
+    return;
+  }
+
+  if (process.platform === "win32" && (await commandExists("winget"))) {
+    logs.push("Node.js ou npm manquant. Installation automatique de Node.js LTS via winget...");
+    await runCommand(
+      "winget",
+      [
+        "install",
+        "-e",
+        "--id",
+        "OpenJS.NodeJS.LTS",
+        "--silent",
+        "--scope",
+        "user",
+        "--accept-package-agreements",
+        "--accept-source-agreements",
+        "--disable-interactivity",
+      ],
+      {
+        timeoutMs: 600000,
+        timeoutMessage:
+          "L'installation automatique de Node.js via winget prend trop de temps. Réessayez ou installez Node.js manuellement.",
+      },
+    );
+    await refreshNodeRuntimePath();
+  } else if (process.platform === "darwin" && (await commandExists("brew"))) {
+    logs.push("Node.js ou npm manquant. Installation automatique via Homebrew...");
+    await runCommand("brew", ["install", "node"], {
+      cwd: os.homedir(),
+      timeoutMs: 600000,
+      timeoutMessage:
+        "L'installation automatique de Node.js via Homebrew prend trop de temps. Réessayez ou installez Node.js manuellement.",
+    });
+  }
+
+  ensureCommandOrThrow(
+    (await commandExists("node")) && (await commandExists("npm")),
+    `Node.js et npm sont requis. Installez-les depuis ${OFFICIAL_DOWNLOAD_URLS.nodejs} puis relancez AIPilot Manager.`,
+  );
+}
+
 async function updateShellFile(filePath, exportsMap) {
   let current = "";
 
@@ -835,6 +933,7 @@ function ensureCommandOrThrow(available, message) {
 
 async function installCodex(logs) {
   logs.push("Préparation de l'installation Codex...");
+  await ensureNodeRuntime(logs);
   if (process.platform === "win32") {
     if (await commandExists("codex")) {
       logs.push("Codex CLI est déjà disponible.");
@@ -867,11 +966,6 @@ async function installCodex(logs) {
     }
   }
 
-  ensureCommandOrThrow(
-    await commandExists("npm"),
-    "Node.js et npm sont requis pour installer Codex CLI.",
-  );
-
   logs.push("Installation de Codex CLI via npm...");
   await runCommand("npm", ["install", "-g", "@openai/codex@latest"], {
     cwd: os.homedir(),
@@ -902,62 +996,11 @@ async function installT3Code(logs) {
 
 async function installOpenCode(logs) {
   logs.push("Préparation de l'installation OpenCode...");
-  if (process.platform === "win32") {
-    if (!(await isDesktopAppInstalled("opencode"))) {
-      try {
-        await installWingetPackage("SST.OpenCodeDesktop", logs);
-      } catch (error) {
-        logs.push(
-          `L'app OpenCode Windows n'a pas pu être installée automatiquement. ${
-            error instanceof Error ? error.message : ""
-          }`.trim(),
-        );
-      }
-    } else {
-      logs.push("L'app OpenCode Windows est déjà disponible.");
-    }
-
-    if (await commandExists("opencode")) {
-      logs.push("La commande OpenCode est déjà disponible.");
-      return;
-    }
-
-    try {
-      await installWingetPackage("SST.opencode", logs);
-      if (await commandExists("opencode")) {
-        return;
-      }
-    } catch (error) {
-      logs.push(
-        `winget n'a pas terminé l'installation d'OpenCode CLI. Fallback npm: ${
-          error instanceof Error ? error.message : ""
-        }`.trim(),
-      );
-    }
-  } else if (await commandExists("opencode")) {
+  await ensureNodeRuntime(logs);
+  if (await commandExists("opencode")) {
     logs.push("OpenCode est déjà disponible.");
     return;
   }
-
-  if (process.platform === "darwin" && (await commandExists("brew"))) {
-    try {
-      logs.push("Tentative d'installation de l'app OpenCode via Homebrew...");
-      await runCommand("brew", ["install", "--cask", "opencode"], {
-        cwd: os.homedir(),
-      });
-    } catch (error) {
-      logs.push(
-        `Le cask OpenCode n'a pas été installé automatiquement. Le CLI sera quand même configuré. ${
-          error instanceof Error ? error.message : ""
-        }`.trim(),
-      );
-    }
-  }
-
-  ensureCommandOrThrow(
-    await commandExists("npm"),
-    "Node.js et npm sont requis pour installer OpenCode.",
-  );
 
   logs.push("Installation d'OpenCode via npm...");
   await runCommand("npm", ["install", "-g", "opencode-ai"], {
@@ -1091,12 +1134,6 @@ async function buildDiagnostics(manifest, projectRoot) {
     const localConfigExists = projectRoot ? await fileExists(localConfigPath) : false;
 
     checks.push(
-      {
-        label: "App OpenCode",
-        ok: desktopAppAvailable,
-        optional: true,
-        details: desktopAppAvailable ? "Installée" : "CLI uniquement pour l'instant",
-      },
       {
         label: "Commande OpenCode",
         ok: opencodeAvailable,
@@ -1297,6 +1334,24 @@ ipcMain.handle("manager:get-desktop-app-status", async (_event, environment) => 
   return {
     installed,
     required: requiresDesktopApp(value),
+  };
+});
+
+ipcMain.handle("manager:get-install-readiness", async (_event, environment) => {
+  return getInstallReadiness(String(environment ?? ""));
+});
+
+ipcMain.handle("manager:install-node-runtime", async () => {
+  const logs = [];
+  await ensureNodeRuntime({
+    push(message) {
+      logs.push(String(message));
+    },
+  });
+  return {
+    ok: true,
+    logs,
+    readiness: await getInstallReadiness(""),
   };
 });
 

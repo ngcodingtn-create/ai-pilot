@@ -109,13 +109,14 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
   }
 
   return {
-    label: "OpenCode",
-    projectRootRecommended: true,
-    notes: [
-      "Le manager écrit une configuration globale OpenCode, puis ajoute en option les fichiers projet pour accélérer le premier lancement.",
-      "Sous Windows, WSL reste recommandé pour la meilleure expérience OpenCode.",
-    ],
-    officialAppUrl: "https://opencode.ai/download",
+      label: "OpenCode",
+      projectRootRecommended: true,
+      notes: [
+      "AIPilot installe et configure uniquement OpenCode CLI, puis écrit la configuration Azure globale et optionnellement la configuration projet.",
+      "Sous Windows, WSL reste recommandé pour la meilleure expérience OpenCode CLI.",
+      ],
+    officialAppUrl: "https://opencode.ai/install",
+    officialCliUrl: "https://opencode.ai/install",
   };
 }
 
