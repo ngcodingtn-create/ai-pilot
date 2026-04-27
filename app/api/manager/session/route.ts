@@ -36,12 +36,14 @@ name = "AIPilot AI"
 base_url = "${baseUrl}"
 env_key = "AZURE_OPENAI_API_KEY"
 wire_api = "responses"
-query_params = { api-version = "2025-04-01-preview" }
 
 [profiles.azure-medium]
 model_provider = "azure"
 model = "${deployment}"
 model_reasoning_effort = "medium"
+
+[profiles.azure-medium.windows]
+sandbox = "elevated"
 
 [profiles.azure-high]
 model_provider = "azure"
@@ -52,6 +54,9 @@ model_reasoning_effort = "high"
 model_provider = "azure"
 model = "${deployment}"
 model_reasoning_effort = "xhigh"
+
+[windows]
+sandbox = "elevated"
 `;
 }
 
