@@ -363,6 +363,36 @@ function getOpenCodeLocalConfig(projectRoot) {
   return path.join(projectRoot, ".opencode", "config.json");
 }
 
+function getSetupGuidance(manifest, projectRoot) {
+  if (manifest.tool.environment === "opencode") {
+    return {
+      primaryConfigPath: getOpenCodeGlobalConfigPath(),
+      configDirectoryPath: path.dirname(getOpenCodeGlobalConfigPath()),
+      prompt:
+        "La configuration OpenCode a déjà été préparée par AIPilot. Vérifiez votre dossier projet puis lancez OpenCode.",
+      nextSteps: [
+        "AIPilot écrit la configuration globale OpenCode et le fichier d'authentification Azure.",
+        projectRoot
+          ? `La configuration projet sera utilisée dans ${projectRoot}.`
+          : "Choisissez un dossier projet si vous voulez aussi générer la configuration locale OpenCode.",
+        "Si vous changez de licence ou de déploiement Azure, cliquez sur Réparer pour réécrire la configuration.",
+      ],
+    };
+  }
+
+  const toolLabel = manifest.tool.environment === "t3code" ? "T3 Code" : "Codex";
+  return {
+    primaryConfigPath: getCodexConfigPath(),
+    configDirectoryPath: getCodexHome(),
+    prompt: `La configuration Codex a déjà été écrite par AIPilot. Ouvrez ${toolLabel} ou Codex CLI pour commencer.`,
+    nextSteps: [
+      "Le fichier ~/.codex/config.toml contient déjà l'endpoint Azure AIPilot et le déploiement configuré.",
+      "Si l'app desktop n'est pas encore installée sur Windows, vous pouvez lancer Codex CLI tout de suite ou ouvrir la page officielle de téléchargement.",
+      "Si vous changez de licence ou de machine, cliquez sur Réparer pour réinjecter la configuration.",
+    ],
+  };
+}
+
 function stringifyCommand(parts) {
   return parts.map((part) => (part.includes(" ") ? `"${part}"` : part)).join(" ");
 }
@@ -1248,6 +1278,8 @@ async function executeManagerAction(action, payload, event) {
     await installTool(manifest, logSink);
     await configureTool(manifest, projectRoot, logSink);
     logSink.push("Installation et configuration terminées.");
+    logSink.push(`Configuration prête: ${getSetupGuidance(manifest, projectRoot).primaryConfigPath}`);
+    logSink.push("Vous pouvez ouvrir le fichier de configuration ou le dossier associé directement depuis le manager.");
     return {
       logs,
       diagnostics: await buildDiagnostics(manifest, projectRoot),
@@ -1258,6 +1290,7 @@ async function executeManagerAction(action, payload, event) {
     logSink.push("Réparation de la configuration en cours...");
     await configureTool(manifest, projectRoot, logSink);
     logSink.push("Réparation terminée.");
+    logSink.push(`Configuration prête: ${getSetupGuidance(manifest, projectRoot).primaryConfigPath}`);
     return {
       logs,
       diagnostics: await buildDiagnostics(manifest, projectRoot),
@@ -1348,7 +1381,10 @@ ipcMain.handle("manager:create-session", async (_event, payload) => {
     environment: String(payload.environment ?? "opencode"),
   });
 
-  return data;
+  return {
+    ...data,
+    setup: getSetupGuidance(data, String(payload?.projectRoot ?? "")),
+  };
 });
 
 ipcMain.handle("manager:save-state", async (_event, payload) => {
@@ -1370,6 +1406,30 @@ ipcMain.handle("manager:open-external", async (_event, url) => {
   if (url) {
     await shell.openExternal(url);
   }
+});
+
+ipcMain.handle("manager:open-path", async (_event, targetPath) => {
+  const value = String(targetPath ?? "").trim();
+  if (!value) {
+    return { ok: false };
+  }
+
+  const existing = await fileExists(value);
+  if (!existing) {
+    throw new Error(`Chemin introuvable: ${value}`);
+  }
+
+  if (process.platform === "win32") {
+    await runCommand("explorer.exe", [value]);
+    return { ok: true };
+  }
+
+  const result = await shell.openPath(value);
+  if (result) {
+    throw new Error(result);
+  }
+
+  return { ok: true };
 });
 
 app.whenReady().then(() => {

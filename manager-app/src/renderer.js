@@ -27,6 +27,10 @@ const elements = {
   installUpdate: document.querySelector("#install-update"),
   sessionSummary: document.querySelector("#session-summary"),
   diagnostics: document.querySelector("#diagnostics"),
+  setupGuidance: document.querySelector("#setup-guidance"),
+  openConfigFile: document.querySelector("#open-config-file"),
+  openConfigFolder: document.querySelector("#open-config-folder"),
+  downloadOfficialApp: document.querySelector("#download-official-app"),
   logs: document.querySelector("#logs"),
 };
 
@@ -54,6 +58,7 @@ function normalizeLicenseKey(value) {
 function syncButtons() {
   const connected = Boolean(state.manifest);
   const disabled = !connected || state.busy;
+  const setup = state.manifest?.setup || null;
 
   elements.connect.disabled = state.busy;
   elements.chooseFolder.disabled = state.busy;
@@ -66,6 +71,10 @@ function syncButtons() {
   elements.checkUpdates.disabled =
     state.busy || !state.updateState?.enabled || state.updateState?.checking;
   elements.installUpdate.disabled = !state.updateState?.downloaded || state.busy;
+  elements.openConfigFile.disabled = state.busy || !setup?.primaryConfigPath;
+  elements.openConfigFolder.disabled = state.busy || !setup?.configDirectoryPath;
+  elements.downloadOfficialApp.disabled =
+    state.busy || !state.manifest?.tool?.officialAppUrl;
 }
 
 function setBusy(busy) {
@@ -190,6 +199,35 @@ function renderDiagnostics(diagnostics) {
   `;
 }
 
+function renderSetupGuidance(manifest) {
+  if (!manifest?.setup) {
+    elements.setupGuidance.innerHTML =
+      "<p>Installez ou réparez un outil pour afficher les fichiers de configuration et les actions recommandées.</p>";
+    syncButtons();
+    return;
+  }
+
+  const setup = manifest.setup;
+  const notes = Array.isArray(setup.nextSteps) ? setup.nextSteps : [];
+
+  elements.setupGuidance.innerHTML = `
+    <dl>
+      <div class="summary-row"><dt>Fichier principal</dt><dd>${escapeHtml(setup.primaryConfigPath || "Aucun")}</dd></div>
+      <div class="summary-row"><dt>Dossier config</dt><dd>${escapeHtml(setup.configDirectoryPath || "Aucun")}</dd></div>
+      <div class="summary-row"><dt>État attendu</dt><dd>${escapeHtml(setup.prompt || "")}</dd></div>
+    </dl>
+    ${
+      notes.length
+        ? `<div class="summary-section"><h3>Étapes recommandées</h3><div class="stack-list">${notes
+            .map((note) => `<p>${escapeHtml(note)}</p>`)
+            .join("")}</div></div>`
+        : ""
+    }
+  `;
+
+  syncButtons();
+}
+
 async function connectSession({ autoDiagnose = true } = {}) {
   const backendUrl = state.defaults.backendUrl;
   const licenseKey = normalizeLicenseKey(elements.licenseKey.value);
@@ -206,6 +244,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
     backendUrl,
     licenseKey,
     environment,
+    projectRoot: state.projectRoot,
   });
 
   state.manifest = manifest;
@@ -214,6 +253,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
   }
 
   renderSessionSummary(manifest);
+  renderSetupGuidance(manifest);
   appendLog(`Licence connectée pour ${manifest.license.customerName}.`);
   await persistState();
   syncButtons();
@@ -268,6 +308,8 @@ async function bootstrap() {
     elements.projectRoot.value = state.defaults.projectRoot;
   }
 
+  renderSetupGuidance(null);
+
   const initialUpdateState = await window.aipilotManager.getUpdateState();
   renderUpdateState(initialUpdateState);
   const unsubscribe = window.aipilotManager.onUpdateState(renderUpdateState);
@@ -292,6 +334,21 @@ async function bootstrap() {
     state.projectRoot = directory;
     elements.projectRoot.value = directory;
     appendLog(`Dossier projet: ${directory}`);
+    if (state.manifest) {
+      renderSetupGuidance({
+        ...state.manifest,
+        setup: {
+          ...state.manifest.setup,
+          nextSteps: Array.isArray(state.manifest.setup?.nextSteps)
+            ? state.manifest.setup.nextSteps.map((line) =>
+                line.includes("Choisissez un dossier projet")
+                  ? `La configuration projet sera utilisée dans ${directory}.`
+                  : line,
+              )
+            : state.manifest.setup?.nextSteps,
+        },
+      });
+    }
     await persistState();
   });
 
@@ -358,6 +415,33 @@ async function bootstrap() {
 
     await window.aipilotManager.openExternal(state.manifest.manager.supportVideoUrl);
     appendLog("Ouverture de la vidéo d’aide.");
+  });
+
+  elements.openConfigFile.addEventListener("click", async () => {
+    const target = state.manifest?.setup?.primaryConfigPath;
+    if (!target) {
+      return;
+    }
+    await window.aipilotManager.openPath(target);
+    appendLog(`Ouverture du fichier de configuration: ${target}`);
+  });
+
+  elements.openConfigFolder.addEventListener("click", async () => {
+    const target = state.manifest?.setup?.configDirectoryPath;
+    if (!target) {
+      return;
+    }
+    await window.aipilotManager.openPath(target);
+    appendLog(`Ouverture du dossier de configuration: ${target}`);
+  });
+
+  elements.downloadOfficialApp.addEventListener("click", async () => {
+    const target = state.manifest?.tool?.officialAppUrl;
+    if (!target) {
+      return;
+    }
+    await window.aipilotManager.openExternal(target);
+    appendLog("Ouverture de la page officielle de téléchargement.");
   });
 
   elements.checkUpdates.addEventListener("click", async () => {

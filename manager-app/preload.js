@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("aipilotManager", {
   saveState: (payload) => ipcRenderer.invoke("manager:save-state", payload),
   runAction: (payload) => ipcRenderer.invoke("manager:run-action", payload),
   openExternal: (url) => ipcRenderer.invoke("manager:open-external", url),
+  openPath: (targetPath) => ipcRenderer.invoke("manager:open-path", targetPath),
   onActionLog: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on("manager:action-log", listener);

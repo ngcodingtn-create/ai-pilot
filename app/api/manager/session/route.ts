@@ -7,6 +7,8 @@ type ToolDetails = {
   label: string;
   projectRootRecommended: boolean;
   notes: string[];
+  officialAppUrl?: string;
+  officialCliUrl?: string;
 };
 
 function normalizeEnvironment(value: unknown): EnvironmentKey | undefined {
@@ -88,6 +90,8 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
         "Le manager installe ou répare Codex CLI, écrit ~/.codex/config.toml, puis injecte la configuration Azure AIPilot.",
         "Sur Windows, un terminal WSL2 reste recommandé si l'utilisateur veut un workflow CLI plus stable.",
       ],
+      officialAppUrl: "https://developers.openai.com/codex/app/windows",
+      officialCliUrl: "https://github.com/openai/codex/releases",
     };
   }
 
@@ -99,6 +103,8 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
         "T3 Code repose sur Codex CLI. Le manager traite donc Codex comme prérequis avant toute réparation ou lancement.",
         "Si le binaire T3 local n'est pas disponible, le manager peut lancer le fallback officiel via npx.",
       ],
+      officialAppUrl: "https://github.com/pingdotgg/t3code/releases",
+      officialCliUrl: "https://github.com/openai/codex/releases",
     };
   }
 
@@ -109,6 +115,7 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       "Le manager écrit une configuration globale OpenCode, puis ajoute en option les fichiers projet pour accélérer le premier lancement.",
       "Sous Windows, WSL reste recommandé pour la meilleure expérience OpenCode.",
     ],
+    officialAppUrl: "https://opencode.ai/download",
   };
 }
 
@@ -164,6 +171,8 @@ export async function POST(request: Request) {
       label: tool.label,
       projectRootRecommended: tool.projectRootRecommended,
       notes: tool.notes,
+      officialAppUrl: tool.officialAppUrl ?? "",
+      officialCliUrl: tool.officialCliUrl ?? "",
     },
     azure: {
       apiKey: effectiveApiKey,
