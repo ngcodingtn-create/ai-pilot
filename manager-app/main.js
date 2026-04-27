@@ -782,37 +782,14 @@ function ensureCommandOrThrow(available, message) {
 async function installCodex(logs) {
   logs.push("Préparation de l'installation Codex...");
   if (process.platform === "win32") {
-    if (!(await isDesktopAppInstalled("codex"))) {
-      try {
-        await installWingetPackage("9PLM9XGG6VKS", logs, { source: "msstore" });
-      } catch (error) {
-        logs.push(
-          `L'app Codex Windows n'a pas pu être installée automatiquement. ${
-            error instanceof Error ? error.message : ""
-          }`.trim(),
-        );
-      }
-    } else {
-      logs.push("L'app Codex Windows est déjà disponible.");
-    }
-
     if (await commandExists("codex")) {
       logs.push("Codex CLI est déjà disponible.");
       return;
     }
 
-    try {
-      await installWingetPackage("OpenAI.Codex", logs);
-      if (await commandExists("codex")) {
-        return;
-      }
-    } catch (error) {
-      logs.push(
-        `winget n'a pas terminé l'installation de Codex CLI. Fallback npm: ${
-          error instanceof Error ? error.message : ""
-        }`.trim(),
-      );
-    }
+    logs.push(
+      "Windows: installation directe de Codex CLI via npm. L'app Codex desktop reste disponible depuis la page officielle si vous la voulez aussi.",
+    );
   } else if (await commandExists("codex")) {
     logs.push("Codex CLI est déjà disponible.");
     return;
