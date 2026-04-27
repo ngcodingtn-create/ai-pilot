@@ -3,6 +3,7 @@ const state = {
   manifest: null,
   projectRoot: "",
   busy: false,
+  autoSetupStarted: false,
   updateState: null,
 };
 
@@ -393,6 +394,12 @@ async function bootstrap() {
     appendLog("Connexion automatique de la licence reçue depuis le portail...");
     try {
       await connectSession();
+      if (state.defaults.autoSetup && !state.autoSetupStarted) {
+        state.autoSetupStarted = true;
+        appendLog("Mode automatique: installation, configuration, puis lancement...");
+        await runManagerAction("install-configure");
+        await runManagerAction("launch");
+      }
     } catch (error) {
       appendLog(
         error instanceof Error

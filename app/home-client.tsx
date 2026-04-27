@@ -625,7 +625,8 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   <InfoPanel title="Que fait l’installateur actuel ?" tone="slate">
                     <ul className="space-y-2 text-sm leading-7 text-slate-700">
                       <li>- Il télécharge le launcher AIPilot Manager adapté au système choisi</li>
-                      <li>- Il récupère ensuite l’application manager, préremplie avec votre licence et l’outil sélectionné</li>
+                      <li>- Sous Windows, le bootstrap installe maintenant AIPilot Manager comme une vraie app visible sur le bureau et dans le menu Démarrer</li>
+                      <li>- Il ouvre ensuite l’application manager, préremplie avec votre licence et l’outil sélectionné</li>
                       <li>
                         -{" "}
                         {config.includeApiKeyInInstaller
@@ -638,7 +639,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
                   <InfoPanel title="Points importants" tone="blue">
                     <ul className="space-y-2 text-sm leading-7 text-slate-700">
-                      <li>- Windows utilise un launcher <InlineCode>.cmd</InlineCode> pour installer et lancer AIPilot Manager</li>
+                      <li>- Windows utilise un bootstrap <InlineCode>.cmd</InlineCode> qui installe la vraie app desktop puis l’ouvre automatiquement</li>
                       <li>- Linux et macOS utilisent un script shell qui récupère puis lance le manager</li>
                       <li>- T3 Code est configuré à partir de Codex CLI, donc le manager traite Codex comme prérequis quand vous choisissez T3 Code</li>
                     </ul>
@@ -822,9 +823,9 @@ function getOsOptions() {
       label: "Windows",
       tag: "Le plus courant",
       description:
-        "Windows 10/11. Le téléchargement actuel fournit un launcher `.cmd` pour récupérer et lancer AIPilot Manager.",
+        "Windows 10/11. Le téléchargement actuel fournit un bootstrap `.cmd` qui installe AIPilot Manager sur la machine, crée les raccourcis, puis ouvre l'app.",
       downloadHref: "/api/download/manager/windows",
-      downloadLabel: "AIPilot Manager pour Windows (.cmd)",
+      downloadLabel: "Installer AIPilot Manager pour Windows (.cmd)",
     },
     linux: {
       key: "linux" as const,
@@ -879,7 +880,7 @@ function buildManagerDownloadCommand(
 
   if (os === "windows") {
     return (
-      `powershell -ExecutionPolicy Bypass -Command "$file = Join-Path $env:TEMP 'setup-aipilot-manager.cmd'; ` +
+      `powershell -ExecutionPolicy Bypass -Command "$file = Join-Path $env:TEMP 'install-aipilot-manager.cmd'; ` +
       `Invoke-WebRequest -UseBasicParsing '${downloadUrl}' -OutFile $file; ` +
       `Start-Process $file"`
     );

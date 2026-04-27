@@ -5,11 +5,33 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 
+function readCliArg(flag) {
+  const args = process.argv.slice(app.isPackaged ? 1 : 2);
+  const flagIndex = args.indexOf(flag);
+  if (flagIndex === -1) {
+    return "";
+  }
+
+  return args[flagIndex + 1] ?? "";
+}
+
+function hasCliFlag(flag) {
+  const args = process.argv.slice(app.isPackaged ? 1 : 2);
+  return args.includes(flag);
+}
+
 const DEFAULT_BACKEND_URL =
-  process.env.AIPILOT_MANAGER_BACKEND_URL || "http://localhost:3000";
-const DEFAULT_LICENSE_KEY = process.env.AIPILOT_MANAGER_DEFAULT_LICENSE_KEY || "";
+  readCliArg("--backend-url") ||
+  process.env.AIPILOT_MANAGER_BACKEND_URL ||
+  "http://localhost:3000";
+const DEFAULT_LICENSE_KEY =
+  readCliArg("--license-key") || process.env.AIPILOT_MANAGER_DEFAULT_LICENSE_KEY || "";
 const DEFAULT_ENVIRONMENT =
-  process.env.AIPILOT_MANAGER_DEFAULT_ENVIRONMENT || "opencode";
+  readCliArg("--environment") ||
+  process.env.AIPILOT_MANAGER_DEFAULT_ENVIRONMENT ||
+  "opencode";
+const DEFAULT_AUTO_SETUP =
+  hasCliFlag("--auto-setup") || process.env.AIPILOT_MANAGER_AUTO_SETUP === "1";
 const PLATFORM_KEY =
   process.platform === "win32"
     ? "windows"
@@ -836,6 +858,7 @@ ipcMain.handle("manager:get-defaults", async () => {
     platform: PLATFORM_KEY,
     licenseKey: DEFAULT_LICENSE_KEY,
     environment: DEFAULT_ENVIRONMENT,
+    autoSetup: DEFAULT_AUTO_SETUP,
     version: app.getVersion(),
     packaged: app.isPackaged,
   };

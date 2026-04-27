@@ -85,3 +85,37 @@ export async function downloadBinaryArtifact(filePath: string) {
     },
   });
 }
+
+type GitHubReleaseAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+export async function findManagerReleaseAsset(
+  matcher: (asset: GitHubReleaseAsset) => boolean,
+) {
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/ngcodingtn-create/ai-pilot/releases/latest",
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "User-Agent": "AIPilot-Portal",
+        },
+        next: { revalidate: 300 },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as {
+      assets?: GitHubReleaseAsset[];
+    };
+    const assets = Array.isArray(payload.assets) ? payload.assets : [];
+    return assets.find(matcher) ?? null;
+  } catch {
+    return null;
+  }
+}

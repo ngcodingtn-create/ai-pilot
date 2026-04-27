@@ -1,19 +1,8 @@
 import { resolveSiteUrlFromRequest } from "@/lib/site-url";
 import {
-  downloadBinaryArtifact,
   downloadTextFile,
-  findManagerArtifact,
+  findManagerReleaseAsset,
 } from "../../lib";
-
-const FILES = [
-  "package.json",
-  "package-lock.json",
-  "main.js",
-  "preload.js",
-  "src/index.html",
-  "src/styles.css",
-  "src/renderer.js",
-];
 
 function readEnvironment(value: string | null) {
   return value === "codex" || value === "t3code" ? value : "opencode";
@@ -27,11 +16,6 @@ function readLicenseKey(value: string | null) {
 }
 
 export async function GET(request: Request) {
-  const packagedArtifact = await findManagerArtifact([".exe"], ["setup"]);
-  if (packagedArtifact) {
-    return downloadBinaryArtifact(packagedArtifact);
-  }
-
   const siteUrl = resolveSiteUrlFromRequest(
     request.url,
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-pilot-ten.vercel.app",
@@ -39,40 +23,43 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const environment = readEnvironment(searchParams.get("environment"));
   const licenseKey = readLicenseKey(searchParams.get("licenseKey"));
-
-  const downloadCommands = FILES.map(
-    (file) =>
-      `$target = Join-Path $root '${file.replaceAll("/", "\\")}'; ` +
-      `$dir = Split-Path $target; ` +
-      `New-Item -ItemType Directory -Force -Path $dir | Out-Null; ` +
-      `Invoke-WebRequest -UseBasicParsing '${siteUrl}/api/manager/files/${file}' -OutFile $target;`,
-  ).join(" ");
+  const releaseAsset = await findManagerReleaseAsset((asset) =>
+    /^AIPilot Manager-Setup-.*-x64\.exe$/i.test(asset.name),
+  );
+  const installerUrl =
+    releaseAsset?.browser_download_url ??
+    "https://github.com/ngcodingtn-create/ai-pilot/releases/latest/download/AIPilot%20Manager-Setup-0.2.0-x64.exe";
 
   const launcher = [
     "@echo off",
     "setlocal",
     `powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; ` +
-      `$root = Join-Path $env:LOCALAPPDATA 'AIPilotManager'; ` +
-      `New-Item -ItemType Directory -Force -Path (Join-Path $root 'src') | Out-Null; ` +
-      `if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { ` +
-      `  if (Get-Command winget -ErrorAction SilentlyContinue) { ` +
-      `    winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --disable-interactivity; ` +
-      `    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User'); ` +
-      `  } else { throw 'Node.js et npm sont requis pour lancer AIPilot Manager.' } ` +
+      `$installer = Join-Path $env:TEMP 'AIPilot-Manager-Setup.exe'; ` +
+      `$desktopShortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) 'AIPilot Manager.lnk'; ` +
+      `$installDir = Join-Path $env:LOCALAPPDATA 'Programs\\AIPilot Manager'; ` +
+      `$installedExe = Join-Path $installDir 'AIPilot Manager.exe'; ` +
+      `Invoke-WebRequest -UseBasicParsing '${installerUrl}' -OutFile $installer; ` +
+      `Start-Process -FilePath $installer -ArgumentList '/S' -Wait; ` +
+      `if (-not (Test-Path $installedExe)) { ` +
+      `  $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)'); ` +
+      `  $probePaths = @($installDir, (Join-Path $env:ProgramFiles 'AIPilot Manager')); ` +
+      `  if ($programFilesX86) { $probePaths += (Join-Path $programFilesX86 'AIPilot Manager') }; ` +
+      `  $probe = Get-ChildItem -Path $probePaths -Filter 'AIPilot Manager.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1; ` +
+      `  if ($probe) { $installedExe = $probe.FullName } ` +
       `} ` +
-      `${downloadCommands} ` +
-      `Push-Location $root; ` +
-      `if (Test-Path 'package-lock.json') { npm ci --no-audit --no-fund } else { npm install --no-audit --no-fund }; ` +
-      `$env:AIPILOT_MANAGER_BACKEND_URL='${siteUrl}'; ` +
-      `$env:AIPILOT_MANAGER_DEFAULT_ENVIRONMENT='${environment}'; ` +
-      `$env:AIPILOT_MANAGER_DEFAULT_LICENSE_KEY='${licenseKey}'; ` +
-      `npm run app; ` +
-      `Pop-Location"`,
+      `if (-not (Test-Path $installedExe)) { throw 'AIPilot Manager a été téléchargé, mais l''installation Windows n''a pas produit l''exécutable attendu.' } ` +
+      `$shell = New-Object -ComObject WScript.Shell; ` +
+      `$shortcut = $shell.CreateShortcut($desktopShortcut); ` +
+      `$shortcut.TargetPath = $installedExe; ` +
+      `$shortcut.WorkingDirectory = Split-Path $installedExe; ` +
+      `$shortcut.IconLocation = $installedExe; ` +
+      `$shortcut.Save(); ` +
+      `Start-Process -FilePath $installedExe -ArgumentList @('--backend-url','${siteUrl}','--environment','${environment}','--license-key','${licenseKey}','--auto-setup');"`,
   ].join("\r\n");
 
   return downloadTextFile(
     launcher,
-    "setup-aipilot-manager.cmd",
+    "install-aipilot-manager.cmd",
     "application/octet-stream",
   );
 }
