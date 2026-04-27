@@ -61,6 +61,75 @@ const OFFICIAL_DOWNLOAD_URLS = {
   nodejs: "https://nodejs.org/en/download",
 };
 
+async function resolveNodeWindowsInstallerUrl() {
+  const arch =
+    process.arch === "arm64"
+      ? "arm64"
+      : process.arch === "x64"
+        ? "x64"
+        : "x86";
+
+  const shasumsUrl = "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt";
+  const response = await fetch(shasumsUrl, {
+    headers: {
+      Accept: "text/plain",
+      "User-Agent": "AIPilot-Manager",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Impossible de récupérer la version Node.js LTS officielle.");
+  }
+
+  const text = await response.text();
+  const match = text.match(new RegExp(`(node-v[\\d.]+-${arch}\\.msi)`, "i"));
+
+  if (!match) {
+    throw new Error("Impossible de trouver l'installeur MSI Node.js LTS pour cette architecture.");
+  }
+
+  return `https://nodejs.org/dist/latest-v22.x/${match[1]}`;
+}
+
+async function installNodeRuntimeWindowsFallback(logs) {
+  const installerUrl = await resolveNodeWindowsInstallerUrl();
+  const installerPath = path.join(app.getPath("temp"), "aipilot-node-lts.msi");
+
+  logs.push(`Téléchargement de Node.js LTS depuis ${installerUrl}`);
+
+  const response = await fetch(installerUrl, {
+    headers: {
+      "User-Agent": "AIPilot-Manager",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Le téléchargement de Node.js LTS a échoué.");
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  await fs.writeFile(installerPath, Buffer.from(arrayBuffer));
+
+  logs.push("Installation silencieuse de Node.js LTS...");
+  await runCommand(
+    "msiexec.exe",
+    ["/i", installerPath, "/qn", "/norestart"],
+    {
+      timeoutMs: 900000,
+      timeoutMessage:
+        "L'installation silencieuse de Node.js prend trop de temps. Réessayez ou installez Node.js manuellement.",
+    },
+  );
+
+  await refreshNodeRuntimePath();
+
+  try {
+    await fs.unlink(installerPath);
+  } catch {
+    // Ignore cleanup errors in temp.
+  }
+}
+
 function getStatePath() {
   return path.join(app.getPath("userData"), "manager-state.json");
 }
@@ -760,27 +829,39 @@ async function ensureNodeRuntime(logs) {
 
   if (process.platform === "win32" && (await commandExists("winget"))) {
     logs.push("Node.js ou npm manquant. Installation automatique de Node.js LTS via winget...");
-    await runCommand(
-      "winget",
-      [
-        "install",
-        "-e",
-        "--id",
-        "OpenJS.NodeJS.LTS",
-        "--silent",
-        "--scope",
-        "user",
-        "--accept-package-agreements",
-        "--accept-source-agreements",
-        "--disable-interactivity",
-      ],
-      {
-        timeoutMs: 600000,
-        timeoutMessage:
-          "L'installation automatique de Node.js via winget prend trop de temps. Réessayez ou installez Node.js manuellement.",
-      },
-    );
-    await refreshNodeRuntimePath();
+    try {
+      await runCommand(
+        "winget",
+        [
+          "install",
+          "-e",
+          "--id",
+          "OpenJS.NodeJS.LTS",
+          "--silent",
+          "--scope",
+          "user",
+          "--accept-package-agreements",
+          "--accept-source-agreements",
+          "--disable-interactivity",
+        ],
+        {
+          timeoutMs: 600000,
+          timeoutMessage:
+            "L'installation automatique de Node.js via winget prend trop de temps.",
+        },
+      );
+      await refreshNodeRuntimePath();
+    } catch (error) {
+      logs.push(
+        `winget n'a pas pu installer Node.js automatiquement. Fallback MSI officiel: ${
+          error instanceof Error ? error.message : "erreur inconnue"
+        }`,
+      );
+      await installNodeRuntimeWindowsFallback(logs);
+    }
+  } else if (process.platform === "win32") {
+    logs.push("winget introuvable. Installation automatique de Node.js LTS via MSI officiel...");
+    await installNodeRuntimeWindowsFallback(logs);
   } else if (process.platform === "darwin" && (await commandExists("brew"))) {
     logs.push("Node.js ou npm manquant. Installation automatique via Homebrew...");
     await runCommand("brew", ["install", "node"], {
