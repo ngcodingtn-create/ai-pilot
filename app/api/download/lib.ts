@@ -86,6 +86,17 @@ export async function downloadBinaryArtifact(filePath: string) {
   });
 }
 
+export async function getManagerAppVersion() {
+  try {
+    const packageJsonPath = path.resolve(process.cwd(), "manager-app", "package.json");
+    const raw = await readFile(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw) as { version?: string };
+    return String(parsed.version ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
 type GitHubReleaseAsset = {
   name: string;
   browser_download_url: string;

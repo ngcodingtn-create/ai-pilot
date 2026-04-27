@@ -2,6 +2,7 @@ import { resolveSiteUrlFromRequest } from "@/lib/site-url";
 import {
   downloadTextFile,
   findManagerReleaseAsset,
+  getManagerAppVersion,
 } from "../../lib";
 
 function readEnvironment(value: string | null) {
@@ -21,15 +22,19 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-pilot-ten.vercel.app",
   );
   const { searchParams } = new URL(request.url);
+  const managerVersion = (await getManagerAppVersion()) || "0.2.2";
   const environment = readEnvironment(searchParams.get("environment"));
   const licenseKey = readLicenseKey(searchParams.get("licenseKey"));
   const releaseAsset = await findManagerReleaseAsset((asset) =>
-    /^AIPilot[- ]Manager-Setup-.*-x64\.exe$/i.test(asset.name),
+    /^AIPilot[. -]Manager-Setup-.*-x64\.exe$/i.test(asset.name),
   );
-  const installerUrl =
-    releaseAsset?.browser_download_url ??
-    "https://github.com/ngcodingtn-create/ai-pilot/releases/download/v0.2.2/AIPilot-Manager-Setup-0.2.2-x64.exe";
-  const safeInstallerUrlForCmd = installerUrl.replaceAll("%", "%%");
+  const fallbackInstallerUrls = [
+    releaseAsset?.browser_download_url,
+    `https://github.com/ngcodingtn-create/ai-pilot/releases/download/v${managerVersion}/AIPilot.Manager-Setup-${managerVersion}-x64.exe`,
+    `https://github.com/ngcodingtn-create/ai-pilot/releases/download/v${managerVersion}/AIPilot-Manager-Setup-${managerVersion}-x64.exe`,
+    `https://github.com/ngcodingtn-create/ai-pilot/releases/download/v${managerVersion}/AIPilot%20Manager-Setup-${managerVersion}-x64.exe`,
+  ].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
+  const safeInstallerUrlsForCmd = fallbackInstallerUrls.map((url) => url.replaceAll("%", "%%"));
 
   const launcher = [
     "@echo off",
@@ -40,19 +45,18 @@ export async function GET(request: Request) {
     "echo   AIPilot Manager - Installation Windows",
     "echo ==============================================",
     "echo.",
-    `set "INSTALLER_URL=${safeInstallerUrlForCmd}"`,
     'set "INSTALLER=%TEMP%\\AIPilot-Manager-Setup.exe"',
     `set "BACKEND_URL=${siteUrl}"`,
     `set "TARGET_ENVIRONMENT=${environment}"`,
     `set "LICENSE_KEY=${licenseKey}"`,
+    'set "DOWNLOAD_OK="',
+    'set "LAST_INSTALLER_URL="',
+    ...safeInstallerUrlsForCmd.map((url, index) => `set "INSTALLER_URL_${index + 1}=${url}"`),
     "echo Telechargement de l'installateur...",
-    `if exist "%SystemRoot%\\System32\\curl.exe" (` +
-      ` "%SystemRoot%\\System32\\curl.exe" -L --retry 5 --retry-delay 2 --retry-all-errors --fail --output "%INSTALLER%" "%INSTALLER_URL%"` +
-      `) else (` +
-      ` powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $url=$env:INSTALLER_URL; $target=$env:INSTALLER; for ($i=1; $i -le 4; $i++) { try { Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $target; exit 0 } catch { if ($i -eq 4) { throw }; Start-Sleep -Seconds 2 } }"` +
-      `)`,
-    "if errorlevel 1 goto :download_error",
-    'if not exist "%INSTALLER%" goto :download_error',
+    ...safeInstallerUrlsForCmd.flatMap((_, index) => [
+      `if not defined DOWNLOAD_OK call :try_download "%INSTALLER_URL_${index + 1}%"`,
+    ]),
+    "if not defined DOWNLOAD_OK goto :download_error",
     "echo Telechargement termine.",
     "echo.",
     "echo Installation de AIPilot Manager...",
@@ -90,7 +94,7 @@ export async function GET(request: Request) {
     "echo ERREUR: le telechargement de l'installateur a echoue.",
     "echo Astuce: verifiez votre connexion, puis relancez ce fichier.",
     "echo L'URL tentee etait:",
-    "echo %INSTALLER_URL%",
+    "echo %LAST_INSTALLER_URL%",
     "pause",
     "exit /b 1",
     "",
@@ -107,6 +111,19 @@ export async function GET(request: Request) {
     "echo Ouvrez-le manuellement depuis le bureau ou le menu Demarrer.",
     "pause",
     "exit /b 1",
+    "",
+    ":try_download",
+    'set "LAST_INSTALLER_URL=%~1"',
+    'if "%LAST_INSTALLER_URL%"=="" exit /b 0',
+    'del /f /q "%INSTALLER%" >nul 2>&1',
+    "echo Tentative: %LAST_INSTALLER_URL%",
+    `if exist "%SystemRoot%\\System32\\curl.exe" (` +
+      ` "%SystemRoot%\\System32\\curl.exe" -L --retry 5 --retry-delay 2 --retry-all-errors --fail --output "%INSTALLER%" "%LAST_INSTALLER_URL%"` +
+      `) else (` +
+      ` powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $url=$env:LAST_INSTALLER_URL; $target=$env:INSTALLER; for ($i=1; $i -le 4; $i++) { try { Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $target; exit 0 } catch { if ($i -eq 4) { throw }; Start-Sleep -Seconds 2 } }"` +
+      `)`,
+    'if not errorlevel 1 if exist "%INSTALLER%" set "DOWNLOAD_OK=1"',
+    "exit /b 0",
   ].join("\r\n");
 
   return downloadTextFile(
