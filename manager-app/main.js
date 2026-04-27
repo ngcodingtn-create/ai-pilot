@@ -263,14 +263,41 @@ function resolveCommandForPlatform(command) {
   return command;
 }
 
+function quoteForWindowsCmd(value) {
+  if (!value) {
+    return '""';
+  }
+
+  const escaped = value.replaceAll('"', '\\"');
+  return /[\s"&()^|<>]/.test(escaped) ? `"${escaped}"` : escaped;
+}
+
 function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(resolveCommandForPlatform(command), args, {
+    const resolvedCommand = resolveCommandForPlatform(command);
+    const childOptions = {
       cwd: options.cwd,
       env: { ...process.env, ...(options.env || {}) },
       shell: false,
       windowsHide: true,
-    });
+    };
+
+    const child =
+      process.platform === "win32" &&
+      (resolvedCommand.endsWith(".cmd") || resolvedCommand.endsWith(".bat"))
+        ? spawn(
+            "cmd.exe",
+            [
+              "/d",
+              "/s",
+              "/c",
+              [quoteForWindowsCmd(resolvedCommand), ...args.map(quoteForWindowsCmd)].join(
+                " ",
+              ),
+            ],
+            childOptions,
+          )
+        : spawn(resolvedCommand, args, childOptions);
 
     let stdout = "";
     let stderr = "";
