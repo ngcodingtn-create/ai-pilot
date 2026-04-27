@@ -238,10 +238,6 @@ async function runManagerAction(action, logAction = true) {
     projectRoot: state.projectRoot,
   });
 
-  for (const line of result.logs || []) {
-    appendLog(line);
-  }
-
   renderDiagnostics(result.diagnostics);
 }
 
@@ -275,7 +271,13 @@ async function bootstrap() {
   const initialUpdateState = await window.aipilotManager.getUpdateState();
   renderUpdateState(initialUpdateState);
   const unsubscribe = window.aipilotManager.onUpdateState(renderUpdateState);
-  window.addEventListener("beforeunload", unsubscribe);
+  const unsubscribeActionLog = window.aipilotManager.onActionLog((message) => {
+    appendLog(message);
+  });
+  window.addEventListener("beforeunload", () => {
+    unsubscribe();
+    unsubscribeActionLog();
+  });
 
   elements.licenseKey.addEventListener("input", (event) => {
     event.target.value = normalizeLicenseKey(event.target.value);

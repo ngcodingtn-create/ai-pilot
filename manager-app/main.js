@@ -417,6 +417,8 @@ function runCommand(command, args, options = {}) {
 
     let stdout = "";
     let stderr = "";
+    let timedOut = false;
+    let timeoutId = null;
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -427,6 +429,14 @@ function runCommand(command, args, options = {}) {
 
     child.on("error", reject);
     child.on("close", (code) => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      if (timedOut) {
+        return;
+      }
+
       if (code === 0) {
         resolve({ stdout, stderr, code });
         return;
@@ -438,6 +448,23 @@ function runCommand(command, args, options = {}) {
         ),
       );
     });
+
+    if (options.timeoutMs) {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        try {
+          child.kill();
+        } catch {
+          // Ignore kill errors when the process already exited.
+        }
+        reject(
+          new Error(
+            options.timeoutMessage ||
+              `La commande ${command} a dépassé le délai autorisé.`,
+          ),
+        );
+      }, options.timeoutMs);
+    }
   });
 }
 
@@ -470,13 +497,19 @@ async function installWingetPackage(id, logs, options = {}) {
     args.push("--source", options.source);
   }
   args.push(
+    "--silent",
+    "--scope",
+    "user",
     "--accept-package-agreements",
     "--accept-source-agreements",
     "--disable-interactivity",
   );
 
   logs.push(`Installation via winget: ${id}`);
-  await runCommand("winget", args);
+  await runCommand("winget", args, {
+    timeoutMs: options.timeoutMs ?? 480000,
+    timeoutMessage: `L'installation via winget (${id}) prend trop de temps. Vérifiez le Microsoft Store ou réessayez plus tard.`,
+  });
 }
 
 async function getWindowsStartApps() {
@@ -717,6 +750,7 @@ function ensureCommandOrThrow(available, message) {
 }
 
 async function installCodex(logs) {
+  logs.push("Préparation de l'installation Codex...");
   if (process.platform === "win32") {
     if (!(await isDesktopAppInstalled("codex"))) {
       try {
@@ -780,10 +814,14 @@ async function installCodex(logs) {
   logs.push("Installation de Codex CLI via npm...");
   await runCommand("npm", ["install", "-g", "@openai/codex@latest"], {
     cwd: os.homedir(),
+    timeoutMs: 600000,
+    timeoutMessage:
+      "L'installation npm de Codex prend trop de temps. Vérifiez votre connexion puis réessayez.",
   });
 }
 
 async function installT3Code(logs) {
+  logs.push("Préparation de l'installation T3 Code...");
   await installCodex(logs);
 
   if (process.platform === "win32" && (await commandExists("winget"))) {
@@ -795,10 +833,17 @@ async function installT3Code(logs) {
           "-e",
           "--id",
           "T3Tools.T3Code",
+          "--silent",
+          "--scope",
+          "user",
           "--accept-package-agreements",
           "--accept-source-agreements",
           "--disable-interactivity",
-        ]);
+        ], {
+          timeoutMs: 480000,
+          timeoutMessage:
+            "L'installation winget de l'app T3 Code prend trop de temps. Le manager va continuer avec les alternatives disponibles.",
+        });
       } catch (error) {
         logs.push(
           `winget n'a pas terminé l'installation de l'app T3 Code. ${
@@ -822,10 +867,17 @@ async function installT3Code(logs) {
         "-e",
         "--id",
         "T3Tools.T3Code",
+        "--silent",
+        "--scope",
+        "user",
         "--accept-package-agreements",
         "--accept-source-agreements",
         "--disable-interactivity",
-      ]);
+      ], {
+        timeoutMs: 480000,
+        timeoutMessage:
+          "L'installation winget de T3 Code prend trop de temps. Le fallback npx restera disponible.",
+      });
     } catch (error) {
       logs.push(
         `winget n'a pas terminé l'installation de T3 Code. Le fallback npx restera disponible. ${
@@ -862,6 +914,7 @@ async function installT3Code(logs) {
 }
 
 async function installOpenCode(logs) {
+  logs.push("Préparation de l'installation OpenCode...");
   if (process.platform === "win32") {
     if (!(await isDesktopAppInstalled("opencode"))) {
       try {
@@ -922,20 +975,26 @@ async function installOpenCode(logs) {
   logs.push("Installation d'OpenCode via npm...");
   await runCommand("npm", ["install", "-g", "opencode-ai"], {
     cwd: os.homedir(),
+    timeoutMs: 600000,
+    timeoutMessage:
+      "L'installation npm d'OpenCode prend trop de temps. Vérifiez votre connexion puis réessayez.",
   });
 }
 
 async function installTool(manifest, logs) {
   if (manifest.tool.environment === "codex") {
+    logs.push("Étape 1/2: installation des composants Codex...");
     await installCodex(logs);
     return;
   }
 
   if (manifest.tool.environment === "t3code") {
+    logs.push("Étape 1/2: installation des composants T3 Code et Codex...");
     await installT3Code(logs);
     return;
   }
 
+  logs.push("Étape 1/2: installation des composants OpenCode...");
   await installOpenCode(logs);
 }
 
@@ -1123,6 +1182,7 @@ async function buildDiagnostics(manifest, projectRoot) {
 }
 
 async function configureTool(manifest, projectRoot, logs) {
+  logs.push("Étape 2/2: écriture de la configuration AIPilot...");
   if (manifest.tool.environment === "opencode") {
     await configureOpenCode(manifest, projectRoot, logs);
     return;
@@ -1158,8 +1218,17 @@ async function launchTool(manifest, projectRoot, logs) {
   child.unref();
 }
 
-async function executeManagerAction(action, payload) {
+async function executeManagerAction(action, payload, event) {
   const logs = [];
+  const logSink = {
+    push(message) {
+      const text = String(message);
+      logs.push(text);
+      if (event?.sender && !event.sender.isDestroyed()) {
+        event.sender.send("manager:action-log", text);
+      }
+    },
+  };
   const manifest = payload.manifest;
   const projectRoot = payload.projectRoot || "";
 
@@ -1175,8 +1244,10 @@ async function executeManagerAction(action, payload) {
   }
 
   if (action === "install-configure") {
-    await installTool(manifest, logs);
-    await configureTool(manifest, projectRoot, logs);
+    logSink.push("Installation et configuration démarrées. Cela peut prendre quelques minutes selon votre connexion.");
+    await installTool(manifest, logSink);
+    await configureTool(manifest, projectRoot, logSink);
+    logSink.push("Installation et configuration terminées.");
     return {
       logs,
       diagnostics: await buildDiagnostics(manifest, projectRoot),
@@ -1184,7 +1255,9 @@ async function executeManagerAction(action, payload) {
   }
 
   if (action === "repair") {
-    await configureTool(manifest, projectRoot, logs);
+    logSink.push("Réparation de la configuration en cours...");
+    await configureTool(manifest, projectRoot, logSink);
+    logSink.push("Réparation terminée.");
     return {
       logs,
       diagnostics: await buildDiagnostics(manifest, projectRoot),
@@ -1192,7 +1265,8 @@ async function executeManagerAction(action, payload) {
   }
 
   if (action === "launch") {
-    await launchTool(manifest, projectRoot, logs);
+    logSink.push("Lancement de l'outil...");
+    await launchTool(manifest, projectRoot, logSink);
     return {
       logs,
       diagnostics: await buildDiagnostics(manifest, projectRoot),
@@ -1288,8 +1362,8 @@ ipcMain.handle("manager:save-state", async (_event, payload) => {
   return { ok: true };
 });
 
-ipcMain.handle("manager:run-action", async (_event, payload) => {
-  return executeManagerAction(payload.action, payload);
+ipcMain.handle("manager:run-action", async (event, payload) => {
+  return executeManagerAction(payload.action, payload, event);
 });
 
 ipcMain.handle("manager:open-external", async (_event, url) => {
