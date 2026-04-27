@@ -43,9 +43,6 @@ jobs:
       - name: Install manager dependencies
         run: npm ci
 
-      - name: Generate brand assets
-        run: npm run assets:brand
-
       - name: Build packaged artifacts
         run: npm run ${{ matrix.script }}
 
@@ -53,5 +50,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: manager-app/dist/*
+          path: |
+            manager-app/dist/*.exe
+            manager-app/dist/*.blockmap
+            manager-app/dist/*.yml
+            manager-app/dist/*.AppImage
+            manager-app/dist/*.deb
+            manager-app/dist/*.dmg
+            manager-app/dist/*.zip
           if-no-files-found: error

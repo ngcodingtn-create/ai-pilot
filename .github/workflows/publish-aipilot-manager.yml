@@ -10,18 +10,8 @@ permissions:
 
 jobs:
   publish:
-    name: Publish on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            script: release:win
-          - os: ubuntu-latest
-            script: release:linux
-          - os: macos-latest
-            script: release:mac
+    name: Publish Windows manager
+    runs-on: windows-latest
 
     defaults:
       run:
@@ -44,8 +34,5 @@ jobs:
       - name: Install manager dependencies
         run: npm ci
 
-      - name: Generate brand assets
-        run: npm run assets:brand
-
       - name: Publish release artifacts
-        run: npm run ${{ matrix.script }}
+        run: npm run release:win
