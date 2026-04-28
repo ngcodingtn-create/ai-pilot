@@ -37,11 +37,14 @@ type AdminSearchParams = Promise<{
   created?: string;
   customer?: string;
   error?: string;
+  environment?: string;
   licenseKey?: string;
   loggedOut?: string;
+  q?: string;
   requestAccepted?: string;
   saved?: string;
   section?: string;
+  status?: string;
   updated?: string;
   whatsapp?: string;
 }>;
@@ -71,9 +74,21 @@ export default async function AdminPage({
 
   const section = readSection(params.section);
   const usesDatabase = Boolean(process.env.DATABASE_URL);
-  const activeCount = licenses.filter((license) => license.status === "active").length;
+  const uniqueLicenses = dedupeLicenses(licenses);
+  const activeCount = uniqueLicenses.filter((license) => license.status === "active").length;
   const pendingRequests = accessRequests.filter((request) => request.status === "pending");
   const acceptedRequests = accessRequests.filter((request) => request.status === "accepted");
+  const licenseFilters: {
+    query: string;
+    status: "all" | "active" | "disabled";
+    environment: "all" | "codex" | "vscode-codex" | "t3code" | "opencode";
+  } = {
+    query: normalizeSearchQuery(params.q),
+    status: normalizeLicenseStatusFilter(params.status),
+    environment: normalizeEnvironmentFilter(params.environment),
+  };
+  const filteredLicenses = filterLicenses(uniqueLicenses, licenseFilters);
+  const hiddenDuplicateCount = Math.max(0, licenses.length - uniqueLicenses.length);
   const tutorialPreview = buildTutorialPreview(
     config.managerTutorialLinks,
     config.supportVideoUrl,
@@ -82,12 +97,12 @@ export default async function AdminPage({
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.1),_transparent_30%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_45%,#f8fafc_100%)]">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <HeroHeader
-          usesDatabase={usesDatabase}
-          licenseCount={licenses.length}
-          activeCount={activeCount}
-          pendingCount={pendingRequests.length}
-        />
+          <HeroHeader
+            usesDatabase={usesDatabase}
+            licenseCount={uniqueLicenses.length}
+            activeCount={activeCount}
+            pendingCount={pendingRequests.length}
+          />
 
         <FlashMessages params={params} />
         {params.requestAccepted === "1" && params.licenseKey ? (
@@ -379,7 +394,7 @@ export default async function AdminPage({
                           <MiniMetric label="Demandes traitées" value={String(acceptedRequests.length)} />
                           <MiniMetric
                             label="Répartition outils"
-                            value={`${licenses.filter((item) => item.preferredEnvironment === "codex").length}/${licenses.filter((item) => item.preferredEnvironment === "vscode-codex").length}/${licenses.filter((item) => item.preferredEnvironment === "t3code").length}/${licenses.filter((item) => item.preferredEnvironment === "opencode").length}`}
+                            value={`${uniqueLicenses.filter((item) => item.preferredEnvironment === "codex").length}/${uniqueLicenses.filter((item) => item.preferredEnvironment === "vscode-codex").length}/${uniqueLicenses.filter((item) => item.preferredEnvironment === "t3code").length}/${uniqueLicenses.filter((item) => item.preferredEnvironment === "opencode").length}`}
                           />
                           <MiniMetric
                             label="Source de vérité"
@@ -408,16 +423,79 @@ export default async function AdminPage({
                         l’environnement et l’activité.
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      {licenses.length === 0 ? (
+                    <CardContent className="space-y-5">
+                      {uniqueLicenses.length === 0 ? (
                         <EmptyState
                           title="Aucune licence pour le moment"
                           description="Les licences générées apparaîtront ici."
                         />
                       ) : (
                         <>
-                          <MobileLicenseCards licenses={licenses} />
-                          <div className="hidden overflow-x-auto md:block">
+                          <form
+                            action="/admin"
+                            className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(11rem,0.8fr)_minmax(12rem,0.9fr)_auto]"
+                          >
+                            <input type="hidden" name="section" value="subscriptions" />
+                            <Field
+                              label="Rechercher"
+                              name="q"
+                              defaultValue={licenseFilters.query}
+                              placeholder="Client, email, licence..."
+                            />
+                            <SelectField
+                              label="Statut"
+                              name="status"
+                              defaultValue={licenseFilters.status}
+                              options={[
+                                { label: "Tous les statuts", value: "all" },
+                                { label: "Actives", value: "active" },
+                                { label: "Suspendues", value: "disabled" },
+                              ]}
+                            />
+                            <SelectField
+                              label="Outil"
+                              name="environment"
+                              defaultValue={licenseFilters.environment}
+                              options={[
+                                { label: "Tous les outils", value: "all" },
+                                { label: "Codex app", value: "codex" },
+                                { label: "VS Code Codex", value: "vscode-codex" },
+                                { label: "T3 Code", value: "t3code" },
+                                { label: "OpenCode", value: "opencode" },
+                              ]}
+                            />
+                            <div className="flex items-end gap-2 lg:justify-end">
+                              <Button type="submit" className="flex-1 sm:flex-none">
+                                Rechercher
+                              </Button>
+                              <a
+                                href="/admin?section=subscriptions"
+                                className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 sm:flex-none"
+                              >
+                                Réinitialiser
+                              </a>
+                            </div>
+                          </form>
+
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                            <Badge tone="blue">{filteredLicenses.length} affichée(s)</Badge>
+                            <Badge tone="slate">{uniqueLicenses.length} unique(s)</Badge>
+                            {hiddenDuplicateCount > 0 ? (
+                              <Badge tone="amber">
+                                {hiddenDuplicateCount} doublon(s) masqué(s)
+                              </Badge>
+                            ) : null}
+                          </div>
+
+                          {filteredLicenses.length === 0 ? (
+                            <EmptyState
+                              title="Aucune licence ne correspond à cette recherche"
+                              description="Essaie un autre nom, une autre clé ou réinitialise les filtres."
+                            />
+                          ) : (
+                            <>
+                              <MobileLicenseCards licenses={filteredLicenses} />
+                              <div className="hidden overflow-x-auto md:block">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -431,41 +509,43 @@ export default async function AdminPage({
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {licenses.map((license) => (
-                                  <TableRow key={license.id}>
-                                    <TableCell>
+                                {filteredLicenses.map((license) => (
+                                  <TableRow key={license.id} className="align-top">
+                                    <TableCell className="min-w-[14rem]">
                                       <p className="font-semibold text-slate-950">
                                         {license.customerName}
                                       </p>
-                                      <p className="mt-1 break-words text-slate-500">
+                                      <p className="mt-1 break-words text-xs leading-6 text-slate-500">
                                         {license.customerEmail || "Email non renseigné"}
                                       </p>
                                     </TableCell>
-                                    <TableCell>
-                                      <code className="break-all rounded bg-slate-100 px-2 py-1 font-mono text-[13px] text-slate-900">
+                                    <TableCell className="min-w-[14rem]">
+                                      <code className="block break-all rounded-xl bg-slate-100 px-2.5 py-2 font-mono text-[13px] text-slate-900">
                                         {license.licenseKey}
                                       </code>
-                                      <p className="mt-2 text-xs text-slate-500">
-                                        {license.azureApiKey ? "Clé Azure dédiée" : "Clé Azure globale"}
-                                      </p>
+                                      <div className="mt-2">
+                                        <Badge tone={license.azureApiKey ? "blue" : "slate"}>
+                                          {license.azureApiKey ? "Clé Azure dédiée" : "Clé Azure globale"}
+                                        </Badge>
+                                      </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="whitespace-nowrap">
                                       <Badge tone="blue">{license.tier.toUpperCase()}</Badge>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="whitespace-nowrap">
                                       <Badge tone="slate">{formatEnvironmentLabel(license.preferredEnvironment)}</Badge>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="whitespace-nowrap">
                                       <Badge tone={license.status === "active" ? "emerald" : "amber"}>
                                         {license.status === "active" ? "Active" : "Suspendue"}
                                       </Badge>
                                     </TableCell>
-                                    <TableCell className="break-words text-slate-600">
+                                    <TableCell className="min-w-[11rem] text-sm text-slate-600">
                                       {license.lastValidatedAt
                                         ? formatDateTime(license.lastValidatedAt)
                                         : formatDateTime(license.createdAt)}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="whitespace-nowrap">
                                       <form action={updateLicenseStatusAction}>
                                         <input type="hidden" name="licenseId" value={license.id} />
                                         <input
@@ -483,6 +563,8 @@ export default async function AdminPage({
                               </TableBody>
                             </Table>
                           </div>
+                            </>
+                          )}
                         </>
                       )}
                     </CardContent>
@@ -932,6 +1014,7 @@ function MobileLicenseCards({
 
           <div className="mt-4 space-y-2 text-sm text-slate-600">
             <p>Outil: {formatEnvironmentLabel(license.preferredEnvironment)}</p>
+            <p>{license.azureApiKey ? "Clé Azure dédiée" : "Clé Azure globale"}</p>
             <p>
               Dernière activité:{" "}
               {license.lastValidatedAt
@@ -1036,6 +1119,67 @@ function MobileRequestCards({
 
 function readSection(value: string | undefined): AdminSection {
   return value === "subscriptions" || value === "requests" ? value : "dashboard";
+}
+
+function dedupeLicenses(licenses: Awaited<ReturnType<typeof listLicenseKeys>>) {
+  const seen = new Set<string>();
+
+  return licenses.filter((license) => {
+    if (seen.has(license.licenseKey)) {
+      return false;
+    }
+
+    seen.add(license.licenseKey);
+    return true;
+  });
+}
+
+function normalizeSearchQuery(value: string | undefined) {
+  return String(value ?? "").trim();
+}
+
+function normalizeLicenseStatusFilter(value: string | undefined) {
+  return value === "active" || value === "disabled" ? value : "all";
+}
+
+function normalizeEnvironmentFilter(value: string | undefined) {
+  return value === "codex" ||
+    value === "vscode-codex" ||
+    value === "t3code" ||
+    value === "opencode"
+    ? value
+    : "all";
+}
+
+function filterLicenses(
+  licenses: Awaited<ReturnType<typeof listLicenseKeys>>,
+  filters: {
+    query: string;
+    status: "all" | "active" | "disabled";
+    environment: "all" | "codex" | "vscode-codex" | "t3code" | "opencode";
+  },
+) {
+  const query = filters.query.toLowerCase();
+
+  return licenses.filter((license) => {
+    const matchesQuery =
+      !query ||
+      [
+        license.customerName,
+        license.customerEmail ?? "",
+        license.licenseKey,
+        formatEnvironmentLabel(license.preferredEnvironment),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+
+    const matchesStatus = filters.status === "all" || license.status === filters.status;
+    const matchesEnvironment =
+      filters.environment === "all" || license.preferredEnvironment === filters.environment;
+
+    return matchesQuery && matchesStatus && matchesEnvironment;
+  });
 }
 
 function formatEnvironmentLabel(value: string) {
