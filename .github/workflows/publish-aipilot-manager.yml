@@ -11,8 +11,31 @@ permissions:
 
 jobs:
   publish:
-    name: Publish Windows manager
-    runs-on: windows-latest
+    name: Publish ${{ matrix.label }} manager
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            os: windows-latest
+            script: dist:win
+            files: |
+              manager-app/dist/*Manager-Setup-*.exe
+              manager-app/dist/*Manager-Setup-*.exe.blockmap
+              manager-app/dist/latest.yml
+          - label: Linux
+            os: ubuntu-latest
+            script: dist:linux
+            files: |
+              manager-app/dist/*.AppImage
+              manager-app/dist/*.deb
+          - label: macOS
+            os: macos-latest
+            script: dist:mac
+            files: |
+              manager-app/dist/*.dmg
+              manager-app/dist/*.zip
 
     defaults:
       run:
@@ -32,8 +55,8 @@ jobs:
       - name: Install manager dependencies
         run: npm ci
 
-      - name: Build Windows release artifacts
-        run: npm run dist:win
+      - name: Build release artifacts
+        run: npm run ${{ matrix.script }}
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -41,7 +64,4 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
-          files: |
-            manager-app/dist/*Manager-Setup-*.exe
-            manager-app/dist/*Manager-Setup-*.exe.blockmap
-            manager-app/dist/latest.yml
+          files: ${{ matrix.files }}

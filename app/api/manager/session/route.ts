@@ -242,7 +242,7 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
         "Si vous voyez `404 The API deployment for this resource does not exist`, vérifiez dans l'admin AIPilot que le champ de déploiement contient le nom exact du déploiement Azure AI Foundry, pas juste un nom de modèle supposé.",
         "Sur Windows, un terminal WSL2 reste recommandé si l'utilisateur veut un workflow CLI plus stable.",
       ],
-      officialAppUrl: "https://developers.openai.com/codex/app/windows",
+      officialAppUrl: "https://developers.openai.com/codex/app",
       officialCliUrl: "https://github.com/openai/codex/releases",
     };
   }

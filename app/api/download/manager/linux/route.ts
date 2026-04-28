@@ -3,6 +3,8 @@ import {
   downloadBinaryArtifact,
   downloadTextFile,
   findManagerArtifact,
+  findManagerReleaseAsset,
+  redirectToArtifact,
 } from "../../lib";
 
 const FILES = [
@@ -33,6 +35,14 @@ export async function GET(request: Request) {
     (await findManagerArtifact([".zip"], ["linux"], { requirePreferredMatch: true }));
   if (packagedArtifact) {
     return downloadBinaryArtifact(packagedArtifact);
+  }
+
+  const releaseArtifact =
+    (await findManagerReleaseAsset((asset) => /\.AppImage$/i.test(asset.name))) ??
+    (await findManagerReleaseAsset((asset) => /\.deb$/i.test(asset.name))) ??
+    (await findManagerReleaseAsset((asset) => /linux/i.test(asset.name) && /\.zip$/i.test(asset.name)));
+  if (releaseArtifact) {
+    return redirectToArtifact(releaseArtifact.browser_download_url);
   }
 
   const siteUrl = resolveSiteUrlFromRequest(

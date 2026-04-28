@@ -86,6 +86,16 @@ export async function downloadBinaryArtifact(filePath: string) {
   });
 }
 
+export function redirectToArtifact(url: string) {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: url,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 export async function getManagerAppVersion() {
   try {
     const packageJsonPath = path.resolve(process.cwd(), "manager-app", "package.json");
