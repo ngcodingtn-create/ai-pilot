@@ -6,7 +6,7 @@ const state = {
   autoSetupStarted: false,
   updateState: null,
   progress: null,
-  activeTab: "main",
+  activeView: "home",
 };
 
 const elements = {
@@ -16,6 +16,10 @@ const elements = {
   platformChip: document.querySelector("#platform-chip"),
   versionChip: document.querySelector("#version-chip"),
   portalText: document.querySelector("#portal-text"),
+  pageTitle: document.querySelector("#page-title"),
+  globalStatus: document.querySelector("#global-status"),
+  globalStatusTitle: document.querySelector("#global-status-title"),
+  globalStatusText: document.querySelector("#global-status-text"),
   overview: document.querySelector("#overview"),
   tutorials: document.querySelector("#tutorials"),
   updateMessage: document.querySelector("#update-message"),
@@ -37,11 +41,26 @@ const elements = {
   progressSteps: document.querySelector("#progress-steps"),
   systemHealth: document.querySelector("#system-health"),
   systemIssues: document.querySelector("#system-issues"),
-  tabMain: document.querySelector("#tab-main"),
-  tabSystem: document.querySelector("#tab-system"),
-  panelMain: document.querySelector("#panel-main"),
-  panelSystem: document.querySelector("#panel-system"),
   logs: document.querySelector("#logs"),
+  toolLabel: document.querySelector("#tool-label"),
+  toolSubtitle: document.querySelector("#tool-subtitle"),
+  toolStatus: document.querySelector("#tool-status"),
+  dockLaunch: document.querySelector("#dock-launch"),
+  dockInstall: document.querySelector("#dock-install"),
+  dockRepair: document.querySelector("#dock-repair"),
+  flowLicense: document.querySelector("#flow-license"),
+  flowAzure: document.querySelector("#flow-azure"),
+  flowTools: document.querySelector("#flow-tools"),
+  flowReady: document.querySelector("#flow-ready"),
+  navHome: document.querySelector("#nav-home"),
+  navDiagnostics: document.querySelector("#nav-diagnostics"),
+  navTutorials: document.querySelector("#nav-tutorials"),
+  navUpdates: document.querySelector("#nav-updates"),
+  sidebarOpenTutorials: document.querySelector("#sidebar-open-tutorials"),
+  viewHome: document.querySelector("#view-home"),
+  viewDiagnostics: document.querySelector("#view-diagnostics"),
+  viewTutorials: document.querySelector("#view-tutorials"),
+  viewUpdates: document.querySelector("#view-updates"),
 };
 
 function escapeHtml(value) {
@@ -78,13 +97,54 @@ function badge(ok, optional) {
   return '<span class="badge badge-warning">À corriger</span>';
 }
 
-function setActiveTab(tab) {
-  state.activeTab = tab;
-  const isMain = tab === "main";
-  elements.tabMain.classList.toggle("is-active", isMain);
-  elements.tabSystem.classList.toggle("is-active", !isMain);
-  elements.panelMain.classList.toggle("is-active", isMain);
-  elements.panelSystem.classList.toggle("is-active", !isMain);
+function setActiveView(view) {
+  state.activeView = view;
+  const isHome = view === "home";
+  const isDiagnostics = view === "diagnostics";
+  const isTutorials = view === "tutorials";
+  const isUpdates = view === "updates";
+
+  elements.navHome.classList.toggle("is-active", isHome);
+  elements.navDiagnostics.classList.toggle("is-active", isDiagnostics);
+  elements.navTutorials.classList.toggle("is-active", isTutorials);
+  elements.navUpdates.classList.toggle("is-active", isUpdates);
+
+  elements.viewHome.classList.toggle("is-active", isHome);
+  elements.viewDiagnostics.classList.toggle("is-active", isDiagnostics);
+  elements.viewTutorials.classList.toggle("is-active", isTutorials);
+  elements.viewUpdates.classList.toggle("is-active", isUpdates);
+
+  elements.pageTitle.textContent =
+    view === "diagnostics"
+      ? "Diagnostic et réparation"
+      : view === "tutorials"
+        ? "Tutoriels et aide"
+        : view === "updates"
+          ? "Mises à jour automatiques"
+          : "Bienvenue dans AIPilot Manager";
+}
+
+function setFlowCard(element, stateName, text) {
+  if (!element) return;
+  element.dataset.state = stateName;
+  const status = element.querySelector(".flow-state");
+  if (status) status.textContent = text;
+  element.style.borderColor =
+    stateName === "done"
+      ? "#bbf7d0"
+      : stateName === "active"
+        ? "#bfdbfe"
+        : stateName === "error"
+          ? "#fecdd3"
+          : "#dbe7f0";
+  element.style.background =
+    stateName === "done"
+      ? "#f0fdf4"
+      : stateName === "active"
+        ? "#eff6ff"
+        : stateName === "error"
+          ? "#fff1f2"
+          : "#f8fbfd";
 }
 
 function syncButtons() {
@@ -102,6 +162,9 @@ function syncButtons() {
     state.busy || !state.updateState?.enabled || state.updateState?.checking;
   elements.installUpdate.disabled = !state.updateState?.downloaded || state.busy;
   elements.downloadOfficialApp.disabled = state.busy || !state.manifest?.tool?.officialAppUrl;
+  elements.dockLaunch.disabled = elements.launch.disabled;
+  elements.dockInstall.disabled = elements.installConfigure.disabled;
+  elements.dockRepair.disabled = elements.repair.disabled;
 }
 
 function setBusy(busy) {
@@ -111,7 +174,6 @@ function setBusy(busy) {
 
 async function persistState() {
   if (!state.defaults) return;
-
   await window.aipilotManager.saveState({
     backendUrl: state.defaults.backendUrl,
     licenseKey: normalizeLicenseKey(elements.licenseKey.value),
@@ -120,12 +182,56 @@ async function persistState() {
   });
 }
 
+function renderGlobalStatus({ title, text, tone = "neutral" }) {
+  elements.globalStatusTitle.textContent = title;
+  elements.globalStatusText.textContent = text;
+  const dot = elements.globalStatus.querySelector(".global-dot");
+  if (dot) {
+    dot.style.background =
+      tone === "success"
+        ? "#16a34a"
+        : tone === "warning"
+          ? "#f59e0b"
+          : tone === "error"
+            ? "#e11d48"
+            : "#94a3b8";
+  }
+}
+
+function renderToolDock() {
+  const toolLabel = state.manifest?.tool?.label || getSelectedToolLabel();
+  elements.toolLabel.textContent = toolLabel;
+
+  if (!state.manifest) {
+    elements.toolSubtitle.textContent = "Connectez votre licence pour charger la configuration.";
+    elements.toolStatus.className = "badge badge-neutral";
+    elements.toolStatus.textContent = "En attente";
+    return;
+  }
+
+  elements.toolSubtitle.textContent = `Déploiement Azure: ${state.manifest.azure?.deployment || "-"}`;
+
+  const diagnosticsOk = state.lastDiagnostics?.overallOk;
+  elements.toolStatus.className = diagnosticsOk ? "badge badge-success" : "badge badge-warning";
+  elements.toolStatus.textContent = diagnosticsOk ? "Prêt" : "À vérifier";
+}
+
 function renderOverview() {
   if (!state.manifest) {
     elements.overview.innerHTML = `
-      <p><strong>Commencez ici :</strong> connectez votre licence pour charger votre configuration AIPilot.</p>
-      <p>Ensuite, cliquez sur <strong>Installer et configurer</strong>. Si quelque chose bloque, passez à l’onglet <strong>Vérification système</strong>.</p>
+      <p><strong>Commencez ici :</strong> connectez votre licence pour récupérer la configuration AIPilot.</p>
+      <p>Ensuite, cliquez sur <strong>Installer et configurer</strong>. Si un problème apparaît, ouvrez <strong>Diagnostics</strong> puis laissez AIPilot réparer automatiquement.</p>
     `;
+    renderGlobalStatus({
+      title: "En attente",
+      text: "Connectez votre licence pour commencer l’installation.",
+      tone: "neutral",
+    });
+    renderToolDock();
+    setFlowCard(elements.flowLicense, "pending", "En attente");
+    setFlowCard(elements.flowAzure, "pending", "En attente");
+    setFlowCard(elements.flowTools, "pending", "En attente");
+    setFlowCard(elements.flowReady, "pending", "En attente");
     return;
   }
 
@@ -141,8 +247,29 @@ function renderOverview() {
     <p><strong>${escapeHtml(customerName)}</strong>, votre configuration AIPilot est prête pour <strong>${escapeHtml(toolLabel)}</strong>.</p>
     <p>Le déploiement Azure actif est <strong>${escapeHtml(deployment)}</strong> et le modèle par défaut reste <strong>${escapeHtml(modelLabel)}</strong>.</p>
     <p>${projectText}</p>
-    <p>Le bouton <strong>Installer et configurer</strong> prépare automatiquement l’outil. Si un élément manque sur votre machine, l’onglet <strong>Vérification système</strong> vous dira exactement quoi corriger.</p>
+    <p>Le bouton <strong>Installer et configurer</strong> prépare automatiquement l’outil. Si un élément manque, AIPilot l’expliquera dans Diagnostics et proposera la correction.</p>
   `;
+
+  const diagnosticsOk = state.lastDiagnostics?.overallOk;
+  renderGlobalStatus(
+    diagnosticsOk
+      ? {
+          title: "Système opérationnel",
+          text: "Tous les points obligatoires sont prêts.",
+          tone: "success",
+        }
+      : {
+          title: "Configuration chargée",
+          text: "La licence est connectée. Préparez ou réparez l’outil pour continuer.",
+          tone: "warning",
+        },
+  );
+
+  setFlowCard(elements.flowLicense, "done", "Connectée");
+  setFlowCard(elements.flowAzure, "done", "Prête");
+  setFlowCard(elements.flowTools, diagnosticsOk ? "done" : "active", diagnosticsOk ? "Prêts" : "À préparer");
+  setFlowCard(elements.flowReady, diagnosticsOk ? "done" : "pending", diagnosticsOk ? "Utilisable" : "En attente");
+  renderToolDock();
 }
 
 function renderUpdateState(updateState) {
@@ -166,7 +293,7 @@ function renderUpdateState(updateState) {
     <dl>
       <div class="summary-row"><dt>Version actuelle</dt><dd>${escapeHtml(updateState.currentVersion || "-")}</dd></div>
       <div class="summary-row"><dt>Nouvelle version</dt><dd>${escapeHtml(updateState.availableVersion || "Aucune")}</dd></div>
-      <div class="summary-row"><dt>État</dt><dd>${statusBadge}<div>Le manager vérifie les nouvelles versions automatiquement.</div></dd></div>
+      <div class="summary-row"><dt>État</dt><dd>${statusBadge}<div>Le manager vérifie automatiquement les nouvelles versions.</div></dd></div>
       <div class="summary-row"><dt>Source</dt><dd>${escapeHtml(updateState.updateUrl || "Non configurée")}</dd></div>
     </dl>
     ${
@@ -183,63 +310,39 @@ function getFixHint(check) {
   const label = String(check?.label || "").toLowerCase();
   const details = String(check?.details || "");
 
-  if (label.includes("node")) {
-    return "Node.js doit être présent pour installer ou réparer le CLI. Cliquez sur Réparer pour laisser AIPilot tenter l’installation automatique.";
-  }
-
-  if (label.includes("npm")) {
-    return "npm manque ou n’est pas visible dans le PATH. Réparer va revérifier Node.js et remettre l’environnement en place.";
-  }
-
-  if (label.includes("app codex")) {
-    return "Installez d’abord l’application Codex officielle, ouvrez-la une première fois, puis revenez dans AIPilot Manager.";
-  }
-
-  if (label.includes("app t3")) {
-    return "Installez d’abord T3 Code depuis son site officiel, ouvrez-le une première fois, puis revenez dans AIPilot Manager.";
-  }
-
-  if (label.includes("commande codex")) {
-    return "Le CLI Codex n’est pas prêt. Réparer va tenter de l’installer puis de réécrire la configuration Azure.";
-  }
-
-  if (label.includes("configuration codex")) {
-    return `Le fichier config.toml n’est pas prêt. Réparer va tenter de le recréer dans ${escapeHtml(details)}.`;
-  }
-
-  if (label.includes("opencode")) {
-    return "Réparer va réinstaller le CLI OpenCode si nécessaire et réécrire les fichiers de configuration Azure.";
-  }
-
-  if (label.includes("variables azure")) {
-    return "Les variables Azure sont absentes ou incomplètes. Réparer va les remettre pour l’utilisateur, puis tenter aussi le niveau machine sur Windows.";
-  }
-
-  if (label.includes("t3")) {
-    return "Réparer va revérifier T3 Code, Codex CLI et réinjecter le modèle Azure dans les réglages T3.";
-  }
-
+  if (label.includes("node")) return "AIPilot peut tenter l’installation automatique de Node.js si vous lancez Réparer.";
+  if (label.includes("npm")) return "Réparer va revérifier Node.js et remettre npm dans l’environnement si nécessaire.";
+  if (label.includes("app codex")) return "Installez d’abord Codex officiel, ouvrez-le une fois, puis revenez ici.";
+  if (label.includes("app t3")) return "Installez d’abord T3 Code officiel, ouvrez-le une fois, puis revenez ici.";
+  if (label.includes("commande codex")) return "Réparer va tenter de remettre Codex CLI et sa configuration Azure.";
+  if (label.includes("configuration codex")) return `Réparer va tenter de recréer le fichier dans ${escapeHtml(details)}.`;
+  if (label.includes("opencode")) return "Réparer va réinstaller OpenCode CLI si nécessaire et réécrire sa configuration.";
+  if (label.includes("variables azure")) return "Réparer va remettre les variables Azure pour l’utilisateur et tenter le niveau machine sur Windows.";
+  if (label.includes("t3")) return "Réparer va revérifier T3 Code, Codex CLI et le modèle Azure injecté dans T3.";
   return "Lancez Réparer pour que le manager revérifie ce point et applique la correction automatiquement si possible.";
 }
 
 function renderDiagnostics(diagnostics) {
+  state.lastDiagnostics = diagnostics;
+
   if (!diagnostics) {
     elements.systemHealth.innerHTML = `
       <article class="health-card">
         <span>État global</span>
         <strong>En attente</strong>
-        <small>Lancez une vérification pour afficher le diagnostic.</small>
+        <small>Lancez une vérification pour voir le diagnostic.</small>
       </article>
     `;
     elements.systemIssues.innerHTML = `
       <article class="issue-card issue-card-muted">
         <div>
           <strong>Aucun diagnostic exécuté</strong>
-          <p>Lancez “Vérifier mon installation” pour voir les problèmes et les corrections recommandées.</p>
+          <p>Lancez une vérification pour voir les problèmes et les corrections proposées.</p>
         </div>
       </article>
     `;
     elements.diagnostics.innerHTML = "<p>Aucune vérification exécutée pour le moment.</p>";
+    renderOverview();
     return;
   }
 
@@ -308,17 +411,16 @@ function renderDiagnostics(diagnostics) {
     </dl>
     ${
       notes.length
-        ? `<div class="summary-block">${notes
-            .map((note) => `<p>${escapeHtml(note)}</p>`)
-            .join("")}</div>`
+        ? `<div class="summary-block">${notes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}</div>`
         : ""
     }
   `;
+
+  renderOverview();
 }
 
 function setProgress(progress) {
   state.progress = progress;
-
   const toneClass =
     progress.tone === "success"
       ? "badge badge-success"
@@ -342,7 +444,6 @@ function setProgress(progress) {
             : step.state === "error"
               ? "progress-step is-error"
               : "progress-step";
-
       return `
         <div class="${className}">
           <strong>${escapeHtml(step.label)}</strong>
@@ -364,7 +465,7 @@ function createProgressModel(action) {
         { label: "Connexion", text: "Configuration chargée", state: "done" },
         { label: "Installation", text: "Aucune action", state: "pending" },
         { label: "Configuration", text: "Aucune action", state: "pending" },
-        { label: "Diagnostic", text: "Analyse système en cours", state: "active" },
+        { label: "Vérification", text: "Analyse système en cours", state: "active" },
       ],
     };
   }
@@ -378,7 +479,7 @@ function createProgressModel(action) {
       { label: "Connexion", text: "Licence chargée", state: "done" },
       { label: "Installation", text: "En attente", state: "active" },
       { label: "Configuration", text: "En attente", state: "pending" },
-      { label: "Diagnostic", text: "En attente", state: "pending" },
+      { label: "Vérification", text: "En attente", state: "pending" },
     ],
   };
 }
@@ -394,13 +495,11 @@ function updateProgressFromLog(message) {
     next.steps[0].text = "Licence connectée";
     next.percent = Math.max(next.percent, 18);
   }
-
   if (text.includes("Étape 1/2") || text.includes("Préparation de l'installation") || text.includes("Installation de")) {
     next.steps[1].state = "active";
     next.steps[1].text = "Installation des composants";
     next.percent = Math.max(next.percent, 40);
   }
-
   if (text.includes("Étape 2/2") || text.includes("Écriture de la configuration") || text.includes("Mise à jour de la variable")) {
     next.steps[1].state = "done";
     next.steps[1].text = "Composants prêts";
@@ -408,7 +507,6 @@ function updateProgressFromLog(message) {
     next.steps[2].text = "Configuration Azure en cours";
     next.percent = Math.max(next.percent, 72);
   }
-
   if (text.includes("Vérification finale") || text.includes("Configuration prête") || text.includes("Vérification de")) {
     next.steps[2].state = "done";
     next.steps[2].text = "Configuration écrite";
@@ -416,10 +514,9 @@ function updateProgressFromLog(message) {
     next.steps[3].text = "Contrôle final";
     next.percent = Math.max(next.percent, 88);
   }
-
   if (text.includes("Installation et configuration terminées.") || text.includes("Réparation terminée.") || text.includes("Vérification terminée")) {
     next.status = "Terminé";
-    next.detail = "L’action est terminée. Consultez la vérification système si vous voulez voir le détail.";
+    next.detail = "L’action est terminée. Consultez Diagnostics si vous voulez voir les détails.";
     next.tone = "success";
     next.percent = 100;
     next.steps = next.steps.map((step) => ({
@@ -428,7 +525,6 @@ function updateProgressFromLog(message) {
       text: step.text === "En attente" ? "Terminé" : step.text,
     }));
   }
-
   if (text.includes("Erreur") || text.includes("introuvable") || text.includes("Installez d'abord")) {
     next.status = "Action interrompue";
     next.detail = text;
@@ -453,14 +549,13 @@ function renderIdleProgress() {
       { label: "Connexion", text: "En attente", state: "pending" },
       { label: "Installation", text: "En attente", state: "pending" },
       { label: "Configuration", text: "En attente", state: "pending" },
-      { label: "Diagnostic", text: "En attente", state: "pending" },
+      { label: "Vérification", text: "En attente", state: "pending" },
     ],
   });
 }
 
 function renderTutorials(manifest) {
   const tutorials = Array.isArray(manifest?.manager?.tutorials) ? manifest.manager.tutorials : [];
-
   if (!tutorials.length) {
     elements.tutorials.innerHTML = "<p>Ajoutez des liens dans l’admin AIPilot pour afficher les tutoriels ici.</p>";
     return;
@@ -501,10 +596,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
   const backendUrl = state.defaults.backendUrl;
   const licenseKey = normalizeLicenseKey(elements.licenseKey.value);
   const environment = elements.environment.value;
-
-  if (!licenseKey) {
-    throw new Error("Saisissez d’abord votre clé de licence.");
-  }
+  if (!licenseKey) throw new Error("Saisissez d’abord votre clé de licence.");
 
   elements.licenseKey.value = licenseKey;
   appendLog(`Connexion de la licence ${licenseKey || "(vide)"}...`);
@@ -534,7 +626,6 @@ async function connectSession({ autoDiagnose = true } = {}) {
 
 async function runManagerAction(action, logAction = true) {
   if (!state.manifest) return;
-
   if (logAction) appendLog(`Action: ${action}`);
 
   const result = await window.aipilotManager.runAction({
@@ -546,39 +637,34 @@ async function runManagerAction(action, logAction = true) {
   renderDiagnostics(result.diagnostics);
   renderOverview();
 
-  if (action === "diagnose") {
-    setActiveTab("system");
-    if (state.progress?.tone !== "error") {
-      setProgress({
-        status: "Vérification terminée",
-        detail: "Le diagnostic est prêt. Consultez les points à corriger ci-dessous.",
-        percent: 100,
-        tone: "success",
-        steps: [
-          { label: "Connexion", text: "Terminé", state: "done" },
-          { label: "Installation", text: "Aucune action", state: "done" },
-          { label: "Configuration", text: "Aucune action", state: "done" },
-          { label: "Diagnostic", text: "Diagnostic disponible", state: "done" },
-        ],
-      });
-    }
+  if (action === "diagnose" || action === "repair") {
+    setActiveView("diagnostics");
   }
 
-  if (action === "repair") {
-    setActiveTab("system");
+  if (action === "diagnose" && state.progress?.tone !== "error") {
+    setProgress({
+      status: "Vérification terminée",
+      detail: "Le diagnostic est prêt. Consultez les points à corriger ci-dessous.",
+      percent: 100,
+      tone: "success",
+      steps: [
+        { label: "Connexion", text: "Terminé", state: "done" },
+        { label: "Installation", text: "Aucune action", state: "done" },
+        { label: "Configuration", text: "Aucune action", state: "done" },
+        { label: "Vérification", text: "Diagnostic disponible", state: "done" },
+      ],
+    });
   }
 }
 
 async function ensureNodeRuntimeReadyBeforeInstall() {
   if (!state.manifest) return false;
-
   const readiness = await window.aipilotManager.getInstallReadiness(state.manifest.tool.environment);
   if (readiness.nodeInstalled && readiness.npmInstalled) return true;
 
   const wantsInstall = window.confirm(
     "Node.js et npm sont nécessaires pour continuer. Voulez-vous laisser AIPilot Manager les installer automatiquement maintenant ?",
   );
-
   if (!wantsInstall) {
     appendLog("Installation annulée: Node.js et npm sont requis.");
     return false;
@@ -590,24 +676,18 @@ async function ensureNodeRuntimeReadyBeforeInstall() {
     appendLog(line);
     updateProgressFromLog(line);
   }
-
   if (!result.readiness?.nodeInstalled || !result.readiness?.npmInstalled) {
     throw new Error("Node.js et npm ne sont toujours pas disponibles après l'installation automatique.");
   }
-
   appendLog("Node.js et npm sont prêts.");
   return true;
 }
 
 async function ensureDesktopAppReadyBeforeInstall() {
   if (!state.manifest) return false;
-
   const environment = state.manifest.tool.environment;
   const desktopStatus = await window.aipilotManager.getDesktopAppStatus(environment);
-
-  if (!desktopStatus.required || desktopStatus.installed) {
-    return true;
-  }
+  if (!desktopStatus.required || desktopStatus.installed) return true;
 
   const label = state.manifest.tool.label || environment;
   const wantsOpen = window.confirm(
@@ -615,7 +695,6 @@ async function ensureDesktopAppReadyBeforeInstall() {
   );
 
   appendLog(`${label} n'est pas encore installé. Installez l'application officielle puis relancez l'installation AIPilot.`);
-
   if (wantsOpen && state.manifest.tool.officialAppUrl) {
     await window.aipilotManager.openExternal(state.manifest.tool.officialAppUrl);
     appendLog(`Ouverture de la page officielle ${label}.`);
@@ -668,8 +747,11 @@ async function bootstrap() {
     unsubscribeActionLog();
   });
 
-  elements.tabMain.addEventListener("click", () => setActiveTab("main"));
-  elements.tabSystem.addEventListener("click", () => setActiveTab("system"));
+  elements.navHome.addEventListener("click", () => setActiveView("home"));
+  elements.navDiagnostics.addEventListener("click", () => setActiveView("diagnostics"));
+  elements.navTutorials.addEventListener("click", () => setActiveView("tutorials"));
+  elements.navUpdates.addEventListener("click", () => setActiveView("updates"));
+  elements.sidebarOpenTutorials.addEventListener("click", () => setActiveView("tutorials"));
 
   elements.licenseKey.addEventListener("input", (event) => {
     event.target.value = normalizeLicenseKey(event.target.value);
@@ -697,7 +779,7 @@ async function bootstrap() {
           { label: "Connexion", text: "Vérification de la licence", state: "active" },
           { label: "Installation", text: "En attente", state: "pending" },
           { label: "Configuration", text: "En attente", state: "pending" },
-          { label: "Diagnostic", text: "En attente", state: "pending" },
+          { label: "Vérification", text: "En attente", state: "pending" },
         ],
       });
       await connectSession();
@@ -709,10 +791,10 @@ async function bootstrap() {
     }
   });
 
-  elements.installConfigure.addEventListener("click", async () => {
+  async function handleInstall() {
     setBusy(true);
     try {
-      setActiveTab("main");
+      setActiveView("home");
       setProgress(createProgressModel("install-configure"));
       const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
       if (!nodeReady) return;
@@ -725,12 +807,12 @@ async function bootstrap() {
     } finally {
       setBusy(false);
     }
-  });
+  }
 
-  elements.repair.addEventListener("click", async () => {
+  async function handleRepair() {
     setBusy(true);
     try {
-      setActiveTab("system");
+      setActiveView("diagnostics");
       setProgress(createProgressModel("repair"));
       await runManagerAction("repair");
     } catch (error) {
@@ -739,9 +821,14 @@ async function bootstrap() {
     } finally {
       setBusy(false);
     }
-  });
+  }
 
-  elements.launch.addEventListener("click", async () => {
+  elements.installConfigure.addEventListener("click", handleInstall);
+  elements.dockInstall.addEventListener("click", handleInstall);
+  elements.repair.addEventListener("click", handleRepair);
+  elements.dockRepair.addEventListener("click", handleRepair);
+
+  async function handleLaunch() {
     setBusy(true);
     try {
       await runManagerAction("launch");
@@ -750,12 +837,15 @@ async function bootstrap() {
     } finally {
       setBusy(false);
     }
-  });
+  }
+
+  elements.launch.addEventListener("click", handleLaunch);
+  elements.dockLaunch.addEventListener("click", handleLaunch);
 
   elements.diagnose.addEventListener("click", async () => {
     setBusy(true);
     try {
-      setActiveTab("system");
+      setActiveView("diagnostics");
       setProgress(createProgressModel("diagnose"));
       await runManagerAction("diagnose");
     } catch (error) {
@@ -826,7 +916,7 @@ async function bootstrap() {
       await connectSession();
       if (state.defaults.autoSetup && !state.autoSetupStarted) {
         state.autoSetupStarted = true;
-        setActiveTab("main");
+        setActiveView("home");
         setProgress(createProgressModel("install-configure"));
         const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
         const canProceed = nodeReady ? await ensureDesktopAppReadyBeforeInstall() : false;
