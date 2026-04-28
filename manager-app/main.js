@@ -190,10 +190,10 @@ async function getEffectiveDefaults() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1040,
-    height: 760,
-    minWidth: 920,
-    minHeight: 680,
+    width: 1440,
+    height: 920,
+    minWidth: 1180,
+    minHeight: 820,
     backgroundColor: "#f8fafc",
     webPreferences: {
       contextIsolation: true,

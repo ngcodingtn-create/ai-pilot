@@ -5,6 +5,7 @@ const state = {
   busy: false,
   autoSetupStarted: false,
   updateState: null,
+  progress: null,
 };
 
 const elements = {
@@ -27,12 +28,12 @@ const elements = {
   watchVideo: document.querySelector("#watch-video"),
   checkUpdates: document.querySelector("#check-updates"),
   installUpdate: document.querySelector("#install-update"),
-  sessionSummary: document.querySelector("#session-summary"),
   diagnostics: document.querySelector("#diagnostics"),
-  setupGuidance: document.querySelector("#setup-guidance"),
-  openConfigFile: document.querySelector("#open-config-file"),
-  openConfigFolder: document.querySelector("#open-config-folder"),
   downloadOfficialApp: document.querySelector("#download-official-app"),
+  progressStatus: document.querySelector("#progress-status"),
+  progressDetail: document.querySelector("#progress-detail"),
+  progressBar: document.querySelector("#progress-bar"),
+  progressSteps: document.querySelector("#progress-steps"),
   logs: document.querySelector("#logs"),
 };
 
@@ -67,7 +68,6 @@ function getSelectedToolLabel() {
 function syncButtons() {
   const connected = Boolean(state.manifest);
   const disabled = !connected || state.busy;
-  const setup = state.manifest?.setup || null;
 
   elements.connect.disabled = state.busy;
   elements.chooseFolder.disabled = state.busy;
@@ -79,8 +79,6 @@ function syncButtons() {
   elements.checkUpdates.disabled =
     state.busy || !state.updateState?.enabled || state.updateState?.checking;
   elements.installUpdate.disabled = !state.updateState?.downloaded || state.busy;
-  elements.openConfigFile.disabled = state.busy || !setup?.primaryConfigPath;
-  elements.openConfigFolder.disabled = state.busy || !setup?.configDirectoryPath;
   elements.downloadOfficialApp.disabled =
     state.busy || !state.manifest?.tool?.officialAppUrl;
 }
@@ -182,37 +180,6 @@ function renderUpdateState(updateState) {
   syncButtons();
 }
 
-function renderSessionSummary(manifest) {
-  if (!manifest) {
-    elements.sessionSummary.innerHTML = "<p>Connectez une licence pour voir le résumé.</p>";
-    return;
-  }
-
-  const notes = Array.isArray(manifest.tool.notes) ? manifest.tool.notes : [];
-  const availableModels = Array.isArray(manifest.azure.availableDeployments)
-    ? manifest.azure.availableDeployments.map((item) => item.label).join(", ")
-    : manifest.azure.selectedModelLabel || manifest.azure.deployment;
-
-  elements.sessionSummary.innerHTML = `
-    <dl>
-      <div class="summary-row"><dt>Client</dt><dd>${escapeHtml(manifest.license.customerName)}</dd></div>
-      <div class="summary-row"><dt>Licence</dt><dd>${escapeHtml(manifest.license.key)}</dd></div>
-      <div class="summary-row"><dt>Outil choisi</dt><dd>${escapeHtml(manifest.tool.label || manifest.tool.environment)}</dd></div>
-      <div class="summary-row"><dt>Ressource Azure</dt><dd>${escapeHtml(manifest.azure.resourceName)}</dd></div>
-      <div class="summary-row"><dt>Modèle actif</dt><dd>${escapeHtml(manifest.azure.selectedModelLabel || manifest.azure.deployment)}</dd></div>
-      <div class="summary-row"><dt>Modèles disponibles</dt><dd>${escapeHtml(availableModels)}</dd></div>
-      <div class="summary-row"><dt>Déploiement Azure</dt><dd>${escapeHtml(manifest.azure.deployment)}</dd></div>
-    </dl>
-    ${
-      notes.length
-        ? `<div class="summary-section"><h3>Informations utiles</h3><div class="stack-list">${notes
-            .map((note) => `<p>${escapeHtml(note)}</p>`)
-            .join("")}</div></div>`
-        : ""
-    }
-  `;
-}
-
 function renderDiagnostics(diagnostics) {
   if (!diagnostics) {
     elements.diagnostics.innerHTML = "<p>Aucune vérification exécutée pour le moment.</p>";
@@ -245,33 +212,170 @@ function renderDiagnostics(diagnostics) {
   `;
 }
 
-function renderSetupGuidance(manifest) {
-  if (!manifest?.setup) {
-    elements.setupGuidance.innerHTML =
-      "<p>Installez ou réparez un outil pour afficher les fichiers de configuration.</p>";
-    syncButtons();
+function setProgress(progress) {
+  state.progress = progress;
+
+  if (!elements.progressStatus || !elements.progressDetail || !elements.progressBar || !elements.progressSteps) {
     return;
   }
 
-  const setup = manifest.setup;
-  const notes = Array.isArray(setup.nextSteps) ? setup.nextSteps : [];
+  const toneClass =
+    progress.tone === "success"
+      ? "badge badge-success"
+      : progress.tone === "error"
+        ? "badge badge-warning"
+        : progress.tone === "active"
+          ? "badge badge-success"
+          : "badge badge-neutral";
 
-  elements.setupGuidance.innerHTML = `
-    <dl>
-      <div class="summary-row"><dt>Fichier principal</dt><dd>${escapeHtml(setup.primaryConfigPath || "Aucun")}</dd></div>
-      <div class="summary-row"><dt>Dossier config</dt><dd>${escapeHtml(setup.configDirectoryPath || "Aucun")}</dd></div>
-      <div class="summary-row"><dt>Ce que cela veut dire</dt><dd>${escapeHtml(setup.prompt || "")}</dd></div>
-    </dl>
-    ${
-      notes.length
-        ? `<div class="summary-section"><h3>Prochaines étapes</h3><div class="stack-list">${notes
-            .map((note) => `<p>${escapeHtml(note)}</p>`)
-            .join("")}</div></div>`
-        : ""
+  elements.progressStatus.className = toneClass;
+  elements.progressStatus.textContent = progress.status;
+  elements.progressDetail.textContent = progress.detail;
+  elements.progressBar.style.width = `${Math.max(0, Math.min(progress.percent || 0, 100))}%`;
+  elements.progressSteps.innerHTML = (progress.steps || [])
+    .map((step) => {
+      const className =
+        step.state === "done"
+          ? "progress-step is-done"
+          : step.state === "active"
+            ? "progress-step is-active"
+            : step.state === "error"
+              ? "progress-step is-error"
+              : "progress-step";
+
+      return `
+        <div class="${className}">
+          <strong>${escapeHtml(step.label)}</strong>
+          <span>${escapeHtml(step.text)}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function createProgressModel(action) {
+  if (action === "diagnose") {
+    return {
+      status: "Vérification en cours",
+      detail: "AIPilot vérifie l’état réel de votre machine et des composants nécessaires.",
+      percent: 25,
+      tone: "active",
+      steps: [
+        { label: "Préparation", text: "Lecture de la configuration", state: "done" },
+        { label: "Vérification", text: "Analyse des composants", state: "active" },
+        { label: "Résultat", text: "En attente", state: "pending" },
+      ],
+    };
+  }
+
+  return {
+    status: action === "repair" ? "Réparation en cours" : "Installation en cours",
+    detail: "AIPilot effectue chaque étape et vous montre exactement où il en est.",
+    percent: 10,
+    tone: "active",
+    steps: [
+      { label: "Connexion", text: "Licence et paramètres chargés", state: "done" },
+      { label: "Installation", text: "Préparation des composants", state: "active" },
+      { label: "Configuration", text: "En attente", state: "pending" },
+      { label: "Vérification", text: "En attente", state: "pending" },
+      { label: "Terminé", text: "En attente", state: "pending" },
+    ],
+  };
+}
+
+function updateProgressFromLog(message) {
+  if (!state.progress) {
+    return;
+  }
+
+  const next = JSON.parse(JSON.stringify(state.progress));
+  const text = String(message || "");
+
+  if (text.includes("Connexion de la licence") || text.includes("Licence connectée")) {
+    if (next.steps[0]) {
+      next.steps[0].state = "done";
+      next.steps[0].text = "Licence connectée";
     }
-  `;
+    next.percent = Math.max(next.percent, 18);
+  }
 
-  syncButtons();
+  if (text.includes("Étape 1/2") || text.includes("Préparation de l'installation") || text.includes("Installation de")) {
+    if (next.steps[1]) {
+      next.steps[1].state = "active";
+      next.steps[1].text = "Installation des composants en cours";
+    }
+    next.percent = Math.max(next.percent, 38);
+  }
+
+  if (text.includes("Étape 2/2") || text.includes("Écriture de la configuration") || text.includes("Mise à jour de la variable")) {
+    if (next.steps[1]) {
+      next.steps[1].state = "done";
+      next.steps[1].text = "Composants prêts";
+    }
+    if (next.steps[2]) {
+      next.steps[2].state = "active";
+      next.steps[2].text = "Configuration Azure en cours";
+    }
+    next.percent = Math.max(next.percent, 68);
+  }
+
+  if (text.includes("Vérification finale") || text.includes("Configuration prête") || text.includes("Vérification de")) {
+    if (next.steps[2]) {
+      next.steps[2].state = "done";
+      next.steps[2].text = "Configuration écrite";
+    }
+    if (next.steps[3]) {
+      next.steps[3].state = "active";
+      next.steps[3].text = "Contrôle final en cours";
+    }
+    next.percent = Math.max(next.percent, 84);
+  }
+
+  if (
+    text.includes("Installation et configuration terminées.") ||
+    text.includes("Réparation terminée.") ||
+    text.includes("Node.js et npm sont prêts.")
+  ) {
+    next.status = "Terminé";
+    next.detail = "Votre outil est prêt. Vous pouvez maintenant l’ouvrir ou lancer une vérification.";
+    next.tone = "success";
+    next.percent = 100;
+    next.steps = next.steps.map((step) => ({
+      ...step,
+      state: "done",
+      text:
+        step.label === "Terminé" ? "Prêt à être utilisé" : step.text === "En attente" ? "Terminé" : step.text,
+    }));
+  }
+
+  if (text.includes("Erreur") || text.includes("introuvable") || text.includes("Installez d'abord")) {
+    next.status = "Action interrompue";
+    next.detail = text;
+    next.tone = "error";
+    const activeStep = next.steps.find((step) => step.state === "active");
+    if (activeStep) {
+      activeStep.state = "error";
+      activeStep.text = text;
+    }
+  }
+
+  setProgress(next);
+}
+
+function renderIdleProgress() {
+  setProgress({
+    status: "En attente",
+    detail:
+      "Le manager vous montrera ici chaque étape pendant l’installation, la vérification ou la réparation.",
+    percent: 0,
+    tone: "idle",
+    steps: [
+      { label: "Connexion", text: "En attente", state: "pending" },
+      { label: "Installation", text: "En attente", state: "pending" },
+      { label: "Configuration", text: "En attente", state: "pending" },
+      { label: "Vérification", text: "En attente", state: "pending" },
+    ],
+  });
 }
 
 function renderTutorials(manifest) {
@@ -344,8 +448,6 @@ async function connectSession({ autoDiagnose = true } = {}) {
   }
 
   renderOverview();
-  renderSessionSummary(manifest);
-  renderSetupGuidance(manifest);
   renderTutorials(manifest);
   appendLog(`Licence connectée pour ${manifest.license.customerName}.`);
   await persistState();
@@ -373,6 +475,19 @@ async function runManagerAction(action, logAction = true) {
 
   renderDiagnostics(result.diagnostics);
   renderOverview();
+  if (action === "diagnose" && state.progress?.tone !== "error") {
+    setProgress({
+      status: "Vérification terminée",
+      detail: "Le diagnostic est terminé. Consultez les éléments prêts et ceux à corriger.",
+      percent: 100,
+      tone: "success",
+      steps: [
+        { label: "Préparation", text: "Terminé", state: "done" },
+        { label: "Vérification", text: "Terminé", state: "done" },
+        { label: "Résultat", text: "Diagnostic disponible", state: "done" },
+      ],
+    });
+  }
 }
 
 async function ensureNodeRuntimeReadyBeforeInstall() {
@@ -471,14 +586,15 @@ async function bootstrap() {
   }
 
   renderOverview();
-  renderSetupGuidance(null);
   renderTutorials(null);
+  renderIdleProgress();
 
   const initialUpdateState = await window.aipilotManager.getUpdateState();
   renderUpdateState(initialUpdateState);
   const unsubscribe = window.aipilotManager.onUpdateState(renderUpdateState);
   const unsubscribeActionLog = window.aipilotManager.onActionLog((message) => {
     appendLog(message);
+    updateProgressFromLog(message);
   });
   window.addEventListener("beforeunload", () => {
     unsubscribe();
@@ -505,9 +621,22 @@ async function bootstrap() {
   elements.connect.addEventListener("click", async () => {
     setBusy(true);
     try {
+      setProgress({
+        status: "Connexion en cours",
+        detail: "AIPilot vérifie votre licence et charge la configuration recommandée.",
+        percent: 12,
+        tone: "active",
+        steps: [
+          { label: "Connexion", text: "Vérification de la licence", state: "active" },
+          { label: "Installation", text: "En attente", state: "pending" },
+          { label: "Configuration", text: "En attente", state: "pending" },
+          { label: "Vérification", text: "En attente", state: "pending" },
+        ],
+      });
       await connectSession();
     } catch (error) {
       appendLog(error instanceof Error ? error.message : "Erreur de connexion.");
+      updateProgressFromLog(error instanceof Error ? error.message : "Erreur de connexion.");
     } finally {
       setBusy(false);
     }
@@ -516,6 +645,7 @@ async function bootstrap() {
   elements.installConfigure.addEventListener("click", async () => {
     setBusy(true);
     try {
+      setProgress(createProgressModel("install-configure"));
       const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
       if (!nodeReady) {
         return;
@@ -526,6 +656,7 @@ async function bootstrap() {
       }
       await runManagerAction("install-configure");
     } catch (error) {
+      updateProgressFromLog(error instanceof Error ? error.message : "Erreur d’installation.");
       appendLog(error instanceof Error ? error.message : "Erreur d’installation.");
     } finally {
       setBusy(false);
@@ -535,8 +666,10 @@ async function bootstrap() {
   elements.repair.addEventListener("click", async () => {
     setBusy(true);
     try {
+      setProgress(createProgressModel("repair"));
       await runManagerAction("repair");
     } catch (error) {
+      updateProgressFromLog(error instanceof Error ? error.message : "Erreur de réparation.");
       appendLog(error instanceof Error ? error.message : "Erreur de réparation.");
     } finally {
       setBusy(false);
@@ -557,8 +690,10 @@ async function bootstrap() {
   elements.diagnose.addEventListener("click", async () => {
     setBusy(true);
     try {
+      setProgress(createProgressModel("diagnose"));
       await runManagerAction("diagnose");
     } catch (error) {
+      updateProgressFromLog(error instanceof Error ? error.message : "Erreur de vérification.");
       appendLog(error instanceof Error ? error.message : "Erreur de vérification.");
     } finally {
       setBusy(false);
@@ -573,24 +708,6 @@ async function bootstrap() {
 
     await window.aipilotManager.openExternal(state.manifest.manager.supportVideoUrl);
     appendLog("Ouverture de la vidéo d’aide.");
-  });
-
-  elements.openConfigFile.addEventListener("click", async () => {
-    const target = state.manifest?.setup?.primaryConfigPath;
-    if (!target) {
-      return;
-    }
-    await window.aipilotManager.openPath(target);
-    appendLog(`Ouverture du fichier de configuration: ${target}`);
-  });
-
-  elements.openConfigFolder.addEventListener("click", async () => {
-    const target = state.manifest?.setup?.configDirectoryPath;
-    if (!target) {
-      return;
-    }
-    await window.aipilotManager.openPath(target);
-    appendLog(`Ouverture du dossier de configuration: ${target}`);
   });
 
   elements.downloadOfficialApp.addEventListener("click", async () => {
@@ -657,6 +774,7 @@ async function bootstrap() {
       await connectSession();
       if (state.defaults.autoSetup && !state.autoSetupStarted) {
         state.autoSetupStarted = true;
+        setProgress(createProgressModel("install-configure"));
         const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
         const canProceed = nodeReady
           ? await ensureDesktopAppReadyBeforeInstall()

@@ -32,9 +32,9 @@ body {
 }
 
 .app-shell {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 18px 20px 20px;
 }
 
 .hero,
@@ -161,13 +161,9 @@ body {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 0.6fr);
   gap: 16px;
   margin-top: 16px;
-}
-
-.layout.bottom {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .stack {
@@ -272,6 +268,94 @@ body {
 
 .helper-box {
   margin-top: 18px;
+}
+
+.progress-box {
+  margin-top: 18px;
+  border: 1px solid #dbe7f0;
+  border-radius: 20px;
+  background: #f8fbfd;
+  padding: 16px;
+}
+
+.progress-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.progress-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.progress-head p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.progress-track {
+  margin-top: 14px;
+  height: 12px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8 0%, #22c55e 100%);
+  transition: width 0.25s ease;
+}
+
+.progress-steps {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.progress-step {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.progress-step strong,
+.progress-step span {
+  display: block;
+}
+
+.progress-step strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.progress-step span {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.progress-step.is-active {
+  border-color: #7dd3fc;
+  background: #eff6ff;
+}
+
+.progress-step.is-done {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.progress-step.is-error {
+  border-color: #fda4af;
+  background: #fff1f2;
 }
 
 .helper-box h3 {
@@ -438,8 +522,8 @@ body {
 
 .logs {
   margin: 0;
-  min-height: 180px;
-  max-height: 320px;
+  min-height: 150px;
+  max-height: 260px;
   overflow: auto;
   border-top: 1px solid rgba(148, 163, 184, 0.18);
   background: #0f172a;
@@ -452,12 +536,15 @@ body {
 @media (max-width: 960px) {
   .hero,
   .layout,
-  .layout.bottom,
   .field-grid {
     grid-template-columns: 1fr;
   }
 
   .summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-steps {
     grid-template-columns: 1fr;
   }
 }
@@ -480,7 +567,8 @@ body {
   }
 
   .inline-field,
-  .tutorial-card {
+  .tutorial-card,
+  .progress-head {
     flex-direction: column;
     align-items: stretch;
   }
