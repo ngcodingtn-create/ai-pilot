@@ -11,9 +11,9 @@
       <header class="hero">
         <div class="hero-copy">
           <p class="eyebrow">AIPILOT MANAGER</p>
-          <h1>Votre assistant d’installation AIPilot</h1>
+          <h1>Installation guidée, claire et rapide</h1>
           <p id="portal-text" class="hero-text">
-            AIPilot Manager vous aide à installer, configurer, mettre à jour et réparer votre outil.
+            AIPilot Manager prépare votre outil, vérifie votre machine et vous explique quoi faire à chaque étape.
           </p>
           <div class="hero-chips">
             <span id="platform-chip" class="chip">Plateforme</span>
@@ -24,171 +24,211 @@
 
         <aside class="hero-side">
           <div class="mini-card">
-            <p class="mini-label">Comment ça marche</p>
+            <p class="mini-label">Parcours conseillé</p>
             <ol class="step-list">
               <li>1. Connectez votre licence</li>
               <li>2. Cliquez sur Installer et configurer</li>
-              <li>3. Ouvrez votre outil et commencez</li>
+              <li>3. Ouvrez l’outil une fois la préparation terminée</li>
             </ol>
           </div>
         </aside>
       </header>
 
-      <section class="panel panel-accent">
-        <div class="section-head">
-          <h2>Démarrage rapide</h2>
-          <p>Tout est centralisé ici pour qu’une personne non technique puisse suivre facilement.</p>
-        </div>
-        <div id="overview" class="summary-block">
-          <p>Connectez votre licence pour afficher le plan d’installation recommandé.</p>
-        </div>
-      </section>
+      <nav class="tab-nav" aria-label="Navigation du manager">
+        <button id="tab-main" class="tab-button is-active" type="button">Informations</button>
+        <button id="tab-system" class="tab-button" type="button">Vérification système</button>
+      </nav>
 
-      <section class="layout">
-        <section class="panel">
-          <div class="section-head">
-            <h2>Votre accès</h2>
-            <p>Renseignez la licence, choisissez l’outil et indiquez éventuellement votre dossier projet.</p>
-          </div>
+      <section class="workspace">
+        <section id="panel-main" class="tab-panel is-active">
+          <div class="workspace-grid">
+            <section class="panel panel-primary">
+              <div class="section-head">
+                <h2>Démarrage</h2>
+                <p>Entrez votre licence, choisissez l’outil, puis laissez AIPilot Manager s’occuper du reste.</p>
+              </div>
 
-          <div class="field-grid">
-            <label class="field">
-              <span>Clé de licence</span>
-              <input id="license-key" type="text" placeholder="ABCD-1234-EFGH-5678" />
-            </label>
+              <div id="overview" class="overview-card">
+                <p>Connectez votre licence pour afficher le plan d’installation recommandé.</p>
+              </div>
 
-            <label class="field">
-              <span>Outil à préparer</span>
-              <select id="environment">
-                <option value="opencode">OpenCode</option>
-                <option value="codex">Codex</option>
-                <option value="t3code">T3 Code</option>
-              </select>
-            </label>
+              <div class="field-grid">
+                <label class="field">
+                  <span>Clé de licence</span>
+                  <input id="license-key" type="text" placeholder="ABCD-1234-EFGH-5678" />
+                </label>
 
-            <div class="field field-full">
-              <span>Dossier projet</span>
-              <div class="inline-field">
-                <input id="project-root" type="text" readonly placeholder="Optionnel, mais recommandé pour OpenCode" />
-                <button id="choose-folder" class="button button-secondary" type="button">
-                  Choisir
+                <label class="field">
+                  <span>Outil à préparer</span>
+                  <select id="environment">
+                    <option value="opencode">OpenCode</option>
+                    <option value="codex">Codex</option>
+                    <option value="t3code">T3 Code</option>
+                  </select>
+                </label>
+
+                <div class="field field-full">
+                  <span>Dossier projet</span>
+                  <div class="inline-field">
+                    <input id="project-root" type="text" readonly placeholder="Optionnel, mais recommandé pour OpenCode" />
+                    <button id="choose-folder" class="button button-secondary" type="button">
+                      Choisir
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="action-row">
+                <button id="connect" class="button" type="button">Connecter ma licence</button>
+                <button id="install-configure" class="button button-success" type="button" disabled>
+                  Installer et configurer
+                </button>
+                <button id="launch" class="button button-secondary" type="button" disabled>
+                  Ouvrir l’outil
                 </button>
               </div>
-            </div>
-          </div>
 
-          <div class="action-row">
-            <button id="connect" class="button" type="button">Connecter ma licence</button>
-            <button id="install-configure" class="button button-success" type="button" disabled>
-              Installer et configurer
-            </button>
-            <button id="launch" class="button button-secondary" type="button" disabled>
-              Ouvrir l’outil
-            </button>
-          </div>
+              <div class="progress-box">
+                <div class="progress-head">
+                  <div>
+                    <h3>Ce que fait AIPilot en ce moment</h3>
+                    <p id="progress-detail">Aucune action en cours pour le moment.</p>
+                  </div>
+                  <span id="progress-status" class="badge badge-neutral">En attente</span>
+                </div>
+                <div class="progress-track" aria-hidden="true">
+                  <div id="progress-bar" class="progress-fill"></div>
+                </div>
+                <div id="progress-steps" class="progress-steps">
+                  <div class="progress-step">
+                    <strong>Connexion</strong>
+                    <span>En attente</span>
+                  </div>
+                  <div class="progress-step">
+                    <strong>Installation</strong>
+                    <span>En attente</span>
+                  </div>
+                  <div class="progress-step">
+                    <strong>Configuration</strong>
+                    <span>En attente</span>
+                  </div>
+                  <div class="progress-step">
+                    <strong>Diagnostic</strong>
+                    <span>En attente</span>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-          <div class="progress-box">
-            <div class="progress-head">
-              <div>
-                <h3>Progression en direct</h3>
-                <p id="progress-detail">Le manager vous montrera ici chaque étape pendant l’installation, la vérification ou la réparation.</p>
-              </div>
-              <span id="progress-status" class="badge badge-neutral">En attente</span>
-            </div>
-            <div class="progress-track" aria-hidden="true">
-              <div id="progress-bar" class="progress-fill"></div>
-            </div>
-            <div id="progress-steps" class="progress-steps">
-              <div class="progress-step">
-                <strong>Connexion</strong>
-                <span>En attente</span>
-              </div>
-              <div class="progress-step">
-                <strong>Installation</strong>
-                <span>En attente</span>
-              </div>
-              <div class="progress-step">
-                <strong>Configuration</strong>
-                <span>En attente</span>
-              </div>
-              <div class="progress-step">
-                <strong>Vérification</strong>
-                <span>En attente</span>
-              </div>
-            </div>
-          </div>
+            <aside class="stack">
+              <section class="panel">
+                <div class="section-head">
+                  <h2>Mises à jour automatiques</h2>
+                  <p id="update-message">Chargement…</p>
+                </div>
+                <div id="update-summary" class="summary-block">
+                  <p>Chargement de l’état des mises à jour…</p>
+                </div>
+                <div class="action-row compact">
+                  <button id="check-updates" class="button button-secondary" type="button">
+                    Vérifier maintenant
+                  </button>
+                  <button id="install-update" class="button button-success" type="button" disabled>
+                    Installer la mise à jour
+                  </button>
+                </div>
+              </section>
 
-          <div class="helper-box">
-            <h3>Si quelque chose ne marche pas</h3>
-            <p>
-              Le bouton <strong>Réparer</strong> revérifie l’installation, réécrit la configuration,
-              remet les variables Azure et vous indique ce qu’il faut corriger.
-            </p>
-            <div class="action-row compact">
-              <button id="repair" class="button button-secondary" type="button" disabled>
-                Réparer mon installation
-              </button>
-              <button id="diagnose" class="button button-secondary" type="button" disabled>
-                Vérifier mon installation
-              </button>
-            </div>
+              <section class="panel">
+                <div class="section-head">
+                  <h2>Tutoriels</h2>
+                  <p>Guides et liens utiles pour terminer l’installation sans stress.</p>
+                </div>
+                <div id="tutorials" class="summary-block">
+                  <p>Connectez votre licence pour afficher les tutoriels recommandés.</p>
+                </div>
+                <div class="action-row compact">
+                  <button id="watch-video" class="button button-secondary" type="button" disabled>
+                    Ouvrir la vidéo
+                  </button>
+                  <button id="download-official-app" class="button button-secondary" type="button" disabled>
+                    Télécharger l’app officielle
+                  </button>
+                </div>
+              </section>
+            </aside>
           </div>
         </section>
 
-        <section class="stack">
-          <section class="panel">
-            <div class="section-head">
-              <h2>Mises à jour automatiques</h2>
-              <p id="update-message">Chargement…</p>
-            </div>
-            <div id="update-summary" class="summary-block">
-              <p>Chargement de l’état des mises à jour…</p>
-            </div>
-            <div class="action-row compact">
-              <button id="check-updates" class="button button-secondary" type="button">
-                Vérifier maintenant
-              </button>
-              <button id="install-update" class="button button-success" type="button" disabled>
-                Installer la mise à jour
-              </button>
-            </div>
-          </section>
+        <section id="panel-system" class="tab-panel">
+          <div class="workspace-grid system-grid">
+            <section class="panel panel-primary">
+              <div class="section-head">
+                <h2>Vérification système</h2>
+                <p>Cette vue contrôle les composants nécessaires, repère les problèmes et vous indique quoi réparer.</p>
+              </div>
 
-          <section class="panel">
-            <div class="section-head">
-              <h2>Tutoriels</h2>
-              <p>Liens utiles pour démarrer, comprendre l’outil choisi ou résoudre un blocage.</p>
-            </div>
-            <div id="tutorials" class="summary-block">
-              <p>Connectez votre licence pour afficher les tutoriels recommandés.</p>
-            </div>
-            <div class="action-row compact">
-              <button id="watch-video" class="button button-secondary" type="button" disabled>
-                Ouvrir la vidéo principale
-              </button>
-              <button id="download-official-app" class="button button-secondary" type="button" disabled>
-                Télécharger l’app officielle
-              </button>
-            </div>
-          </section>
+              <div id="system-health" class="health-grid">
+                <article class="health-card">
+                  <span>État global</span>
+                  <strong>En attente</strong>
+                  <small>Lancez une vérification pour afficher le diagnostic.</small>
+                </article>
+              </div>
+
+              <div class="helper-box helper-box-tight">
+                <h3>Que fait le bouton Réparer ?</h3>
+                <p>
+                  Il revérifie l’app choisie, le CLI, Node.js, npm, la configuration Azure et réécrit
+                  automatiquement ce qui manque ou ce qui est cassé.
+                </p>
+              </div>
+
+              <div id="system-issues" class="issue-list">
+                <article class="issue-card issue-card-muted">
+                  <div>
+                    <strong>Aucun diagnostic exécuté</strong>
+                    <p>Lancez “Vérifier mon installation” pour afficher les points prêts et les points à corriger.</p>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <aside class="stack">
+              <section class="panel">
+                <div class="section-head">
+                  <h2>Actions</h2>
+                  <p>Utilisez d’abord la vérification, puis la réparation si un problème est détecté.</p>
+                </div>
+                <div class="action-stack">
+                  <button id="diagnose" class="button button-secondary" type="button" disabled>
+                    Vérifier mon installation
+                  </button>
+                  <button id="repair" class="button button-success" type="button" disabled>
+                    Réparer automatiquement
+                  </button>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="section-head">
+                  <h2>Détails techniques</h2>
+                  <p>Liste complète des contrôles effectués sur votre machine.</p>
+                </div>
+                <div id="diagnostics" class="summary-block">
+                  <p>Aucune vérification exécutée pour le moment.</p>
+                </div>
+              </section>
+            </aside>
+          </div>
         </section>
-      </section>
-
-      <section class="panel">
-        <div class="section-head">
-          <h2>Vérification de la machine</h2>
-          <p>Un diagnostic simple pour savoir ce qui est prêt et ce qui doit être réparé.</p>
-        </div>
-        <div id="diagnostics" class="summary-block">
-          <p>Aucune vérification exécutée pour le moment.</p>
-        </div>
       </section>
 
       <details class="panel logs-panel">
         <summary>
           <div>
             <h2>Journal détaillé</h2>
-            <p>À ouvrir uniquement si vous voulez voir les détails techniques.</p>
+            <p>À ouvrir seulement si vous voulez voir les messages techniques.</p>
           </div>
         </summary>
         <pre id="logs" class="logs">AIPilot Manager prêt.</pre>

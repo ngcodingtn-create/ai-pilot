@@ -190,17 +190,25 @@ async function getEffectiveDefaults() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 920,
-    minWidth: 1180,
-    minHeight: 820,
+    width: 1600,
+    height: 980,
+    minWidth: 1280,
+    minHeight: 860,
     backgroundColor: "#f8fafc",
+    show: false,
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
     },
     icon: path.join(__dirname, "build", "icon.png"),
     title: "AIPilot Manager",
+  });
+
+  mainWindow.once("ready-to-show", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.maximize();
+      mainWindow.show();
+    }
   });
 
   mainWindow.loadFile(path.join(__dirname, "src", "index.html"));
