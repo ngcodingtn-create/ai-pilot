@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 export type HomeConfig = {
@@ -759,6 +760,40 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                     </ul>
                   </InfoPanel>
 
+                  {selectedEnvironment === "codex" ? (
+                    <InfoPanel title="Dernière étape pour Codex" tone="blue">
+                      <div className="space-y-4">
+                        <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                          <li>1. Téléchargez puis ouvrez Codex sur votre machine.</li>
+                          <li>2. Sur l’écran d’accueil de Codex, cliquez sur <InlineCode>Enter API key</InlineCode>.</li>
+                          <li>3. Revenez ensuite dans <InlineCode>AIPilot Manager</InlineCode>.</li>
+                          <li>4. Dans AIPilot Manager, cliquez sur <InlineCode>Connecter ma licence</InlineCode>.</li>
+                          <li>5. Cliquez ensuite sur <InlineCode>Installer et configurer</InlineCode>.</li>
+                          <li>6. AIPilot écrira la configuration Azure, réparera Codex CLI si nécessaire, puis vous pourrez ouvrir Codex et commencer.</li>
+                        </ol>
+
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          <GuideScreenshot
+                            src="/tutorials/codex-enter-api-key.png"
+                            alt="Écran de bienvenue Codex avec le bouton Enter API key"
+                            title="Dans Codex"
+                            description="Sur le premier écran, utilisez le bouton Enter API key."
+                            placeholderLabel="Ajoutez la capture Codex"
+                            placeholderPath="public/tutorials/codex-enter-api-key.png"
+                          />
+                          <GuideScreenshot
+                            src="/tutorials/aipilot-manager-connect-install.png"
+                            alt="AIPilot Manager avec les boutons Connecter ma licence et Installer et configurer"
+                            title="Dans AIPilot Manager"
+                            description="Ensuite cliquez sur Connecter ma licence, puis sur Installer et configurer."
+                            placeholderLabel="Ajoutez la capture AIPilot Manager"
+                            placeholderPath="public/tutorials/aipilot-manager-connect-install.png"
+                          />
+                        </div>
+                      </div>
+                    </InfoPanel>
+                  ) : null}
+
                   <InfoPanel title="Points importants" tone="blue">
                     <ul className="space-y-2 text-sm leading-7 text-slate-700">
                       <li>- Windows télécharge un fichier <InlineCode>.cmd</InlineCode> qui installe la vraie app desktop puis l’ouvre automatiquement</li>
@@ -1244,6 +1279,51 @@ function DownloadButton({ href, label }: { href: string; label: string }) {
     >
       {label}
     </a>
+  );
+}
+
+function GuideScreenshot({
+  src,
+  alt,
+  title,
+  description,
+  placeholderLabel,
+  placeholderPath,
+}: {
+  src: string;
+  alt: string;
+  title: string;
+  description: string;
+  placeholderLabel: string;
+  placeholderPath: string;
+}) {
+  const [imageMissing, setImageMissing] = useState(false);
+
+  return (
+    <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+      {!imageMissing ? (
+        <Image
+          src={src}
+          alt={alt}
+          width={1200}
+          height={700}
+          className="h-56 w-full object-cover object-top"
+          onError={() => setImageMissing(true)}
+        />
+      ) : (
+        <div className="flex h-56 w-full flex-col items-center justify-center bg-slate-100 px-5 text-center">
+          <p className="text-sm font-semibold text-slate-900">{placeholderLabel}</p>
+          <p className="mt-2 text-xs leading-6 text-slate-500">
+            Déposez l’image ici: <InlineCode>{placeholderPath}</InlineCode>
+          </p>
+        </div>
+      )}
+
+      <div className="p-4">
+        <p className="text-sm font-bold text-slate-950">{title}</p>
+        <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
+      </div>
+    </div>
   );
 }
 
