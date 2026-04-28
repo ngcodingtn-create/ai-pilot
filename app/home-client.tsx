@@ -53,6 +53,10 @@ const CODEX_TOTAL_STEPS = 5;
 const LICENSE_KEY_LENGTH = 16;
 const LICENSE_PATTERN = /^[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}$/;
 
+function getTotalStepsForEnvironment(environment: EnvironmentKey) {
+  return environment === "codex" ? CODEX_TOTAL_STEPS : DEFAULT_TOTAL_STEPS;
+}
+
 export default function HomeClient({ config }: { config: HomeConfig }) {
   const [selectedOs, setSelectedOs] = useState<OsKey>("windows");
   const [selectedEnvironment, setSelectedEnvironment] =
@@ -69,8 +73,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
   const [accessRequest, setAccessRequest] = useState<AccessRequestState>({
     status: "idle",
   });
-  const totalSteps =
-    selectedEnvironment === "codex" ? CODEX_TOTAL_STEPS : DEFAULT_TOTAL_STEPS;
+  const totalSteps = getTotalStepsForEnvironment(selectedEnvironment);
 
   const osOptions = getOsOptions();
   const environmentOptions = getEnvironmentOptions();
@@ -132,7 +135,9 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         );
         setLicenseKey(normalizeLicenseKey(parsed.licenseKey ?? ""));
         if (typeof parsed.currentStep === "number") {
-          setCurrentStep(Math.min(Math.max(parsed.currentStep, 1), totalSteps));
+          setCurrentStep(
+            Math.min(Math.max(parsed.currentStep, 1), CODEX_TOTAL_STEPS),
+          );
         }
         setIsReady(true);
       });
@@ -144,7 +149,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         setIsReady(true);
       });
     }
-  }, [totalSteps]);
+  }, []);
 
   useEffect(() => {
     if (!isReady) return;
@@ -252,8 +257,14 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
   function selectEnvironment(environment: EnvironmentKey) {
     setSelectedEnvironment(environment);
+    const targetMaxStep = getTotalStepsForEnvironment(environment);
     if (currentStep < 3) {
       setCurrentStep(3);
+      return;
+    }
+
+    if (currentStep > targetMaxStep) {
+      setCurrentStep(targetMaxStep);
     }
   }
 
