@@ -374,8 +374,8 @@ export default async function AdminPage({
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="grid gap-3 sm:grid-cols-2">
-                          <MiniMetric label="Demandes acceptées" value={String(acceptedRequests.length)} />
                           <MiniMetric label="Demandes en attente" value={String(pendingRequests.length)} />
+                          <MiniMetric label="Demandes traitées" value={String(acceptedRequests.length)} />
                           <MiniMetric
                             label="Répartition outils"
                             value={`${licenses.filter((item) => item.preferredEnvironment === "codex").length}/${licenses.filter((item) => item.preferredEnvironment === "t3code").length}/${licenses.filter((item) => item.preferredEnvironment === "opencode").length}`}
@@ -494,25 +494,25 @@ export default async function AdminPage({
                   <SectionIntro
                     eyebrow="Requests"
                     title="Demandes d’accès WhatsApp"
-                    description="Accepte une demande, attribue un plan, puis copie ou envoie la clé au client."
+                    description="Cette vue montre uniquement les demandes en attente, pour que tu traites seulement ce qui reste à faire."
                   />
 
                   <Card>
                     <CardHeader>
-                      <CardTitle>Demandes entrantes</CardTitle>
+                      <CardTitle>Demandes en attente</CardTitle>
                       <CardDescription>
-                        Le client remplit le formulaire du portail, puis tout se traite ici.
+                        Dès qu’une demande est acceptée, elle disparaît de cette vue.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {accessRequests.length === 0 ? (
+                      {pendingRequests.length === 0 ? (
                         <EmptyState
-                          title="Aucune demande reçue"
-                          description="Les nouveaux prospects apparaîtront ici."
+                          title="Aucune demande en attente"
+                          description="Toutes les demandes reçues ont déjà été traitées."
                         />
                       ) : (
                         <>
-                          <MobileRequestCards requests={accessRequests} />
+                          <MobileRequestCards requests={pendingRequests} />
                           <div className="hidden overflow-x-auto md:block">
                             <Table>
                               <TableHeader>
@@ -527,7 +527,7 @@ export default async function AdminPage({
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {accessRequests.map((request) => (
+                                {pendingRequests.map((request) => (
                                   <TableRow key={request.id}>
                                     <TableCell className="font-semibold text-slate-950">
                                       {request.customerName}
@@ -564,30 +564,21 @@ export default async function AdminPage({
                                       {formatDateTime(request.createdAt)}
                                     </TableCell>
                                     <TableCell>
-                                      {request.status === "pending" ? (
-                                        <form action={acceptAccessRequestAction} className="space-y-3">
-                                          <input type="hidden" name="requestId" value={request.id} />
-                                          <select
-                                            name="tier"
-                                            defaultValue="pro"
-                                            className="w-full min-w-[8rem] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                                          >
-                                            <option value="starter">Starter</option>
-                                            <option value="pro">Pro</option>
-                                            <option value="max">Max</option>
-                                          </select>
-                                          <Button type="submit" variant="success" size="sm">
-                                            Générer la licence
-                                          </Button>
-                                        </form>
-                                      ) : (
-                                        <div className="space-y-2">
-                                          <code className="block break-all rounded bg-slate-100 px-2 py-1 font-mono text-[13px] text-slate-900">
-                                            {request.generatedLicenseKey ?? "Clé non disponible"}
-                                          </code>
-                                          <span className="text-xs text-slate-500">Déjà traitée</span>
-                                        </div>
-                                      )}
+                                      <form action={acceptAccessRequestAction} className="space-y-3">
+                                        <input type="hidden" name="requestId" value={request.id} />
+                                        <select
+                                          name="tier"
+                                          defaultValue="pro"
+                                          className="w-full min-w-[8rem] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                                        >
+                                          <option value="starter">Starter</option>
+                                          <option value="pro">Pro</option>
+                                          <option value="max">Max</option>
+                                        </select>
+                                        <Button type="submit" variant="success" size="sm">
+                                          Générer la licence
+                                        </Button>
+                                      </form>
                                     </TableCell>
                                   </TableRow>
                                 ))}
