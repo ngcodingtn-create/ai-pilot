@@ -128,6 +128,8 @@ function renderOverview() {
   }
 
   const toolLabel = state.manifest.tool.label || getSelectedToolLabel();
+  const modelLabel =
+    state.manifest.azure?.selectedModelLabel || state.manifest.azure?.deployment || "modèle Azure";
   const projectText = state.projectRoot
     ? `Le dossier projet sélectionné est ${escapeHtml(state.projectRoot)}.`
     : "Aucun dossier projet spécifique n’est encore choisi.";
@@ -137,7 +139,8 @@ function renderOverview() {
 
   elements.overview.innerHTML = `
     <div class="stack-list">
-      <p><strong>Étape suivante recommandée:</strong> cliquez sur <strong>Installer et configurer</strong> pour préparer ${escapeHtml(toolLabel)} automatiquement.</p>
+      <p><strong>Étape suivante recommandée:</strong> cliquez sur <strong>Installer et configurer</strong> pour préparer ${escapeHtml(toolLabel)} automatiquement avec ${escapeHtml(modelLabel)}.</p>
+      <p>Le modèle par défaut reste <strong>GPT-5.4</strong>, et si GPT-5.5 est configuré dans l’admin, il sera aussi disponible directement dans l’outil.</p>
       <p><strong>Réparer</strong> relance une vérification complète, remet les fichiers de configuration, la clé Azure et les réglages importants.</p>
       <p>${projectText}</p>
       <p>${supportEmail}</p>
@@ -186,6 +189,9 @@ function renderSessionSummary(manifest) {
   }
 
   const notes = Array.isArray(manifest.tool.notes) ? manifest.tool.notes : [];
+  const availableModels = Array.isArray(manifest.azure.availableDeployments)
+    ? manifest.azure.availableDeployments.map((item) => item.label).join(", ")
+    : manifest.azure.selectedModelLabel || manifest.azure.deployment;
 
   elements.sessionSummary.innerHTML = `
     <dl>
@@ -193,6 +199,8 @@ function renderSessionSummary(manifest) {
       <div class="summary-row"><dt>Licence</dt><dd>${escapeHtml(manifest.license.key)}</dd></div>
       <div class="summary-row"><dt>Outil choisi</dt><dd>${escapeHtml(manifest.tool.label || manifest.tool.environment)}</dd></div>
       <div class="summary-row"><dt>Ressource Azure</dt><dd>${escapeHtml(manifest.azure.resourceName)}</dd></div>
+      <div class="summary-row"><dt>Modèle actif</dt><dd>${escapeHtml(manifest.azure.selectedModelLabel || manifest.azure.deployment)}</dd></div>
+      <div class="summary-row"><dt>Modèles disponibles</dt><dd>${escapeHtml(availableModels)}</dd></div>
       <div class="summary-row"><dt>Déploiement Azure</dt><dd>${escapeHtml(manifest.azure.deployment)}</dd></div>
     </dl>
     ${
@@ -630,7 +638,6 @@ async function bootstrap() {
     renderOverview();
     await persistState();
   });
-
   syncButtons();
 
   try {

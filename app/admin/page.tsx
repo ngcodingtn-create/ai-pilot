@@ -198,6 +198,13 @@ export default async function AdminPage({
                             helperText="Important: utilisez le nom exact du déploiement créé dans Azure AI Foundry. Pour Codex et T3 Code, une valeur incorrecte provoque souvent l’erreur 404 `The API deployment for this resource does not exist`."
                           />
                           <Field
+                            label="Déploiement GPT-5.5 optionnel"
+                            name="azureGpt55Deployment"
+                            defaultValue={config.azureGpt55Deployment ?? ""}
+                            placeholder="Ex: gpt-5.5-1"
+                            helperText="Optionnel. Si vous le renseignez, GPT-5.5 sera aussi disponible directement dans Codex, T3 Code et OpenCode, tout en gardant GPT-5.4 comme choix par défaut."
+                          />
+                          <Field
                             label="Clé API Azure"
                             name="azureApiKey"
                             defaultValue=""

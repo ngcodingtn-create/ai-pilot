@@ -1021,6 +1021,12 @@ async function configureCodex(manifest, logs) {
   logs.push(`Écriture de la configuration Codex dans ${configPath}`);
   await writeFileWithDirs(configPath, manifest.azure.codex.configToml);
 
+  const availableDeploymentNames = Array.isArray(manifest.azure.availableDeployments)
+    ? manifest.azure.availableDeployments
+        .map((item) => String(item?.deployment ?? "").trim())
+        .filter(Boolean)
+    : [manifest.azure.deployment];
+
   if (manifest.tool.environment === "t3code") {
     const t3SettingsPath = getT3SettingsPath();
     const t3ClientSettingsPath = getT3ClientSettingsPath();
@@ -1036,7 +1042,7 @@ async function configureCodex(manifest, logs) {
           .filter(Boolean)
       : [];
     const nextCustomModels = Array.from(
-      new Set([manifest.azure.deployment, ...currentCustomModels]),
+      new Set([...availableDeploymentNames, ...currentCustomModels]),
     );
 
     const nextSettings = {
@@ -1063,23 +1069,30 @@ async function configureCodex(manifest, logs) {
     );
 
     const currentFavorites = Array.isArray(currentClientSettings?.favorites)
-      ? currentClientSettings.favorites.filter(
-          (favorite) =>
-            favorite &&
-            typeof favorite === "object" &&
-            (favorite.provider !== "codex" || favorite.model !== manifest.azure.deployment),
-        )
+      ? currentClientSettings.favorites.filter((favorite) => {
+          if (!favorite || typeof favorite !== "object") {
+            return false;
+          }
+
+          if (favorite.provider !== "codex") {
+            return true;
+          }
+
+          return !availableDeploymentNames.includes(String(favorite.model || "").trim());
+        })
       : [];
+
+    const deploymentFavorites = availableDeploymentNames.map((model) => ({
+      provider: "codex",
+      model,
+    }));
 
     const nextClientSettings = {
       ...(currentClientSettings && typeof currentClientSettings === "object"
         ? currentClientSettings
         : {}),
       favorites: [
-        {
-          provider: "codex",
-          model: manifest.azure.deployment,
-        },
+        ...deploymentFavorites,
         ...currentFavorites,
       ],
     };
@@ -1090,7 +1103,7 @@ async function configureCodex(manifest, logs) {
       `${JSON.stringify(nextClientSettings, null, 2)}\n`,
     );
     logs.push(
-      `T3 Code verra automatiquement le modèle ${manifest.azure.deployment} dans son sélecteur et dans les favoris.`,
+      `T3 Code verra automatiquement les modèles Azure disponibles dans son sélecteur et dans les favoris.`,
     );
   }
 

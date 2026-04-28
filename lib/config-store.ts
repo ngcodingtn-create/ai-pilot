@@ -6,6 +6,7 @@ import { getSql } from "./db";
 export type StoredConfig = {
   azureResourceName: string;
   azureDefaultDeployment: string;
+  azureGpt55Deployment?: string;
   azureApiKey?: string;
   includeApiKeyInInstaller: boolean;
   supportEmail?: string;
@@ -17,6 +18,7 @@ export type StoredConfig = {
 type LocalConfigFile = {
   azureResourceName?: string;
   azureDefaultDeployment?: string;
+  azureGpt55Deployment?: string;
   azureApiKey?: string;
   azureApiKeyEncrypted?: boolean;
   includeApiKeyInInstaller?: boolean;
@@ -39,6 +41,7 @@ type LocalOpenCodeRuntimeConfig = {
 const DEFAULTS: StoredConfig = {
   azureResourceName: process.env.NEXT_PUBLIC_AZURE_RESOURCE_NAME ?? "admin-3342-resource",
   azureDefaultDeployment: process.env.NEXT_PUBLIC_DEFAULT_DEPLOYMENT ?? "gpt-5.4-1",
+  azureGpt55Deployment: process.env.NEXT_PUBLIC_GPT55_DEPLOYMENT ?? "",
   includeApiKeyInInstaller: false,
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "",
   supportVideoUrl: process.env.NEXT_PUBLIC_SUPPORT_VIDEO_URL ?? "",
@@ -107,6 +110,7 @@ async function saveLocalConfig(config: StoredConfig) {
   const next: LocalConfigFile = {
     azureResourceName: config.azureResourceName,
     azureDefaultDeployment: config.azureDefaultDeployment,
+    azureGpt55Deployment: config.azureGpt55Deployment,
     includeApiKeyInInstaller: config.includeApiKeyInInstaller,
     supportEmail: config.supportEmail,
     supportVideoUrl: config.supportVideoUrl,
@@ -168,6 +172,7 @@ export async function saveStoredConfig(config: StoredConfig) {
   await ensureConfigTable();
   await setValue("azureResourceName", config.azureResourceName);
   await setValue("azureDefaultDeployment", config.azureDefaultDeployment);
+  await setValue("azureGpt55Deployment", config.azureGpt55Deployment ?? "");
   await setValue(
     "includeApiKeyInInstaller",
     String(config.includeApiKeyInInstaller),
@@ -201,6 +206,8 @@ export async function getStoredConfig(): Promise<StoredConfig> {
         local.azureDefaultDeployment ??
         runtimeAzure?.deployment ??
         DEFAULTS.azureDefaultDeployment,
+      azureGpt55Deployment:
+        local.azureGpt55Deployment ?? DEFAULTS.azureGpt55Deployment,
       azureApiKey: readStoredSecret(
         local.azureApiKey ?? runtimeAzure?.apiKey,
         local.azureApiKeyEncrypted ?? false,
@@ -234,6 +241,7 @@ export async function getStoredConfig(): Promise<StoredConfig> {
 
     if (row.key === "azureResourceName") config.azureResourceName = value;
     if (row.key === "azureDefaultDeployment") config.azureDefaultDeployment = value;
+    if (row.key === "azureGpt55Deployment") config.azureGpt55Deployment = value;
     if (row.key === "azureApiKey") config.azureApiKey = value;
     if (row.key === "includeApiKeyInInstaller") {
       config.includeApiKeyInInstaller = value === "true";

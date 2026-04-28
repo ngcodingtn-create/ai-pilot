@@ -16,6 +16,13 @@ type TutorialLink = {
   url: string;
 };
 
+type AvailableDeployment = {
+  id: string;
+  label: string;
+  deployment: string;
+  recommended: boolean;
+};
+
 function normalizeEnvironment(value: unknown): EnvironmentKey | undefined {
   if (value === "codex" || value === "t3code" || value === "opencode") {
     return value;
@@ -28,8 +35,13 @@ function buildAzureBaseUrl(resourceName: string) {
   return `https://${resourceName}.openai.azure.com/openai/v1`;
 }
 
-function buildCodexConfig(resourceName: string, deployment: string) {
+function buildCodexConfig(
+  resourceName: string,
+  deployment: string,
+  availableDeployments: AvailableDeployment[],
+) {
   const baseUrl = buildAzureBaseUrl(resourceName);
+  const gpt55 = availableDeployments.find((item) => item.id === "gpt-5.5");
 
   return `model = "${deployment}"
 model_provider = "azure"
@@ -60,12 +72,36 @@ model_provider = "azure"
 model = "${deployment}"
 model_reasoning_effort = "xhigh"
 
+${
+  gpt55
+    ? `[profiles.azure-55-medium]
+model_provider = "azure"
+model = "${gpt55.deployment}"
+model_reasoning_effort = "medium"
+
+[profiles.azure-55-high]
+model_provider = "azure"
+model = "${gpt55.deployment}"
+model_reasoning_effort = "high"
+
+[profiles.azure-55-xhigh]
+model_provider = "azure"
+model = "${gpt55.deployment}"
+model_reasoning_effort = "xhigh"
+
+`
+    : ""
+}
 [windows]
 sandbox = "elevated"
 `;
 }
 
-function buildOpenCodeConfig(resourceName: string, deployment: string) {
+function buildOpenCodeConfig(
+  resourceName: string,
+  deployment: string,
+  availableDeployments: AvailableDeployment[],
+) {
   return {
     $schema: "https://opencode.ai/config.json",
     provider: {
@@ -74,9 +110,9 @@ function buildOpenCodeConfig(resourceName: string, deployment: string) {
         options: {
           baseURL: `https://${resourceName}.openai.azure.com/openai/deployments`,
         },
-        models: {
-          [deployment]: {},
-        },
+        models: Object.fromEntries(
+          availableDeployments.map((item) => [item.deployment, {}]),
+        ),
       },
     },
   };
@@ -138,6 +174,29 @@ function dedupeTutorialLinks(items: TutorialLink[]) {
     seen.add(key);
     return true;
   });
+}
+
+function buildAvailableDeployments(config: Awaited<ReturnType<typeof getStoredConfig>>) {
+  const deployments: AvailableDeployment[] = [
+    {
+      id: "gpt-5.4",
+      label: "GPT-5.4",
+      deployment: config.azureDefaultDeployment,
+      recommended: true,
+    },
+  ];
+
+  const gpt55 = String(config.azureGpt55Deployment ?? "").trim();
+  if (gpt55 && gpt55 !== config.azureDefaultDeployment) {
+    deployments.push({
+      id: "gpt-5.5",
+      label: "GPT-5.5",
+      deployment: gpt55,
+      recommended: false,
+    });
+  }
+
+  return deployments;
 }
 
 function buildManagerTutorials(config: Awaited<ReturnType<typeof getStoredConfig>>, tool: ToolDetails) {
@@ -248,7 +307,8 @@ export async function POST(request: Request) {
   }
 
   const resourceName = config.azureResourceName;
-  const deployment = config.azureDefaultDeployment;
+  const availableDeployments = buildAvailableDeployments(config);
+  const deployment = availableDeployments[0].deployment;
   const tool = buildToolDetails(selectedEnvironment);
 
   return Response.json({
@@ -274,12 +334,14 @@ export async function POST(request: Request) {
       apiKey: effectiveApiKey,
       resourceName,
       deployment,
+      selectedModelLabel: availableDeployments[0].label,
+      availableDeployments,
       codex: {
         baseUrl: buildAzureBaseUrl(resourceName),
-        configToml: buildCodexConfig(resourceName, deployment),
+        configToml: buildCodexConfig(resourceName, deployment, availableDeployments),
       },
       opencode: {
-        config: buildOpenCodeConfig(resourceName, deployment),
+        config: buildOpenCodeConfig(resourceName, deployment, availableDeployments),
         auth: buildOpenCodeAuth(effectiveApiKey),
       },
     },

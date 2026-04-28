@@ -54,6 +54,8 @@ export async function saveAdminConfig(formData: FormData) {
   await saveStoredConfig({
     azureResourceName: String(formData.get("azureResourceName") ?? "admin-3342-resource"),
     azureDefaultDeployment: String(formData.get("azureDefaultDeployment") ?? "gpt-5.4-1"),
+    azureGpt55Deployment:
+      String(formData.get("azureGpt55Deployment") ?? "").trim() || undefined,
     azureApiKey: String(formData.get("azureApiKey") ?? "").trim() || undefined,
     includeApiKeyInInstaller: formData.get("includeApiKeyInInstaller") === "on",
     supportEmail: String(formData.get("supportEmail") ?? "").trim() || undefined,
