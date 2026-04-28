@@ -761,22 +761,70 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   </InfoPanel>
 
                   {selectedEnvironment === "codex" ? (
-                    <InfoPanel title="Dernière étape pour Codex" tone="blue">
-                      <div className="space-y-4">
-                        <ol className="space-y-2 text-sm leading-7 text-slate-700">
-                          <li>1. Téléchargez puis ouvrez Codex sur votre machine.</li>
-                          <li>2. Sur l’écran d’accueil de Codex, cliquez sur <InlineCode>Enter API key</InlineCode>.</li>
-                          <li>3. Revenez ensuite dans <InlineCode>AIPilot Manager</InlineCode>.</li>
-                          <li>4. Dans AIPilot Manager, cliquez sur <InlineCode>Connecter ma licence</InlineCode>.</li>
-                          <li>5. Cliquez ensuite sur <InlineCode>Installer et configurer</InlineCode>.</li>
-                          <li>6. AIPilot écrira la configuration Azure, réparera Codex CLI si nécessaire, puis vous pourrez ouvrir Codex et commencer.</li>
-                        </ol>
+                    <div className="overflow-hidden rounded-[1.75rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.12),_transparent_35%),linear-gradient(180deg,#eff6ff_0%,#ffffff_100%)] shadow-sm">
+                      <div className="border-b border-sky-200/80 px-5 py-4 sm:px-6">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.16em] text-sky-800">
+                            ÉTAPE FINALE CODEX
+                          </span>
+                          <p className="text-sm font-medium text-slate-700">
+                            Après le téléchargement, suivez ce mini tutoriel pour terminer l’installation.
+                          </p>
+                        </div>
+                        <h3 className="mt-3 text-xl font-bold text-slate-950 sm:text-2xl">
+                          Ouvrez Codex, cliquez sur <InlineCode>Enter API key</InlineCode>, puis revenez dans AIPilot Manager
+                        </h3>
+                        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700 sm:text-base">
+                          Le manager prépare ensuite toute la configuration Azure pour vous. L’objectif est que même un utilisateur non technique puisse finir l’installation sans deviner quoi faire.
+                        </p>
+                      </div>
 
-                        <div className="grid gap-3 lg:grid-cols-2">
+                      <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                          <TutorialStepCard
+                            step="1"
+                            title="Télécharger"
+                            text="Téléchargez AIPilot Manager pour votre système depuis le bouton ci-dessus."
+                          />
+                          <TutorialStepCard
+                            step="2"
+                            title="Ouvrir Codex"
+                            text="Installez puis ouvrez Codex sur votre ordinateur."
+                          />
+                          <TutorialStepCard
+                            step="3"
+                            title="Enter API key"
+                            text="Sur l’écran d’accueil de Codex, cliquez sur Enter API key."
+                          />
+                          <TutorialStepCard
+                            step="4"
+                            title="Revenir au manager"
+                            text="Dans AIPilot Manager, cliquez sur Connecter ma licence."
+                          />
+                          <TutorialStepCard
+                            step="5"
+                            title="Terminer"
+                            text="Cliquez sur Installer et configurer pour laisser AIPilot tout préparer."
+                          />
+                        </div>
+
+                        <div className="rounded-[1.5rem] border border-sky-100 bg-white/90 p-4 sm:p-5">
+                          <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                            <li>1. Téléchargez AIPilot Manager puis terminez son installation.</li>
+                            <li>2. Ouvrez Codex sur votre machine.</li>
+                            <li>3. Sur l’écran d’accueil de Codex, cliquez sur <InlineCode>Enter API key</InlineCode>.</li>
+                            <li>4. Revenez ensuite dans <InlineCode>AIPilot Manager</InlineCode>.</li>
+                            <li>5. Dans AIPilot Manager, cliquez sur <InlineCode>Connecter ma licence</InlineCode>.</li>
+                            <li>6. Cliquez ensuite sur <InlineCode>Installer et configurer</InlineCode>.</li>
+                            <li>7. AIPilot écrira la configuration Azure, réparera Codex CLI si nécessaire, puis vous pourrez ouvrir Codex et commencer.</li>
+                          </ol>
+                        </div>
+
+                        <div className="grid gap-4 lg:grid-cols-2">
                           <GuideScreenshot
                             src="/tutorials/codex-enter-api-key.png"
                             alt="Écran de bienvenue Codex avec le bouton Enter API key"
-                            title="Dans Codex"
+                            title="Capture 1 · Dans Codex"
                             description="Sur le premier écran, utilisez le bouton Enter API key."
                             placeholderLabel="Ajoutez la capture Codex"
                             placeholderPath="public/tutorials/codex-enter-api-key.png"
@@ -784,14 +832,14 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                           <GuideScreenshot
                             src="/tutorials/aipilot-manager-connect-install.png"
                             alt="AIPilot Manager avec les boutons Connecter ma licence et Installer et configurer"
-                            title="Dans AIPilot Manager"
+                            title="Capture 2 · Dans AIPilot Manager"
                             description="Ensuite cliquez sur Connecter ma licence, puis sur Installer et configurer."
                             placeholderLabel="Ajoutez la capture AIPilot Manager"
                             placeholderPath="public/tutorials/aipilot-manager-connect-install.png"
                           />
                         </div>
                       </div>
-                    </InfoPanel>
+                    </div>
                   ) : null}
 
                   <InfoPanel title="Points importants" tone="blue">
@@ -1279,6 +1327,28 @@ function DownloadButton({ href, label }: { href: string; label: string }) {
     >
       {label}
     </a>
+  );
+}
+
+function TutorialStepCard({
+  step,
+  title,
+  text,
+}: {
+  step: string;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="rounded-[1.35rem] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-sky-100 text-sm font-bold text-sky-900">
+          {step}
+        </span>
+        <p className="text-sm font-bold text-slate-950">{title}</p>
+      </div>
+      <p className="mt-3 text-sm leading-7 text-slate-600">{text}</p>
+    </div>
   );
 }
 
