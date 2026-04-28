@@ -44,7 +44,8 @@ const DEFAULTS: StoredConfig = {
   azureGpt55Deployment: process.env.NEXT_PUBLIC_GPT55_DEPLOYMENT ?? "",
   includeApiKeyInInstaller: false,
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "",
-  supportVideoUrl: process.env.NEXT_PUBLIC_SUPPORT_VIDEO_URL ?? "",
+  supportVideoUrl:
+    process.env.NEXT_PUBLIC_SUPPORT_VIDEO_URL ?? "https://youtu.be/WwDvzdM9YWw",
   managerUpdateUrl: process.env.MANAGER_UPDATE_URL ?? "",
   managerTutorialLinks: "",
 };

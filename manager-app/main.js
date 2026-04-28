@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
@@ -190,12 +190,15 @@ async function getEffectiveDefaults() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1600,
-    height: 980,
-    minWidth: 1280,
-    minHeight: 860,
-    backgroundColor: "#f8fafc",
+    width: 1480,
+    height: 920,
+    minWidth: 1240,
+    minHeight: 820,
+    backgroundColor: "#F0F4FA",
     show: false,
+    frame: false,
+    titleBarStyle: "hidden",
+    autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
@@ -206,12 +209,14 @@ function createWindow() {
 
   mainWindow.once("ready-to-show", () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.maximize();
+      mainWindow.center();
       mainWindow.show();
+      mainWindow.focus();
     }
   });
 
   mainWindow.loadFile(path.join(__dirname, "src", "index.html"));
+  mainWindow.setMenuBarVisibility(false);
 }
 
 function broadcastUpdateState() {
@@ -673,6 +678,145 @@ async function commandExists(command) {
   }
 }
 
+async function resolveCommandPath(command) {
+  const probe =
+    process.platform === "win32"
+      ? ["where.exe", [command]]
+      : ["bash", ["-lc", `command -v ${command}`]];
+
+  try {
+    const { stdout } = await runCommand(probe[0], probe[1]);
+    const matches = stdout
+      .split(/\r?\n/)
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    return matches[0] || "";
+  } catch {
+    return "";
+  }
+}
+
+function isWindowsStoreCodexPath(candidate) {
+  return (
+    process.platform === "win32" &&
+    String(candidate || "")
+      .toLowerCase()
+      .includes(`${path.sep}windowsapps${path.sep}openai.codex_`)
+  );
+}
+
+async function getNpmGlobalPrefixPath() {
+  try {
+    const { stdout } = await runCommand("npm", ["prefix", "-g"], {
+      cwd: os.homedir(),
+      timeoutMs: 20000,
+    });
+    const prefix = stdout.trim();
+    if (prefix) {
+      return prefix;
+    }
+  } catch {
+    // Fall through to the platform default.
+  }
+
+  if (process.platform === "win32" && process.env.APPDATA) {
+    return path.join(process.env.APPDATA, "npm");
+  }
+
+  return "";
+}
+
+async function getNpmGlobalRootPath() {
+  try {
+    const { stdout } = await runCommand("npm", ["root", "-g"], {
+      cwd: os.homedir(),
+      timeoutMs: 20000,
+    });
+    const rootPath = stdout.trim();
+    if (rootPath) {
+      return rootPath;
+    }
+  } catch {
+    // Fall through to the platform default.
+  }
+
+  if (process.platform === "win32" && process.env.APPDATA) {
+    return path.join(process.env.APPDATA, "npm", "node_modules");
+  }
+
+  return "";
+}
+
+function getManagedCodexLauncherPath() {
+  if (process.platform === "win32") {
+    return path.join(getCodexHome(), "bin", "codex-aipilot.cmd");
+  }
+
+  return path.join(getCodexHome(), "bin", "codex-aipilot");
+}
+
+async function ensureManagedCodexLauncher(logs = null) {
+  if (process.platform !== "win32") {
+    return (await commandExists("codex")) ? "codex" : "";
+  }
+
+  const nodePath = await resolveCommandPath("node");
+  const npmRoot = await getNpmGlobalRootPath();
+  const codexJsPath = npmRoot
+    ? path.join(npmRoot, "@openai", "codex", "bin", "codex.js")
+    : "";
+
+  if (!nodePath || !(await fileExists(codexJsPath))) {
+    return "";
+  }
+
+  const launcherPath = getManagedCodexLauncherPath();
+  const launcherContent = [
+    "@ECHO OFF",
+    "SETLOCAL",
+    `\"${nodePath}\" \"${codexJsPath}\" %*`,
+    "",
+  ].join("\r\n");
+
+  await writeFileWithDirs(launcherPath, launcherContent);
+
+  if (Array.isArray(logs)) {
+    logs.push(`Préparation d'un lanceur Codex stable pour Windows dans ${launcherPath}`);
+  }
+
+  return launcherPath;
+}
+
+async function getCodexCliCommand(logs = null) {
+  if (process.platform !== "win32") {
+    return (await commandExists("codex")) ? ["codex"] : null;
+  }
+
+  const managedLauncherPath = await ensureManagedCodexLauncher(logs);
+  if (managedLauncherPath && (await fileExists(managedLauncherPath))) {
+    return [managedLauncherPath];
+  }
+
+  const npmPrefix = await getNpmGlobalPrefixPath();
+  const npmShimCandidates = npmPrefix
+    ? [path.join(npmPrefix, "codex.cmd"), path.join(npmPrefix, "codex")]
+    : [];
+
+  for (const candidate of npmShimCandidates) {
+    if (candidate && (await fileExists(candidate))) {
+      return [candidate];
+    }
+  }
+
+  const resolvedCodexPath = await resolveCommandPath("codex");
+  if (resolvedCodexPath && !isWindowsStoreCodexPath(resolvedCodexPath)) {
+    return [resolvedCodexPath];
+  }
+
+  return null;
+}
+
 async function runPowerShell(script) {
   return runCommand("powershell", ["-NoProfile", "-Command", script]);
 }
@@ -1038,6 +1182,9 @@ async function configureCodex(manifest, logs) {
   if (manifest.tool.environment === "t3code") {
     const t3SettingsPath = getT3SettingsPath();
     const t3ClientSettingsPath = getT3ClientSettingsPath();
+    const codexLaunchCommand = await getCodexCliCommand(logs);
+    const codexBinaryPath = Array.isArray(codexLaunchCommand) ? codexLaunchCommand[0] : "";
+    const codexHome = getCodexHome();
     const currentSettings = await readJsonFile(t3SettingsPath, {});
     const currentClientSettings = await readJsonFile(t3ClientSettingsPath, {});
     const currentProviders =
@@ -1055,6 +1202,8 @@ async function configureCodex(manifest, logs) {
 
     const nextSettings = {
       ...(currentSettings && typeof currentSettings === "object" ? currentSettings : {}),
+      ...(codexBinaryPath ? { codexBinaryPath } : {}),
+      codexHome,
       textGenerationModelSelection: {
         provider: "codex",
         model: manifest.azure.deployment,
@@ -1065,6 +1214,8 @@ async function configureCodex(manifest, logs) {
           ...(currentCodexProvider && typeof currentCodexProvider === "object"
             ? currentCodexProvider
             : {}),
+          ...(codexBinaryPath ? { codexBinaryPath } : {}),
+          codexHome,
           customModels: nextCustomModels,
         },
       },
@@ -1113,6 +1264,9 @@ async function configureCodex(manifest, logs) {
     logs.push(
       `T3 Code verra automatiquement les modèles Azure disponibles dans son sélecteur et dans les favoris.`,
     );
+    if (codexBinaryPath) {
+      logs.push(`T3 Code utilisera maintenant le binaire Codex géré par AIPilot: ${codexBinaryPath}`);
+    }
   }
 
   const machineScopeApplied = await setUserEnvironmentVariables(
@@ -1249,7 +1403,7 @@ async function installCodex(logs) {
   logs.push("Préparation de l'installation Codex...");
   await ensureNodeRuntime(logs);
   if (process.platform === "win32") {
-    if (await commandExists("codex")) {
+    if (await getCodexCliCommand(logs)) {
       logs.push("Codex CLI est déjà disponible.");
       return;
     }
@@ -1287,6 +1441,11 @@ async function installCodex(logs) {
     timeoutMessage:
       "L'installation npm de Codex prend trop de temps. Vérifiez votre connexion puis réessayez.",
   });
+
+  ensureCommandOrThrow(
+    Boolean(await getCodexCliCommand(logs)),
+    "Codex CLI n'a pas pu être préparé après l'installation npm. Vérifiez Node.js, npm, puis relancez AIPilot Manager.",
+  );
 }
 
 async function installT3Code(logs) {
@@ -1389,11 +1548,12 @@ async function tryLaunchDesktopApp(environment, logs) {
 
 async function getLaunchCommand(environment) {
   if (environment === "codex") {
+    const codexLaunchCommand = await getCodexCliCommand();
     ensureCommandOrThrow(
-      await commandExists("codex"),
+      Boolean(codexLaunchCommand),
       "Codex CLI est introuvable. Lancez d'abord l'installation.",
     );
-    return ["codex"];
+    return codexLaunchCommand;
   }
 
   if (environment === "t3code") {
@@ -1418,7 +1578,8 @@ async function getLaunchCommand(environment) {
 async function buildDiagnostics(manifest, projectRoot) {
   const nodeAvailable = await commandExists("node");
   const npmAvailable = await commandExists("npm");
-  const codexAvailable = await commandExists("codex");
+  const codexLaunchCommand = await getCodexCliCommand();
+  const codexAvailable = Boolean(codexLaunchCommand);
   const t3Available = await commandExists("t3");
   const npxAvailable = await commandExists("npx");
   const opencodeAvailable = await commandExists("opencode");
@@ -1485,7 +1646,7 @@ async function buildDiagnostics(manifest, projectRoot) {
         label: "Commande Codex",
         ok: codexAvailable,
         optional: false,
-        details: codexAvailable ? "Prête" : "Manquante",
+        details: codexAvailable ? codexLaunchCommand[0] : "Manquante",
       },
       {
         label: "Configuration Codex",
@@ -1815,12 +1976,38 @@ ipcMain.handle("manager:open-path", async (_event, targetPath) => {
   return { ok: true };
 });
 
+ipcMain.handle("manager:window-minimize", async () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+  }
+  return { ok: true };
+});
+
+ipcMain.handle("manager:window-toggle-maximize", async () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+  return { ok: true };
+});
+
+ipcMain.handle("manager:window-close", async () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+  }
+  return { ok: true };
+});
+
 app.whenReady().then(() => {
   app.setName("AIPilot Manager");
   if (process.platform === "win32") {
     app.setAppUserModelId("tn.aipilot.manager");
   }
 
+  Menu.setApplicationMenu(null);
   initAutoUpdaterEvents();
   createWindow();
 

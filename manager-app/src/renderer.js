@@ -7,64 +7,133 @@ const state = {
   updateState: null,
   progress: null,
   activeView: "home",
+  lastDiagnostics: null,
+  activity: [],
+  currentAction: "",
+  sidebarCollapsed: false,
 };
 
+const UI_STORAGE_KEY = "aipilot-manager-ui";
+
 const elements = {
+  appShell: document.querySelector(".app-shell"),
+  versionChip: document.querySelector("#version-chip"),
+  globalStatusTitle: document.querySelector("#global-status-title"),
   licenseKey: document.querySelector("#license-key"),
   environment: document.querySelector("#environment"),
   projectRoot: document.querySelector("#project-root"),
-  platformChip: document.querySelector("#platform-chip"),
-  versionChip: document.querySelector("#version-chip"),
-  portalText: document.querySelector("#portal-text"),
-  pageTitle: document.querySelector("#page-title"),
-  globalStatus: document.querySelector("#global-status"),
-  globalStatusTitle: document.querySelector("#global-status-title"),
-  globalStatusText: document.querySelector("#global-status-text"),
-  overview: document.querySelector("#overview"),
-  tutorials: document.querySelector("#tutorials"),
+  configLicenseKey: document.querySelector("#config-license-key"),
+  configEnvironment: document.querySelector("#config-environment"),
+  configProjectRoot: document.querySelector("#config-project-root"),
+  settingsPreferredTool: document.querySelector("#settings-preferred-tool"),
+  machineList: document.querySelector("#machine-list"),
+  configList: document.querySelector("#config-list"),
+  configFormWrap: document.querySelector("#config-form-wrap"),
+  configDetailList: document.querySelector("#config-detail-list"),
+  prepList: document.querySelector("#prep-list"),
+  prepDetailList: document.querySelector("#prep-detail-list"),
+  prepGuidance: document.querySelector("#prep-guidance"),
+  prepOperationBanner: document.querySelector("#prep-operation-banner"),
+  prepOperationStatus: document.querySelector("#prep-operation-status"),
+  prepOperationTitle: document.querySelector("#prep-operation-title"),
+  prepOperationDetail: document.querySelector("#prep-operation-detail"),
+  prepActivityFeed: document.querySelector("#prep-activity-feed"),
+  issuesList: document.querySelector("#issues-list"),
+  issuesCount: document.querySelector("#issues-count"),
+  tutorialsList: document.querySelector("#tutorials-list"),
+  tutorialsLibrary: document.querySelector("#tutorials-library"),
   updateMessage: document.querySelector("#update-message"),
+  updateBannerTitle: document.querySelector("#update-banner-title"),
   updateSummary: document.querySelector("#update-summary"),
+  settingsSummary: document.querySelector("#settings-summary"),
+  aboutSummary: document.querySelector("#about-summary"),
   connect: document.querySelector("#connect"),
+  configConnect: document.querySelector("#config-connect"),
   chooseFolder: document.querySelector("#choose-folder"),
+  configChooseFolder: document.querySelector("#config-choose-folder"),
   diagnose: document.querySelector("#diagnose"),
-  installConfigure: document.querySelector("#install-configure"),
+  prepDiagnose: document.querySelector("#prep-diagnose"),
   repair: document.querySelector("#repair"),
-  launch: document.querySelector("#launch"),
+  prepRepair: document.querySelector("#prep-repair"),
   watchVideo: document.querySelector("#watch-video"),
+  downloadOfficialApp: document.querySelector("#download-official-app"),
   checkUpdates: document.querySelector("#check-updates"),
   installUpdate: document.querySelector("#install-update"),
-  diagnostics: document.querySelector("#diagnostics"),
-  downloadOfficialApp: document.querySelector("#download-official-app"),
-  progressStatus: document.querySelector("#progress-status"),
-  progressDetail: document.querySelector("#progress-detail"),
-  progressBar: document.querySelector("#progress-bar"),
-  progressSteps: document.querySelector("#progress-steps"),
-  systemHealth: document.querySelector("#system-health"),
-  systemIssues: document.querySelector("#system-issues"),
-  logs: document.querySelector("#logs"),
-  toolLabel: document.querySelector("#tool-label"),
-  toolSubtitle: document.querySelector("#tool-subtitle"),
-  toolStatus: document.querySelector("#tool-status"),
+  installUpdateSecondary: document.querySelector("#install-update-secondary"),
   dockLaunch: document.querySelector("#dock-launch"),
+  prepLaunch: document.querySelector("#prep-launch"),
   dockInstall: document.querySelector("#dock-install"),
+  prepInstall: document.querySelector("#prep-install"),
   dockRepair: document.querySelector("#dock-repair"),
+  dockChangeTool: document.querySelector("#dock-change-tool"),
+  dockToolSelect: document.querySelector("#dock-tool-select"),
+  toolIcon: document.querySelector("#tool-icon"),
+  toolLabel: document.querySelector("#tool-label"),
+  toolStatus: document.querySelector("#tool-status"),
+  launchLabel: document.querySelector("#launch-label"),
   flowLicense: document.querySelector("#flow-license"),
   flowAzure: document.querySelector("#flow-azure"),
   flowTools: document.querySelector("#flow-tools"),
   flowReady: document.querySelector("#flow-ready"),
+  homeOpenDiagnostics: document.querySelector("#home-open-diagnostics"),
+  homeOpenConfiguration: document.querySelector("#home-open-configuration"),
+  homeRunPreparation: document.querySelector("#home-run-preparation"),
+  homeOpenProblems: document.querySelector("#home-open-problems"),
+  homeOpenTutorials: document.querySelector("#home-open-tutorials"),
+  homeOpenUpdates: document.querySelector("#home-open-updates"),
+  sidebarOpenTutorials: document.querySelector("#sidebar-open-tutorials"),
   navHome: document.querySelector("#nav-home"),
+  navConfiguration: document.querySelector("#nav-configuration"),
+  navPreparation: document.querySelector("#nav-preparation"),
   navDiagnostics: document.querySelector("#nav-diagnostics"),
   navTutorials: document.querySelector("#nav-tutorials"),
   navUpdates: document.querySelector("#nav-updates"),
-  sidebarOpenTutorials: document.querySelector("#sidebar-open-tutorials"),
+  navSettings: document.querySelector("#nav-settings"),
+  navAbout: document.querySelector("#nav-about"),
   viewHome: document.querySelector("#view-home"),
+  viewConfiguration: document.querySelector("#view-configuration"),
+  viewPreparation: document.querySelector("#view-preparation"),
   viewDiagnostics: document.querySelector("#view-diagnostics"),
   viewTutorials: document.querySelector("#view-tutorials"),
   viewUpdates: document.querySelector("#view-updates"),
+  viewSettings: document.querySelector("#view-settings"),
+  viewAbout: document.querySelector("#view-about"),
+  systemHealth: document.querySelector("#system-health"),
+  systemIssues: document.querySelector("#system-issues"),
+  verificationChecklist: document.querySelector("#verification-checklist"),
+  diagnosticsOperationBanner: document.querySelector("#diagnostics-operation-banner"),
+  diagnosticsOperationStatus: document.querySelector("#diagnostics-operation-status"),
+  diagnosticsOperationTitle: document.querySelector("#diagnostics-operation-title"),
+  diagnosticsOperationDetail: document.querySelector("#diagnostics-operation-detail"),
+  diagnosticsActivityFeed: document.querySelector("#diagnostics-activity-feed"),
+  diagnostics: document.querySelector("#diagnostics"),
+  windowMinimize: document.querySelector("#window-minimize"),
+  windowMaximize: document.querySelector("#window-maximize"),
+  windowClose: document.querySelector("#window-close"),
+  helpButton: document.querySelector("#help-button"),
+  sidebarToggle: document.querySelector("#sidebar-toggle"),
+};
+
+const toolLaunchLabels = {
+  codex: "Lancer Codex",
+  t3code: "Lancer T3 Code",
+  opencode: "Lancer OpenCode",
+};
+
+const toolNameMap = {
+  codex: "Codex",
+  t3code: "T3 Code",
+  opencode: "OpenCode",
+};
+
+const toolIconMap = {
+  codex: "./assets/tool-codex.png",
+  t3code: "./assets/tool-t3code.png",
+  opencode: "./assets/tool-opencode.png",
 };
 
 function escapeHtml(value) {
-  return String(value)
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -73,78 +142,122 @@ function escapeHtml(value) {
 }
 
 function appendLog(message) {
-  const timestamp = new Date().toLocaleTimeString("fr-FR");
-  elements.logs.textContent += `\n[${timestamp}] ${message}`;
-  elements.logs.scrollTop = elements.logs.scrollHeight;
+  const entry = {
+    time: new Date().toLocaleTimeString("fr-FR"),
+    message: String(message || ""),
+    tone:
+      String(message || "").includes("Erreur") || String(message || "").includes("introuvable")
+        ? "error"
+        : String(message || "").includes("terminée") || String(message || "").includes("connectée")
+          ? "success"
+          : "live",
+  };
+  state.activity = [entry, ...state.activity].slice(0, 10);
+  renderActivityFeed();
+}
+
+function loadUiState() {
+  try {
+    const raw = window.localStorage.getItem(UI_STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+    state.sidebarCollapsed = Boolean(parsed?.sidebarCollapsed);
+  } catch {
+    state.sidebarCollapsed = false;
+  }
+}
+
+function persistUiState() {
+  window.localStorage.setItem(
+    UI_STORAGE_KEY,
+    JSON.stringify({
+      sidebarCollapsed: state.sidebarCollapsed,
+    }),
+  );
+}
+
+function applySidebarState() {
+  elements.appShell?.classList.toggle("is-sidebar-collapsed", state.sidebarCollapsed);
+}
+
+function setSidebarCollapsed(nextValue) {
+  state.sidebarCollapsed = Boolean(nextValue);
+  applySidebarState();
+  persistUiState();
 }
 
 function normalizeLicenseKey(value) {
-  const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+  const clean = String(value ?? "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 16);
   const groups = clean.match(/.{1,4}/g);
   return groups ? groups.join("-") : "";
 }
 
 function getSelectedToolLabel() {
-  const value = elements.environment.value;
-  if (value === "codex") return "Codex";
-  if (value === "t3code") return "T3 Code";
-  return "OpenCode";
+  const env = elements.environment.value || elements.configEnvironment.value;
+  return toolNameMap[env] || "OpenCode";
 }
 
-function badge(ok, optional) {
-  if (ok) return '<span class="badge badge-success">Prêt</span>';
-  if (optional) return '<span class="badge badge-neutral">Optionnel</span>';
-  return '<span class="badge badge-warning">À corriger</span>';
+function icon(name) {
+  const icons = {
+    wrench: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14.7 6.3 3-3" /><path d="m2 22 6-6" /><path d="m7 11 6 6" /><path d="m14 4 6 6" /></svg>',
+    package: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m7.5 4.27 9 5.15" /><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>',
+    file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>',
+    zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 3 14h7l-1 8 10-12h-7z" /></svg>',
+    checkCircle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9" /><path d="m9 12 2 2 4-4" /></svg>',
+    alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>',
+    external: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>',
+    chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" /></svg>',
+    play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9" /><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none" /></svg>',
+  };
+  return icons[name] || "";
 }
 
 function setActiveView(view) {
   state.activeView = view;
-  const isHome = view === "home";
-  const isDiagnostics = view === "diagnostics";
-  const isTutorials = view === "tutorials";
-  const isUpdates = view === "updates";
+  const map = {
+    home: elements.viewHome,
+    configuration: elements.viewConfiguration,
+    preparation: elements.viewPreparation,
+    diagnostics: elements.viewDiagnostics,
+    tutorials: elements.viewTutorials,
+    updates: elements.viewUpdates,
+    settings: elements.viewSettings,
+    about: elements.viewAbout,
+  };
 
-  elements.navHome.classList.toggle("is-active", isHome);
-  elements.navDiagnostics.classList.toggle("is-active", isDiagnostics);
-  elements.navTutorials.classList.toggle("is-active", isTutorials);
-  elements.navUpdates.classList.toggle("is-active", isUpdates);
+  Object.entries(map).forEach(([key, el]) => {
+    el.classList.toggle("is-active", key === view);
+  });
 
-  elements.viewHome.classList.toggle("is-active", isHome);
-  elements.viewDiagnostics.classList.toggle("is-active", isDiagnostics);
-  elements.viewTutorials.classList.toggle("is-active", isTutorials);
-  elements.viewUpdates.classList.toggle("is-active", isUpdates);
+  const navMap = {
+    home: elements.navHome,
+    configuration: elements.navConfiguration,
+    preparation: elements.navPreparation,
+    diagnostics: elements.navDiagnostics,
+    tutorials: elements.navTutorials,
+    updates: elements.navUpdates,
+    settings: elements.navSettings,
+    about: elements.navAbout,
+  };
 
-  elements.pageTitle.textContent =
-    view === "diagnostics"
-      ? "Diagnostic et réparation"
-      : view === "tutorials"
-        ? "Tutoriels et aide"
-        : view === "updates"
-          ? "Mises à jour automatiques"
-          : "Bienvenue dans AIPilot Manager";
+  Object.values(navMap).forEach((el) => el.classList.remove("is-active"));
+  if (navMap[view]) {
+    navMap[view].classList.add("is-active");
+  }
 }
 
-function setFlowCard(element, stateName, text) {
-  if (!element) return;
-  element.dataset.state = stateName;
-  const status = element.querySelector(".flow-state");
-  if (status) status.textContent = text;
-  element.style.borderColor =
-    stateName === "done"
-      ? "#bbf7d0"
-      : stateName === "active"
-        ? "#bfdbfe"
-        : stateName === "error"
-          ? "#fecdd3"
-          : "#dbe7f0";
-  element.style.background =
-    stateName === "done"
-      ? "#f0fdf4"
-      : stateName === "active"
-        ? "#eff6ff"
-        : stateName === "error"
-          ? "#fff1f2"
-          : "#f8fbfd";
+function setFlowState(element, status) {
+  element.dataset.status = status;
+  const check = element.querySelector(".step-check");
+  if (check) {
+    check.style.display = status === "done" ? "grid" : "none";
+  }
 }
 
 function syncButtons() {
@@ -152,19 +265,37 @@ function syncButtons() {
   const disabled = !connected || state.busy;
 
   elements.connect.disabled = state.busy;
+  elements.configConnect.disabled = state.busy;
   elements.chooseFolder.disabled = state.busy;
+  elements.configChooseFolder.disabled = state.busy;
   elements.diagnose.disabled = disabled;
-  elements.installConfigure.disabled = disabled;
+  elements.prepDiagnose.disabled = disabled;
   elements.repair.disabled = disabled;
-  elements.launch.disabled = disabled;
+  elements.prepRepair.disabled = disabled;
   elements.watchVideo.disabled = disabled || !state.manifest?.manager?.supportVideoUrl;
-  elements.checkUpdates.disabled =
-    state.busy || !state.updateState?.enabled || state.updateState?.checking;
-  elements.installUpdate.disabled = !state.updateState?.downloaded || state.busy;
   elements.downloadOfficialApp.disabled = state.busy || !state.manifest?.tool?.officialAppUrl;
-  elements.dockLaunch.disabled = elements.launch.disabled;
-  elements.dockInstall.disabled = elements.installConfigure.disabled;
-  elements.dockRepair.disabled = elements.repair.disabled;
+  elements.checkUpdates.disabled = state.busy || !state.updateState?.enabled || state.updateState?.checking;
+  elements.installUpdate.disabled = !state.updateState?.downloaded || state.busy;
+  elements.installUpdateSecondary.disabled = !state.updateState?.downloaded || state.busy;
+  elements.dockLaunch.disabled = disabled;
+  elements.prepLaunch.disabled = disabled;
+  elements.dockInstall.disabled = disabled;
+  elements.prepInstall.disabled = disabled;
+  elements.dockRepair.disabled = disabled;
+  elements.homeRunPreparation.disabled = disabled;
+
+  elements.diagnose.textContent =
+    state.busy && state.currentAction === "diagnose" ? "Vérification en cours..." : "Vérifier mon installation";
+  elements.prepDiagnose.textContent =
+    state.busy && state.currentAction === "diagnose" ? "Vérification en cours..." : "Vérifier maintenant";
+  elements.repair.textContent =
+    state.busy && state.currentAction === "repair" ? "Réparation en cours..." : "Réparer automatiquement";
+  elements.prepRepair.textContent =
+    state.busy && state.currentAction === "repair" ? "Réparation en cours..." : "Réparer automatiquement";
+  elements.dockInstall.textContent =
+    state.busy && state.currentAction === "install-configure" ? "Installation en cours..." : "Installer et configurer";
+  elements.prepInstall.textContent =
+    state.busy && state.currentAction === "install-configure" ? "Installation en cours..." : "Installer et configurer";
 }
 
 function setBusy(busy) {
@@ -182,219 +313,549 @@ async function persistState() {
   });
 }
 
-function renderGlobalStatus({ title, text, tone = "neutral" }) {
-  elements.globalStatusTitle.textContent = title;
-  elements.globalStatusText.textContent = text;
-  const dot = elements.globalStatus.querySelector(".global-dot");
-  if (dot) {
-    dot.style.background =
-      tone === "success"
-        ? "#16a34a"
-        : tone === "warning"
-          ? "#f59e0b"
-          : tone === "error"
-            ? "#e11d48"
-            : "#94a3b8";
-  }
+function syncFieldMirrors(source = "main") {
+  const license =
+    source === "config"
+      ? normalizeLicenseKey(elements.configLicenseKey.value || elements.licenseKey.value)
+      : normalizeLicenseKey(elements.licenseKey.value || elements.configLicenseKey.value);
+  const environment =
+    source === "config"
+      ? elements.configEnvironment.value || elements.environment.value || "codex"
+      : elements.environment.value || elements.configEnvironment.value || "codex";
+  const projectRoot = state.projectRoot || elements.projectRoot.value || elements.configProjectRoot.value || "";
+
+  elements.licenseKey.value = license;
+  elements.configLicenseKey.value = license;
+  elements.environment.value = environment;
+  elements.configEnvironment.value = environment;
+  elements.dockToolSelect.value = environment;
+  elements.settingsPreferredTool.value = environment;
+  elements.projectRoot.value = projectRoot;
+  elements.configProjectRoot.value = projectRoot;
+}
+
+function renderWindowStatus() {
+  const connected = Boolean(state.manifest);
+  elements.globalStatusTitle.textContent = connected ? "Licence connectée" : "Licence non connectée";
+  const dot = document.querySelector(".license-center-dot");
+  if (dot) dot.style.background = connected ? "#22C55E" : "#9CA3AF";
+}
+
+function renderActivityFeed() {
+  const rows = state.activity.length
+    ? state.activity
+        .map(
+          (item) => `
+            <article class="activity-item is-${escapeHtml(item.tone)}">
+              <div class="activity-item-head">
+                <strong>${escapeHtml(item.tone === "error" ? "Attention" : item.tone === "success" ? "Terminé" : "En cours")}</strong>
+                <span>${escapeHtml(item.time)}</span>
+              </div>
+              <p>${escapeHtml(item.message)}</p>
+            </article>
+          `,
+        )
+        .join("")
+    : `
+      <article class="activity-item">
+        <div class="activity-item-head">
+          <strong>Prêt</strong>
+          <span>Maintenant</span>
+        </div>
+        <p>AIPilot Manager attend votre prochaine action.</p>
+      </article>
+    `;
+
+  elements.prepActivityFeed.innerHTML = rows;
+  elements.diagnosticsActivityFeed.innerHTML = rows;
+}
+
+function renderOperationState() {
+  const progress = state.progress;
+  const statusText =
+    state.currentAction === "diagnose"
+      ? "Vérification"
+      : state.currentAction === "repair"
+        ? "Réparation"
+        : state.currentAction === "install-configure"
+          ? "Installation"
+          : "En attente";
+  const title =
+    progress?.steps?.find((step) => step.state === "active")?.label ||
+    (state.currentAction ? `${statusText} en cours` : "Aucune action en cours");
+  const detail =
+    progress?.steps?.find((step) => step.state === "active")?.text ||
+    (state.currentAction ? "Le manager est en train d'exécuter cette étape." : "AIPilot attend votre prochaine action.");
+  const tone =
+    state.currentAction === "diagnose" || state.currentAction === "repair" || state.currentAction === "install-configure"
+      ? "live"
+      : "idle";
+
+  const badgeClass = tone === "live" ? "verification-status" : "verification-status";
+  elements.prepOperationStatus.className = badgeClass;
+  elements.diagnosticsOperationStatus.className = badgeClass;
+  elements.prepOperationStatus.textContent = state.currentAction ? "En cours" : "En attente";
+  elements.diagnosticsOperationStatus.textContent = state.currentAction ? "En cours" : "En attente";
+  elements.prepOperationTitle.textContent = title;
+  elements.diagnosticsOperationTitle.textContent = title;
+  elements.prepOperationDetail.textContent = detail;
+  elements.diagnosticsOperationDetail.textContent = detail;
 }
 
 function renderToolDock() {
-  const toolLabel = state.manifest?.tool?.label || getSelectedToolLabel();
-  elements.toolLabel.textContent = toolLabel;
-
-  if (!state.manifest) {
-    elements.toolSubtitle.textContent = "Connectez votre licence pour charger la configuration.";
-    elements.toolStatus.className = "badge badge-neutral";
-    elements.toolStatus.textContent = "En attente";
-    return;
-  }
-
-  elements.toolSubtitle.textContent = `Déploiement Azure: ${state.manifest.azure?.deployment || "-"}`;
-
-  const diagnosticsOk = state.lastDiagnostics?.overallOk;
-  elements.toolStatus.className = diagnosticsOk ? "badge badge-success" : "badge badge-warning";
-  elements.toolStatus.textContent = diagnosticsOk ? "Prêt" : "À vérifier";
+  const env = elements.environment.value || state.manifest?.tool?.environment || "codex";
+  const manifestMatchesSelection = state.manifest?.tool?.environment === env;
+  const label = manifestMatchesSelection
+    ? state.manifest?.tool?.label || toolNameMap[env]
+    : toolNameMap[env];
+  const iconSrc = toolIconMap[env] || toolIconMap.codex;
+  elements.toolLabel.textContent = label;
+  elements.toolIcon.src = iconSrc;
+  elements.toolIcon.alt = `Icône ${label}`;
+  elements.dockToolSelect.value = env;
+  elements.launchLabel.textContent = toolLaunchLabels[env] || `Lancer ${label}`;
+  const ready = manifestMatchesSelection && Boolean(state.lastDiagnostics?.overallOk);
+  const status = !state.manifest
+    ? "En attente"
+    : manifestMatchesSelection
+      ? ready
+        ? "Prêt"
+        : "À vérifier"
+      : "À connecter";
+  elements.toolStatus.textContent = status;
+  elements.toolStatus.className =
+    status === "Prêt" ? "tool-ready-badge" : "tool-ready-badge tool-ready-badge-warn";
 }
 
-function renderOverview() {
-  if (!state.manifest) {
-    elements.overview.innerHTML = `
-      <p><strong>Commencez ici :</strong> connectez votre licence pour récupérer la configuration AIPilot.</p>
-      <p>Ensuite, cliquez sur <strong>Installer et configurer</strong>. Si un problème apparaît, ouvrez <strong>Diagnostics</strong> puis laissez AIPilot réparer automatiquement.</p>
-    `;
-    renderGlobalStatus({
-      title: "En attente",
-      text: "Connectez votre licence pour commencer l’installation.",
-      tone: "neutral",
-    });
-    renderToolDock();
-    setFlowCard(elements.flowLicense, "pending", "En attente");
-    setFlowCard(elements.flowAzure, "pending", "En attente");
-    setFlowCard(elements.flowTools, "pending", "En attente");
-    setFlowCard(elements.flowReady, "pending", "En attente");
-    return;
-  }
-
-  const toolLabel = state.manifest.tool.label || getSelectedToolLabel();
-  const deployment = state.manifest.azure?.deployment || "-";
-  const modelLabel = state.manifest.azure?.selectedModelLabel || "GPT-5.4";
-  const customerName = state.manifest.license?.customerName || "client";
-  const projectText = state.projectRoot
-    ? `Le dossier projet sélectionné est <strong>${escapeHtml(state.projectRoot)}</strong>.`
-    : "Aucun dossier projet spécifique n’est encore choisi.";
-
-  elements.overview.innerHTML = `
-    <p><strong>${escapeHtml(customerName)}</strong>, votre configuration AIPilot est prête pour <strong>${escapeHtml(toolLabel)}</strong>.</p>
-    <p>Le déploiement Azure actif est <strong>${escapeHtml(deployment)}</strong> et le modèle par défaut reste <strong>${escapeHtml(modelLabel)}</strong>.</p>
-    <p>${projectText}</p>
-    <p>Le bouton <strong>Installer et configurer</strong> prépare automatiquement l’outil. Si un élément manque, AIPilot l’expliquera dans Diagnostics et proposera la correction.</p>
-  `;
-
-  const diagnosticsOk = state.lastDiagnostics?.overallOk;
-  renderGlobalStatus(
-    diagnosticsOk
-      ? {
-          title: "Système opérationnel",
-          text: "Tous les points obligatoires sont prêts.",
-          tone: "success",
-        }
-      : {
-          title: "Configuration chargée",
-          text: "La licence est connectée. Préparez ou réparez l’outil pour continuer.",
-          tone: "warning",
-        },
-  );
-
-  setFlowCard(elements.flowLicense, "done", "Connectée");
-  setFlowCard(elements.flowAzure, "done", "Prête");
-  setFlowCard(elements.flowTools, diagnosticsOk ? "done" : "active", diagnosticsOk ? "Prêts" : "À préparer");
-  setFlowCard(elements.flowReady, diagnosticsOk ? "done" : "pending", diagnosticsOk ? "Utilisable" : "En attente");
-  renderToolDock();
-}
-
-function renderUpdateState(updateState) {
-  state.updateState = updateState;
-  elements.updateMessage.textContent =
-    updateState?.message || "Les mises à jour automatiques ne sont pas encore prêtes.";
-
-  if (!updateState) {
-    elements.updateSummary.innerHTML = "<p>Aucune information de mise à jour.</p>";
-    syncButtons();
-    return;
-  }
-
-  const statusBadge = updateState.downloaded
-    ? '<span class="badge badge-success">Prête à installer</span>'
-    : updateState.enabled
-      ? '<span class="badge badge-success">Active</span>'
-      : '<span class="badge badge-warning">Désactivée</span>';
-
-  elements.updateSummary.innerHTML = `
-    <dl>
-      <div class="summary-row"><dt>Version actuelle</dt><dd>${escapeHtml(updateState.currentVersion || "-")}</dd></div>
-      <div class="summary-row"><dt>Nouvelle version</dt><dd>${escapeHtml(updateState.availableVersion || "Aucune")}</dd></div>
-      <div class="summary-row"><dt>État</dt><dd>${statusBadge}<div>Le manager vérifie automatiquement les nouvelles versions.</div></dd></div>
-      <div class="summary-row"><dt>Source</dt><dd>${escapeHtml(updateState.updateUrl || "Non configurée")}</dd></div>
-    </dl>
-    ${
-      updateState.error
-        ? `<div class="summary-row" style="margin-top:10px;"><dt>Problème</dt><dd>${escapeHtml(updateState.error)}</dd></div>`
-        : ""
-    }
-  `;
-
-  syncButtons();
-}
-
-function getFixHint(check) {
+function getRecommendationForCheck(check) {
   const label = String(check?.label || "").toLowerCase();
-  const details = String(check?.details || "");
+  if (check?.ok) return "Aucune action requise.";
+  if (label.includes("node")) return "Installez ou réparez Node.js pour permettre les installations CLI.";
+  if (label.includes("npm")) return "Réparer va remettre npm dans l’environnement utilisateur.";
+  if (label.includes("git")) return "Configurez Git ou laissez AIPilot vous guider pour corriger ce point.";
+  if (label.includes("codex")) return "Installez l’application officielle si nécessaire, puis relancez Réparer.";
+  if (label.includes("opencode")) return "Réinstallez OpenCode CLI ou relancez Installer et configurer.";
+  if (label.includes("azure")) return "Réécrivez les variables Azure puis relancez la vérification.";
+  return "Lancez Réparer pour que le manager tente une correction automatique.";
+}
 
-  if (label.includes("node")) return "AIPilot peut tenter l’installation automatique de Node.js si vous lancez Réparer.";
-  if (label.includes("npm")) return "Réparer va revérifier Node.js et remettre npm dans l’environnement si nécessaire.";
-  if (label.includes("app codex")) return "Installez d’abord Codex officiel, ouvrez-le une fois, puis revenez ici.";
-  if (label.includes("app t3")) return "Installez d’abord T3 Code officiel, ouvrez-le une fois, puis revenez ici.";
-  if (label.includes("commande codex")) return "Réparer va tenter de remettre Codex CLI et sa configuration Azure.";
-  if (label.includes("configuration codex")) return `Réparer va tenter de recréer le fichier dans ${escapeHtml(details)}.`;
-  if (label.includes("opencode")) return "Réparer va réinstaller OpenCode CLI si nécessaire et réécrire sa configuration.";
-  if (label.includes("variables azure")) return "Réparer va remettre les variables Azure pour l’utilisateur et tenter le niveau machine sur Windows.";
-  if (label.includes("t3")) return "Réparer va revérifier T3 Code, Codex CLI et le modèle Azure injecté dans T3.";
-  return "Lancez Réparer pour que le manager revérifie ce point et applique la correction automatiquement si possible.";
+function renderMachineList(diagnostics) {
+  if (!diagnostics?.checks?.length) {
+    elements.machineList.innerHTML = `
+      <div class="machine-row">
+        <div class="machine-left"><span class="machine-check">•</span><span class="machine-name">Vérification système</span></div>
+        <span class="machine-version">--</span>
+        <span class="status-badge-ok">En attente</span>
+      </div>
+    `;
+    return;
+  }
+
+  const rows = diagnostics.checks.slice(0, 5).map((check) => {
+    const versionMatch = String(check.details || "").match(/v?(\d+[\w.\-]*)/i);
+    const version = versionMatch ? `v${versionMatch[1]}` : "--";
+    return `
+      <div class="machine-row">
+        <div class="machine-left">
+          <span class="machine-check">${check.ok ? "✓" : "!"}</span>
+          <span class="machine-name">${escapeHtml(check.label)}</span>
+        </div>
+        <span class="machine-version">${escapeHtml(version)}</span>
+        <span class="status-badge-ok">${check.ok ? "À jour" : check.optional ? "Optionnel" : "À corriger"}</span>
+      </div>
+    `;
+  });
+
+  elements.machineList.innerHTML = rows.join("");
+}
+
+function renderConfigList() {
+  if (!state.manifest) {
+    elements.configList.innerHTML = `
+      <div class="config-pair">
+        <span class="config-label">Portail</span>
+        <span class="config-value">${escapeHtml(state.defaults?.backendUrl || "-")}</span>
+      </div>
+      <div class="config-pair">
+        <span class="config-label">Statut</span>
+        <span class="config-value">Connectez votre licence pour charger la configuration.</span>
+      </div>
+    `;
+    elements.configFormWrap.style.display = "flex";
+    elements.configDetailList.innerHTML = `
+      <dl>
+        <div class="summary-row"><dt>Client</dt><dd>Aucun client connecté</dd></div>
+        <div class="summary-row"><dt>Licence</dt><dd>Saisissez la clé reçue après paiement</dd></div>
+        <div class="summary-row"><dt>Ressource Azure</dt><dd>Chargée automatiquement après connexion</dd></div>
+      </dl>
+    `;
+    return;
+  }
+
+  const azure = state.manifest.azure || {};
+  elements.configList.innerHTML = `
+    <div class="config-pair">
+      <span class="config-label">Azure Tenant</span>
+      <span class="config-value">${escapeHtml(`${azure.resourceName || "admin-3342-resource"}.onmicrosoft.com`)}</span>
+    </div>
+    <div class="config-pair">
+      <span class="config-label">Subscription</span>
+      <span class="config-value">Visual Studio Enterprise</span>
+    </div>
+    <div class="config-pair">
+      <span class="config-label">Région</span>
+      <span class="config-value">France Central</span>
+    </div>
+    <div class="config-pair">
+      <span class="config-label">Modèle de configuration</span>
+      <span class="config-value">
+        ${escapeHtml(azure.selectedModelLabel || "AIPilot Standard")}
+        <span class="active-badge">Actif</span>
+      </span>
+    </div>
+  `;
+  elements.configFormWrap.style.display = "none";
+
+  elements.configDetailList.innerHTML = `
+    <dl>
+      <div class="summary-row"><dt>Client</dt><dd>${escapeHtml(state.manifest.license?.customerName || "-")}</dd></div>
+      <div class="summary-row"><dt>Licence</dt><dd>${escapeHtml(state.manifest.license?.licenseKey || elements.licenseKey.value)}</dd></div>
+      <div class="summary-row"><dt>Ressource Azure</dt><dd>${escapeHtml(azure.resourceName || "-")}</dd></div>
+      <div class="summary-row"><dt>Déploiement</dt><dd>${escapeHtml(azure.deployment || "-")}</dd></div>
+      <div class="summary-row"><dt>Modèles disponibles</dt><dd>${escapeHtml((azure.availableModelLabels || [azure.selectedModelLabel || "GPT-5.4"]).join(", "))}</dd></div>
+    </dl>
+  `;
+}
+
+function renderPrepList(progress) {
+  const steps = progress?.steps || [
+    { label: "Installation des composants", text: "Tous les composants sont à jour", state: "pending" },
+    { label: "Fichiers de configuration", text: "config.toml et autres fichiers générés", state: "pending" },
+    { label: "Variables d'environnement", text: "Variables Azure configurées", state: "pending" },
+    { label: "Vérifications finales", text: "Tous les contrôles sont passés", state: "pending" },
+  ];
+
+  const iconMap = ["package", "file", "zap", "checkCircle"];
+  const normalized = [
+    {
+      label: "Installation des composants",
+      text: steps[1]?.text || "Tous les composants sont à jour",
+      state: steps[1]?.state || "pending",
+    },
+    {
+      label: "Fichiers de configuration",
+      text: steps[2]?.text || "config.toml et autres fichiers générés",
+      state: steps[2]?.state || "pending",
+    },
+    {
+      label: "Variables d'environnement",
+      text: state.manifest ? "Variables Azure configurées" : "Variables Azure en attente",
+      state: state.manifest ? "done" : "pending",
+    },
+    {
+      label: "Vérifications finales",
+      text: steps[3]?.text || "Tous les contrôles sont passés",
+      state: steps[3]?.state || "pending",
+    },
+  ];
+
+  elements.prepList.innerHTML = normalized
+    .map(
+      (step, index) => `
+        <div class="prep-row">
+          <span class="prep-icon">${icon(iconMap[index])}</span>
+          <div class="prep-copy">
+            <strong>${escapeHtml(step.label)}</strong>
+            <span>${escapeHtml(step.text)}</span>
+          </div>
+          <span class="prep-check" style="opacity:${step.state === "done" ? "1" : step.state === "active" ? "0.7" : "0.35"}">✓</span>
+        </div>
+      `,
+    )
+    .join("");
+
+  elements.prepDetailList.innerHTML = elements.prepList.innerHTML;
+  elements.prepGuidance.innerHTML = `
+    <article class="prep-guidance-card">
+      <h4>Étape suivante</h4>
+      <p>${state.manifest ? "Cliquez sur Installer et configurer pour préparer complètement l’outil choisi." : "Connectez d’abord votre licence pour charger le bon plan d’installation."}</p>
+    </article>
+    <article class="prep-guidance-card">
+      <h4>Ce que fait AIPilot</h4>
+      <p>Installation des composants, écriture des fichiers, configuration Azure puis vérification finale, sans vous forcer à manipuler les fichiers à la main.</p>
+    </article>
+    <article class="prep-guidance-card">
+      <h4>Quand utiliser Réparer</h4>
+      <p>Après un changement de machine, de licence, de déploiement Azure, ou si un outil semble cassé et doit être réinitialisé proprement.</p>
+    </article>
+  `;
+  renderOperationState();
+}
+
+function getIssueAction(check) {
+  const label = String(check?.label || "").toLowerCase();
+  if (label.includes("git")) {
+    return {
+      kind: "repair",
+      text: "Réparer automatiquement",
+      icon: icon("wrench"),
+      chevron: true,
+    };
+  }
+  return {
+    kind: "official",
+    text: "Ouvrir le lien officiel",
+    icon: icon("external"),
+    chevron: false,
+  };
+}
+
+function renderIssues(diagnostics) {
+  const issues = (diagnostics?.checks || []).filter((check) => !check.ok && !check.optional);
+  elements.issuesCount.textContent = String(issues.length);
+
+  if (!issues.length) {
+    elements.issuesList.innerHTML = `
+      <div class="issue-row">
+        <span class="issue-warning-icon">${icon("alert")}</span>
+        <div class="issue-copy">
+          <strong>Aucun problème critique</strong>
+          <span>Votre environnement semble prêt.</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  elements.issuesList.innerHTML = issues
+    .slice(0, 3)
+    .map((check) => {
+      const action = getIssueAction(check);
+      return `
+        <div class="issue-row">
+          <span class="issue-warning-icon">${icon("alert")}</span>
+          <div class="issue-copy">
+            <strong>${escapeHtml(check.label)}</strong>
+            <span>${escapeHtml(check.details || "Problème détecté.")}</span>
+          </div>
+          <button class="issue-action" type="button" data-issue-action="${action.kind}">
+            ${action.icon}
+            <span>${escapeHtml(action.text)}</span>
+            ${action.chevron ? icon("chevronDown") : ""}
+          </button>
+        </div>
+      `;
+    })
+    .join("");
+
+  elements.issuesList.querySelectorAll("[data-issue-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const action = button.getAttribute("data-issue-action");
+      if (action === "repair") {
+        await handleRepair();
+        return;
+      }
+      if (state.manifest?.tool?.officialAppUrl) {
+        await window.aipilotManager.openExternal(state.manifest.tool.officialAppUrl);
+      }
+    });
+  });
+}
+
+function inferTutorialMeta(label, url) {
+  const lowerLabel = String(label || "").toLowerCase();
+  const lowerUrl = String(url || "").toLowerCase();
+
+  if (lowerUrl.includes("youtu") || lowerLabel.includes("vidéo")) {
+    return {
+      tag: "Vidéo",
+      subtitle: "Tutoriel pas à pas pour l’installation et la configuration.",
+    };
+  }
+
+  if (lowerLabel.includes("manuel") || lowerLabel.includes("guide")) {
+    return {
+      tag: "Guide complet",
+      subtitle: "Procédure détaillée avec configuration manuelle et vérifications.",
+    };
+  }
+
+  if (lowerLabel.includes("télécharger")) {
+    return {
+      tag: "Téléchargement",
+      subtitle: "Lien officiel vers l’outil ou l’application associée.",
+    };
+  }
+
+  return {
+    tag: "Tutoriel",
+    subtitle: "Aide complémentaire pour finaliser l’installation.",
+  };
+}
+
+function tutorialRow(label, metaLabel, subtitle) {
+  return `
+    <div class="tutorial-item">
+      <div class="tutorial-thumb">${icon("play")}</div>
+      <div class="tutorial-meta">
+        <strong>${escapeHtml(label)}</strong>
+        <span>${escapeHtml(metaLabel)}</span>
+        <small>${escapeHtml(subtitle)}</small>
+      </div>
+    </div>
+  `;
+}
+
+function attachTutorialOpeners(container, tutorials) {
+  container.querySelectorAll("[data-tutorial-index]").forEach((node) => {
+    node.addEventListener("click", async () => {
+      const index = Number(node.getAttribute("data-tutorial-index"));
+      const tutorial = tutorials[index];
+      if (tutorial?.url) {
+        await window.aipilotManager.openExternal(tutorial.url);
+        appendLog(`Ouverture du tutoriel: ${tutorial.url}`);
+      }
+    });
+  });
+}
+
+function renderTutorials(manifest) {
+  const tutorials = Array.isArray(manifest?.manager?.tutorials)
+    ? manifest.manager.tutorials
+    : [];
+  const fallbackVideo =
+    manifest?.manager?.supportVideoUrl || "https://youtu.be/WwDvzdM9YWw";
+  const fallbackManualGuide = `${state.defaults?.backendUrl || "http://localhost:3000"}/tuto`;
+  const merged = [
+    {
+      label: "Téléchargement et configuration pas à pas",
+      url: fallbackVideo,
+    },
+    {
+      label: "Guide manuel AIPilot",
+      url: fallbackManualGuide,
+    },
+    {
+      label: `Télécharger ${manifest?.tool?.label || getSelectedToolLabel()}`,
+      url: manifest?.tool?.officialAppUrl || "",
+    },
+    ...tutorials,
+  ]
+    .filter((item) => item.url)
+    .filter(
+      (item, index, array) =>
+        array.findIndex((candidate) => candidate.url === item.url) === index,
+    );
+
+  elements.tutorialsList.innerHTML = merged
+    .map((item, index) => {
+      const meta = inferTutorialMeta(item.label, item.url);
+      const row = tutorialRow(item.label, meta.tag, meta.subtitle);
+      return item.url ? `<button class="tutorial-open-button" type="button" data-tutorial-index="${index}">${row}</button>` : row;
+    })
+    .join("");
+
+  elements.tutorialsLibrary.innerHTML = merged.length
+    ? merged
+        .map(
+          (tutorial, index) => `
+            <button class="tutorial-open-button" type="button" data-tutorial-index="${index}">
+              ${tutorialRow(
+                tutorial.label || "Tutoriel",
+                inferTutorialMeta(tutorial.label, tutorial.url).tag,
+                inferTutorialMeta(tutorial.label, tutorial.url).subtitle,
+              )}
+            </button>
+          `,
+        )
+        .join("")
+    : "<p>Aucun tutoriel supplémentaire configuré pour le moment.</p>";
+
+  attachTutorialOpeners(elements.tutorialsList, merged);
+  attachTutorialOpeners(elements.tutorialsLibrary, merged);
 }
 
 function renderDiagnostics(diagnostics) {
   state.lastDiagnostics = diagnostics;
+  renderMachineList(diagnostics);
+  renderIssues(diagnostics);
 
   if (!diagnostics) {
     elements.systemHealth.innerHTML = `
-      <article class="health-card">
+      <div class="diag-health-card">
         <span>État global</span>
         <strong>En attente</strong>
         <small>Lancez une vérification pour voir le diagnostic.</small>
-      </article>
+      </div>
     `;
-    elements.systemIssues.innerHTML = `
-      <article class="issue-card issue-card-muted">
-        <div>
-          <strong>Aucun diagnostic exécuté</strong>
-          <p>Lancez une vérification pour voir les problèmes et les corrections proposées.</p>
-        </div>
-      </article>
-    `;
+    elements.systemIssues.innerHTML = "";
+    elements.verificationChecklist.innerHTML = "<p>Aucune vérification exécutée pour le moment.</p>";
     elements.diagnostics.innerHTML = "<p>Aucune vérification exécutée pour le moment.</p>";
-    renderOverview();
+    renderOperationState();
     return;
   }
 
   const checks = Array.isArray(diagnostics.checks) ? diagnostics.checks : [];
-  const notes = Array.isArray(diagnostics.notes) ? diagnostics.notes : [];
   const blockingIssues = checks.filter((check) => !check.ok && !check.optional);
   const readyCount = checks.filter((check) => check.ok).length;
   const optionalCount = checks.filter((check) => !check.ok && check.optional).length;
-  const overallLabel = diagnostics.overallOk ? "Machine prête" : "Action requise";
 
   elements.systemHealth.innerHTML = `
-    <article class="health-card">
+    <div class="diag-health-card">
       <span>État global</span>
-      <strong>${escapeHtml(overallLabel)}</strong>
-      <small>${diagnostics.overallOk ? "Tous les points obligatoires sont prêts." : "Au moins un point doit être réparé."}</small>
-    </article>
-    <article class="health-card">
+      <strong>${escapeHtml(diagnostics.overallOk ? "Machine prête" : "Action requise")}</strong>
+      <small>${diagnostics.overallOk ? "Tous les points obligatoires sont prêts." : "Au moins un point doit être corrigé."}</small>
+    </div>
+    <div class="diag-health-card">
       <span>Composants prêts</span>
       <strong>${readyCount}</strong>
       <small>Éléments déjà détectés comme fonctionnels.</small>
-    </article>
-    <article class="health-card">
+    </div>
+    <div class="diag-health-card">
       <span>Points à corriger</span>
       <strong>${blockingIssues.length}</strong>
       <small>${optionalCount ? `${optionalCount} point(s) optionnel(s) en plus.` : "Aucun point optionnel bloquant."}</small>
-    </article>
+    </div>
   `;
 
-  if (!blockingIssues.length) {
-    elements.systemIssues.innerHTML = `
-      <article class="issue-card issue-card-ok">
-        <div>
-          <strong>Votre installation semble correcte</strong>
-          <p>Tous les points obligatoires sont prêts. Vous pouvez lancer l’outil ou relancer Réparer si vous avez changé de licence ou de déploiement Azure.</p>
-        </div>
-      </article>
-    `;
-  } else {
-    elements.systemIssues.innerHTML = blockingIssues
-      .map(
-        (check) => `
-          <article class="issue-card">
-            <div>
-              <strong>${escapeHtml(check.label)}</strong>
-              <p>${escapeHtml(check.details || "Problème détecté")}</p>
+  elements.systemIssues.innerHTML = blockingIssues.length
+    ? blockingIssues
+        .map(
+          (check) => `
+            <div class="issue-row">
+              <span class="issue-warning-icon">${icon("alert")}</span>
+              <div class="issue-copy">
+                <strong>${escapeHtml(check.label)}</strong>
+                <span>${escapeHtml(check.details || "Problème détecté.")}</span>
+              </div>
             </div>
-            <p>${getFixHint(check)}</p>
-          </article>
-        `,
-      )
-      .join("");
-  }
+          `,
+        )
+        .join("")
+    : `
+        <div class="issue-row">
+          <span class="issue-warning-icon">${icon("alert")}</span>
+          <div class="issue-copy">
+            <strong>Aucun problème critique</strong>
+            <span>Tous les points obligatoires sont prêts.</span>
+          </div>
+        </div>
+      `;
+
+  elements.verificationChecklist.innerHTML = checks
+    .map(
+      (check) => `
+        <article class="verification-item ${check.ok ? "is-ok" : check.optional ? "is-optional" : "is-missing"}">
+          <div class="verification-item-head">
+            <strong>${escapeHtml(check.label)}</strong>
+            <span class="verification-status">${check.ok ? "Prêt" : check.optional ? "Optionnel" : "Manquant / À corriger"}</span>
+          </div>
+          <p>${escapeHtml(check.details || "Aucun détail supplémentaire.")}</p>
+          <div class="verification-reco">${escapeHtml(getRecommendationForCheck(check))}</div>
+        </article>
+      `,
+    )
+    .join("");
 
   elements.diagnostics.innerHTML = `
     <dl>
@@ -403,193 +864,147 @@ function renderDiagnostics(diagnostics) {
           (check) => `
             <div class="summary-row">
               <dt>${escapeHtml(check.label)}</dt>
-              <dd>${badge(check.ok, check.optional)}<div>${escapeHtml(check.details || "")}</div></dd>
+              <dd>${check.ok ? "Prêt" : check.optional ? "Optionnel" : "À corriger"}<div>${escapeHtml(check.details || "")}</div></dd>
             </div>
           `,
         )
         .join("")}
     </dl>
-    ${
-      notes.length
-        ? `<div class="summary-block">${notes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}</div>`
-        : ""
-    }
+  `;
+  renderOperationState();
+}
+
+function renderSettingsSummary() {
+  elements.settingsSummary.innerHTML = `
+    <dl>
+      <div class="summary-row"><dt>Portail</dt><dd>${escapeHtml(state.defaults?.backendUrl || "-")}</dd></div>
+      <div class="summary-row"><dt>Plateforme</dt><dd>${escapeHtml(state.defaults?.platform || "-")}</dd></div>
+      <div class="summary-row"><dt>Version</dt><dd>${escapeHtml(state.defaults?.version || "-")}</dd></div>
+      <div class="summary-row"><dt>Outil préféré</dt><dd>${escapeHtml(getSelectedToolLabel())}</dd></div>
+    </dl>
+  `;
+}
+
+function renderAboutSummary() {
+  elements.aboutSummary.innerHTML = `
+    <dl>
+      <div class="summary-row"><dt>Produit</dt><dd>AIPilot Manager</dd></div>
+      <div class="summary-row"><dt>Mission</dt><dd>Installer, réparer et lancer les outils IA AIPilot avec un parcours simple.</dd></div>
+      <div class="summary-row"><dt>Version</dt><dd>${escapeHtml(state.defaults?.version || "-")}</dd></div>
+    </dl>
+  `;
+}
+
+function renderOverview() {
+  syncFieldMirrors();
+  renderWindowStatus();
+  renderToolDock();
+  renderConfigList();
+  renderSettingsSummary();
+  renderAboutSummary();
+  renderPrepList(state.progress);
+
+  if (!state.manifest) {
+    setFlowState(elements.flowLicense, "pending");
+    setFlowState(elements.flowAzure, "pending");
+    setFlowState(elements.flowTools, "pending");
+    setFlowState(elements.flowReady, "pending");
+    return;
+  }
+
+  setFlowState(elements.flowLicense, "done");
+  setFlowState(elements.flowAzure, "done");
+  setFlowState(elements.flowTools, state.lastDiagnostics?.overallOk ? "done" : "pending");
+  setFlowState(elements.flowReady, state.lastDiagnostics?.overallOk ? "active" : "pending");
+}
+
+function renderUpdateState(updateState) {
+  state.updateState = updateState;
+  elements.updateMessage.textContent =
+    updateState?.message || "Une nouvelle version d'AIPilot Manager est disponible.";
+  elements.updateBannerTitle.textContent = updateState?.downloaded || updateState?.availableVersion ? "Mises à jour disponibles" : "Mises à jour du manager";
+
+  if (!updateState) {
+    elements.updateSummary.innerHTML = "<p>Aucune information de mise à jour.</p>";
+    syncButtons();
+    return;
+  }
+
+  elements.updateSummary.innerHTML = `
+    <dl>
+      <div class="summary-row"><dt>Version actuelle</dt><dd>${escapeHtml(updateState.currentVersion || "-")}</dd></div>
+      <div class="summary-row"><dt>Version dispo</dt><dd>${escapeHtml(updateState.availableVersion || "Aucune")}</dd></div>
+      <div class="summary-row"><dt>Canal</dt><dd>${escapeHtml(updateState.enabled ? "Actif" : "Désactivé")}</dd></div>
+      <div class="summary-row"><dt>Source</dt><dd>${escapeHtml(updateState.updateUrl || "Non configurée")}</dd></div>
+      ${updateState.error ? `<div class="summary-row"><dt>Erreur</dt><dd>${escapeHtml(updateState.error)}</dd></div>` : ""}
+    </dl>
   `;
 
-  renderOverview();
+  syncButtons();
 }
 
 function setProgress(progress) {
   state.progress = progress;
-  const toneClass =
-    progress.tone === "success"
-      ? "badge badge-success"
-      : progress.tone === "error"
-        ? "badge badge-warning"
-        : progress.tone === "active"
-          ? "badge badge-success"
-          : "badge badge-neutral";
-
-  elements.progressStatus.className = toneClass;
-  elements.progressStatus.textContent = progress.status;
-  elements.progressDetail.textContent = progress.detail;
-  elements.progressBar.style.width = `${Math.max(0, Math.min(progress.percent || 0, 100))}%`;
-  elements.progressSteps.innerHTML = (progress.steps || [])
-    .map((step) => {
-      const className =
-        step.state === "done"
-          ? "progress-step is-done"
-          : step.state === "active"
-            ? "progress-step is-active"
-            : step.state === "error"
-              ? "progress-step is-error"
-              : "progress-step";
-      return `
-        <div class="${className}">
-          <strong>${escapeHtml(step.label)}</strong>
-          <span>${escapeHtml(step.text)}</span>
-        </div>
-      `;
-    })
-    .join("");
+  renderPrepList(progress);
+  renderOperationState();
 }
 
 function createProgressModel(action) {
   if (action === "diagnose") {
     return {
-      status: "Vérification en cours",
-      detail: "AIPilot contrôle votre machine et repère les composants à réparer.",
-      percent: 22,
-      tone: "active",
       steps: [
         { label: "Connexion", text: "Configuration chargée", state: "done" },
-        { label: "Installation", text: "Aucune action", state: "pending" },
-        { label: "Configuration", text: "Aucune action", state: "pending" },
-        { label: "Vérification", text: "Analyse système en cours", state: "active" },
+        { label: "Installation des composants", text: "Aucune action", state: "pending" },
+        { label: "Fichiers de configuration", text: "Aucune action", state: "pending" },
+        { label: "Vérifications finales", text: "Analyse système en cours", state: "active" },
       ],
     };
   }
 
   return {
-    status: action === "repair" ? "Réparation en cours" : "Installation en cours",
-    detail: "AIPilot exécute les étapes une par une et vous affiche sa progression.",
-    percent: 10,
-    tone: "active",
     steps: [
       { label: "Connexion", text: "Licence chargée", state: "done" },
-      { label: "Installation", text: "En attente", state: "active" },
-      { label: "Configuration", text: "En attente", state: "pending" },
-      { label: "Vérification", text: "En attente", state: "pending" },
+      { label: "Installation des composants", text: "En attente", state: "active" },
+      { label: "Fichiers de configuration", text: "En attente", state: "pending" },
+      { label: "Vérifications finales", text: "En attente", state: "pending" },
     ],
   };
 }
 
 function updateProgressFromLog(message) {
   if (!state.progress) return;
-
   const next = JSON.parse(JSON.stringify(state.progress));
   const text = String(message || "");
 
-  if (text.includes("Connexion de la licence") || text.includes("Licence connectée")) {
-    next.steps[0].state = "done";
-    next.steps[0].text = "Licence connectée";
-    next.percent = Math.max(next.percent, 18);
-  }
-  if (text.includes("Étape 1/2") || text.includes("Préparation de l'installation") || text.includes("Installation de")) {
+  if (text.includes("Étape 1/2") || text.includes("Installation de")) {
     next.steps[1].state = "active";
-    next.steps[1].text = "Installation des composants";
-    next.percent = Math.max(next.percent, 40);
+    next.steps[1].text = "Composants en cours d'installation";
   }
   if (text.includes("Étape 2/2") || text.includes("Écriture de la configuration") || text.includes("Mise à jour de la variable")) {
     next.steps[1].state = "done";
-    next.steps[1].text = "Composants prêts";
+    next.steps[1].text = "Tous les composants sont à jour";
     next.steps[2].state = "active";
-    next.steps[2].text = "Configuration Azure en cours";
-    next.percent = Math.max(next.percent, 72);
+    next.steps[2].text = "Configuration en cours d'écriture";
   }
-  if (text.includes("Vérification finale") || text.includes("Configuration prête") || text.includes("Vérification de")) {
-    next.steps[2].state = "done";
-    next.steps[2].text = "Configuration écrite";
+  if (text.includes("Vérification")) {
     next.steps[3].state = "active";
-    next.steps[3].text = "Contrôle final";
-    next.percent = Math.max(next.percent, 88);
+    next.steps[3].text = "Contrôles finaux en cours";
   }
-  if (text.includes("Installation et configuration terminées.") || text.includes("Réparation terminée.") || text.includes("Vérification terminée")) {
-    next.status = "Terminé";
-    next.detail = "L’action est terminée. Consultez Diagnostics si vous voulez voir les détails.";
-    next.tone = "success";
-    next.percent = 100;
-    next.steps = next.steps.map((step) => ({
-      ...step,
-      state: "done",
-      text: step.text === "En attente" ? "Terminé" : step.text,
-    }));
+  if (text.includes("terminées.") || text.includes("Réparation terminée.") || text.includes("Vérification terminée")) {
+    next.steps = next.steps.map((step) => ({ ...step, state: "done" }));
+    next.steps[1].text = "Tous les composants sont à jour";
+    next.steps[2].text = "config.toml et autres fichiers générés";
+    next.steps[3].text = "Tous les contrôles sont passés";
   }
   if (text.includes("Erreur") || text.includes("introuvable") || text.includes("Installez d'abord")) {
-    next.status = "Action interrompue";
-    next.detail = text;
-    next.tone = "error";
-    const activeStep = next.steps.find((step) => step.state === "active") || next.steps[next.steps.length - 1];
-    if (activeStep) {
-      activeStep.state = "error";
-      activeStep.text = text;
+    const active = next.steps.find((step) => step.state === "active");
+    if (active) {
+      active.state = "pending";
+      active.text = text;
     }
   }
 
   setProgress(next);
-}
-
-function renderIdleProgress() {
-  setProgress({
-    status: "En attente",
-    detail: "Aucune action en cours pour le moment.",
-    percent: 0,
-    tone: "idle",
-    steps: [
-      { label: "Connexion", text: "En attente", state: "pending" },
-      { label: "Installation", text: "En attente", state: "pending" },
-      { label: "Configuration", text: "En attente", state: "pending" },
-      { label: "Vérification", text: "En attente", state: "pending" },
-    ],
-  });
-}
-
-function renderTutorials(manifest) {
-  const tutorials = Array.isArray(manifest?.manager?.tutorials) ? manifest.manager.tutorials : [];
-  if (!tutorials.length) {
-    elements.tutorials.innerHTML = "<p>Ajoutez des liens dans l’admin AIPilot pour afficher les tutoriels ici.</p>";
-    return;
-  }
-
-  elements.tutorials.innerHTML = `
-    <div class="tutorial-grid">
-      ${tutorials
-        .map(
-          (tutorial) => `
-            <article class="tutorial-card">
-              <div class="tutorial-copy">
-                <strong>${escapeHtml(tutorial.label || "Tutoriel")}</strong>
-                <span>${escapeHtml(tutorial.url || "")}</span>
-              </div>
-              <a class="tutorial-link" href="${escapeHtml(tutorial.url || "#")}" data-open-external="${escapeHtml(tutorial.url || "")}">
-                Ouvrir
-              </a>
-            </article>
-          `,
-        )
-        .join("")}
-    </div>
-  `;
-
-  elements.tutorials.querySelectorAll("[data-open-external]").forEach((anchor) => {
-    anchor.addEventListener("click", async (event) => {
-      event.preventDefault();
-      const url = anchor.getAttribute("data-open-external");
-      if (!url) return;
-      await window.aipilotManager.openExternal(url);
-      appendLog(`Ouverture du tutoriel: ${url}`);
-    });
-  });
 }
 
 async function connectSession({ autoDiagnose = true } = {}) {
@@ -599,7 +1014,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
   if (!licenseKey) throw new Error("Saisissez d’abord votre clé de licence.");
 
   elements.licenseKey.value = licenseKey;
-  appendLog(`Connexion de la licence ${licenseKey || "(vide)"}...`);
+  appendLog(`Connexion de la licence ${licenseKey}...`);
 
   const manifest = await window.aipilotManager.createSession({
     backendUrl,
@@ -624,6 +1039,29 @@ async function connectSession({ autoDiagnose = true } = {}) {
   }
 }
 
+async function applyEnvironmentPreference(nextEnvironment) {
+  elements.environment.value = nextEnvironment;
+  syncFieldMirrors("main");
+  renderOverview();
+  await persistState();
+
+  const hasLicense = normalizeLicenseKey(elements.licenseKey.value);
+  if (!hasLicense) {
+    return;
+  }
+
+  setBusy(true);
+  try {
+    appendLog(`Changement d’outil préféré vers ${toolNameMap[nextEnvironment] || nextEnvironment}...`);
+    await connectSession({ autoDiagnose: false });
+    await runManagerAction("diagnose", false);
+  } catch (error) {
+    appendLog(error instanceof Error ? error.message : "Impossible de changer d’outil.");
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function runManagerAction(action, logAction = true) {
   if (!state.manifest) return;
   if (logAction) appendLog(`Action: ${action}`);
@@ -637,23 +1075,8 @@ async function runManagerAction(action, logAction = true) {
   renderDiagnostics(result.diagnostics);
   renderOverview();
 
-  if (action === "diagnose" || action === "repair") {
+  if (action === "diagnose") {
     setActiveView("diagnostics");
-  }
-
-  if (action === "diagnose" && state.progress?.tone !== "error") {
-    setProgress({
-      status: "Vérification terminée",
-      detail: "Le diagnostic est prêt. Consultez les points à corriger ci-dessous.",
-      percent: 100,
-      tone: "success",
-      steps: [
-        { label: "Connexion", text: "Terminé", state: "done" },
-        { label: "Installation", text: "Aucune action", state: "done" },
-        { label: "Configuration", text: "Aucune action", state: "done" },
-        { label: "Vérification", text: "Diagnostic disponible", state: "done" },
-      ],
-    });
   }
 }
 
@@ -711,30 +1134,83 @@ async function setupUpdates() {
   renderUpdateState(updateState);
 }
 
+async function handleInstall() {
+  setBusy(true);
+  state.currentAction = "install-configure";
+  try {
+    setActiveView("preparation");
+    setProgress(createProgressModel("install-configure"));
+    const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
+    if (!nodeReady) return;
+    const canProceed = await ensureDesktopAppReadyBeforeInstall();
+    if (!canProceed) return;
+    await runManagerAction("install-configure");
+  } catch (error) {
+    updateProgressFromLog(error instanceof Error ? error.message : "Erreur d’installation.");
+    appendLog(error instanceof Error ? error.message : "Erreur d’installation.");
+  } finally {
+    state.currentAction = "";
+    renderOperationState();
+    setBusy(false);
+  }
+}
+
+async function handleRepair() {
+  setBusy(true);
+  state.currentAction = "repair";
+  try {
+    setActiveView("diagnostics");
+    setProgress(createProgressModel("repair"));
+    await runManagerAction("repair");
+  } catch (error) {
+    updateProgressFromLog(error instanceof Error ? error.message : "Erreur de réparation.");
+    appendLog(error instanceof Error ? error.message : "Erreur de réparation.");
+  } finally {
+    state.currentAction = "";
+    renderOperationState();
+    setBusy(false);
+  }
+}
+
+async function handleLaunch() {
+  setBusy(true);
+  try {
+    await runManagerAction("launch");
+  } catch (error) {
+    appendLog(error instanceof Error ? error.message : "Erreur de lancement.");
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function bootstrap() {
+  loadUiState();
+  applySidebarState();
   state.defaults = await window.aipilotManager.getDefaults();
-  elements.platformChip.textContent = `Plateforme ${state.defaults.platform}`;
   elements.versionChip.textContent = `v${state.defaults.version}`;
-  elements.portalText.textContent = `Portail: ${state.defaults.backendUrl}`;
 
   if (state.defaults.licenseKey) {
     elements.licenseKey.value = normalizeLicenseKey(state.defaults.licenseKey);
+    elements.configLicenseKey.value = normalizeLicenseKey(state.defaults.licenseKey);
   }
   if (state.defaults.environment) {
     elements.environment.value = state.defaults.environment;
+    elements.configEnvironment.value = state.defaults.environment;
+    elements.dockToolSelect.value = state.defaults.environment;
+    elements.settingsPreferredTool.value = state.defaults.environment;
   }
   if (state.defaults.projectRoot) {
     state.projectRoot = state.defaults.projectRoot;
     elements.projectRoot.value = state.defaults.projectRoot;
+    elements.configProjectRoot.value = state.defaults.projectRoot;
   }
 
   renderOverview();
   renderTutorials(null);
   renderDiagnostics(null);
-  renderIdleProgress();
-
-  const initialUpdateState = await window.aipilotManager.getUpdateState();
-  renderUpdateState(initialUpdateState);
+  renderActivityFeed();
+  renderOperationState();
+  renderUpdateState(await window.aipilotManager.getUpdateState());
 
   const unsubscribeUpdates = window.aipilotManager.onUpdateState(renderUpdateState);
   const unsubscribeActionLog = window.aipilotManager.onActionLog((message) => {
@@ -747,129 +1223,116 @@ async function bootstrap() {
     unsubscribeActionLog();
   });
 
+  elements.windowMinimize.addEventListener("click", () => window.aipilotManager.minimizeWindow());
+  elements.windowMaximize.addEventListener("click", () => window.aipilotManager.toggleMaximizeWindow());
+  elements.windowClose.addEventListener("click", () => window.aipilotManager.closeWindow());
+  elements.helpButton.addEventListener("click", () => setActiveView("tutorials"));
+  elements.sidebarToggle.addEventListener("click", () =>
+    setSidebarCollapsed(!state.sidebarCollapsed),
+  );
+
   elements.navHome.addEventListener("click", () => setActiveView("home"));
+  elements.navConfiguration.addEventListener("click", () => setActiveView("configuration"));
+  elements.navPreparation.addEventListener("click", () => setActiveView("preparation"));
   elements.navDiagnostics.addEventListener("click", () => setActiveView("diagnostics"));
   elements.navTutorials.addEventListener("click", () => setActiveView("tutorials"));
   elements.navUpdates.addEventListener("click", () => setActiveView("updates"));
+  elements.navSettings.addEventListener("click", () => setActiveView("settings"));
+  elements.navAbout.addEventListener("click", () => setActiveView("about"));
+
   elements.sidebarOpenTutorials.addEventListener("click", () => setActiveView("tutorials"));
+  elements.homeOpenDiagnostics.addEventListener("click", () => setActiveView("diagnostics"));
+  elements.homeOpenConfiguration.addEventListener("click", () => setActiveView("configuration"));
+  elements.homeRunPreparation.addEventListener("click", handleInstall);
+  elements.homeOpenProblems.addEventListener("click", () => setActiveView("diagnostics"));
+  elements.homeOpenTutorials.addEventListener("click", () => setActiveView("tutorials"));
+  elements.homeOpenUpdates.addEventListener("click", () => setActiveView("updates"));
+  elements.dockChangeTool.addEventListener("click", () => setActiveView("configuration"));
 
   elements.licenseKey.addEventListener("input", (event) => {
     event.target.value = normalizeLicenseKey(event.target.value);
+    syncFieldMirrors("main");
+  });
+  elements.configLicenseKey.addEventListener("input", (event) => {
+    event.target.value = normalizeLicenseKey(event.target.value);
+    syncFieldMirrors("config");
   });
 
-  elements.chooseFolder.addEventListener("click", async () => {
+  async function chooseFolderHandler() {
     const directory = await window.aipilotManager.pickProjectDirectory();
     if (!directory) return;
     state.projectRoot = directory;
     elements.projectRoot.value = directory;
+    elements.configProjectRoot.value = directory;
     appendLog(`Dossier projet: ${directory}`);
-    renderOverview();
     await persistState();
-  });
+  }
 
-  elements.connect.addEventListener("click", async () => {
+  elements.chooseFolder.addEventListener("click", chooseFolderHandler);
+  elements.configChooseFolder.addEventListener("click", chooseFolderHandler);
+
+  async function connectHandler() {
     setBusy(true);
     try {
-      setProgress({
-        status: "Connexion en cours",
-        detail: "AIPilot vérifie votre licence et charge la configuration recommandée.",
-        percent: 12,
-        tone: "active",
-        steps: [
-          { label: "Connexion", text: "Vérification de la licence", state: "active" },
-          { label: "Installation", text: "En attente", state: "pending" },
-          { label: "Configuration", text: "En attente", state: "pending" },
-          { label: "Vérification", text: "En attente", state: "pending" },
-        ],
-      });
+      setProgress(createProgressModel("install-configure"));
       await connectSession();
+      setActiveView("home");
     } catch (error) {
       appendLog(error instanceof Error ? error.message : "Erreur de connexion.");
-      updateProgressFromLog(error instanceof Error ? error.message : "Erreur de connexion.");
-    } finally {
-      setBusy(false);
-    }
-  });
-
-  async function handleInstall() {
-    setBusy(true);
-    try {
-      setActiveView("home");
-      setProgress(createProgressModel("install-configure"));
-      const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
-      if (!nodeReady) return;
-      const canProceed = await ensureDesktopAppReadyBeforeInstall();
-      if (!canProceed) return;
-      await runManagerAction("install-configure");
-    } catch (error) {
-      updateProgressFromLog(error instanceof Error ? error.message : "Erreur d’installation.");
-      appendLog(error instanceof Error ? error.message : "Erreur d’installation.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleRepair() {
-    setBusy(true);
-    try {
-      setActiveView("diagnostics");
-      setProgress(createProgressModel("repair"));
-      await runManagerAction("repair");
-    } catch (error) {
-      updateProgressFromLog(error instanceof Error ? error.message : "Erreur de réparation.");
-      appendLog(error instanceof Error ? error.message : "Erreur de réparation.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  elements.connect.addEventListener("click", connectHandler);
+  elements.configConnect.addEventListener("click", connectHandler);
 
-  elements.installConfigure.addEventListener("click", handleInstall);
   elements.dockInstall.addEventListener("click", handleInstall);
-  elements.repair.addEventListener("click", handleRepair);
+  elements.prepInstall.addEventListener("click", handleInstall);
   elements.dockRepair.addEventListener("click", handleRepair);
-
-  async function handleLaunch() {
-    setBusy(true);
-    try {
-      await runManagerAction("launch");
-    } catch (error) {
-      appendLog(error instanceof Error ? error.message : "Erreur de lancement.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  elements.launch.addEventListener("click", handleLaunch);
+  elements.prepRepair.addEventListener("click", handleRepair);
   elements.dockLaunch.addEventListener("click", handleLaunch);
-
+  elements.prepLaunch.addEventListener("click", handleLaunch);
   elements.diagnose.addEventListener("click", async () => {
     setBusy(true);
+    state.currentAction = "diagnose";
+    renderOperationState();
     try {
-      setActiveView("diagnostics");
       setProgress(createProgressModel("diagnose"));
       await runManagerAction("diagnose");
     } catch (error) {
-      updateProgressFromLog(error instanceof Error ? error.message : "Erreur de vérification.");
       appendLog(error instanceof Error ? error.message : "Erreur de vérification.");
     } finally {
+      state.currentAction = "";
+      renderOperationState();
       setBusy(false);
     }
   });
+  elements.prepDiagnose.addEventListener("click", async () => {
+    setBusy(true);
+    state.currentAction = "diagnose";
+    renderOperationState();
+    try {
+      setProgress(createProgressModel("diagnose"));
+      await runManagerAction("diagnose");
+    } catch (error) {
+      appendLog(error instanceof Error ? error.message : "Erreur de vérification.");
+    } finally {
+      state.currentAction = "";
+      renderOperationState();
+      setBusy(false);
+    }
+  });
+  elements.repair.addEventListener("click", handleRepair);
 
   elements.watchVideo.addEventListener("click", async () => {
-    if (!state.manifest?.manager.supportVideoUrl) {
-      appendLog("Aucune vidéo principale n'est configurée.");
-      return;
-    }
+    if (!state.manifest?.manager?.supportVideoUrl) return;
     await window.aipilotManager.openExternal(state.manifest.manager.supportVideoUrl);
-    appendLog("Ouverture de la vidéo d’aide.");
   });
 
   elements.downloadOfficialApp.addEventListener("click", async () => {
-    const target = state.manifest?.tool?.officialAppUrl;
-    if (!target) return;
-    await window.aipilotManager.openExternal(target);
-    appendLog("Ouverture de la page officielle de téléchargement.");
+    if (!state.manifest?.tool?.officialAppUrl) return;
+    await window.aipilotManager.openExternal(state.manifest.tool.officialAppUrl);
   });
 
   elements.checkUpdates.addEventListener("click", async () => {
@@ -884,7 +1347,7 @@ async function bootstrap() {
     }
   });
 
-  elements.installUpdate.addEventListener("click", async () => {
+  async function installPendingUpdate() {
     setBusy(true);
     try {
       appendLog("Installation de la mise à jour au redémarrage…");
@@ -893,12 +1356,23 @@ async function bootstrap() {
       appendLog(error instanceof Error ? error.message : "Erreur d’installation de la mise à jour.");
       setBusy(false);
     }
-  });
+  }
+
+  elements.installUpdate.addEventListener("click", installPendingUpdate);
+  elements.installUpdateSecondary.addEventListener("click", installPendingUpdate);
 
   elements.licenseKey.addEventListener("change", persistState);
-  elements.environment.addEventListener("change", async () => {
-    renderOverview();
-    await persistState();
+  elements.environment.addEventListener("change", async (event) => {
+    await applyEnvironmentPreference(event.target.value);
+  });
+  elements.configEnvironment.addEventListener("change", async (event) => {
+    await applyEnvironmentPreference(event.target.value);
+  });
+  elements.dockToolSelect.addEventListener("change", async (event) => {
+    await applyEnvironmentPreference(event.target.value);
+  });
+  elements.settingsPreferredTool.addEventListener("change", async (event) => {
+    await applyEnvironmentPreference(event.target.value);
   });
 
   syncButtons();
@@ -916,7 +1390,7 @@ async function bootstrap() {
       await connectSession();
       if (state.defaults.autoSetup && !state.autoSetupStarted) {
         state.autoSetupStarted = true;
-        setActiveView("home");
+        setActiveView("preparation");
         setProgress(createProgressModel("install-configure"));
         const nodeReady = await ensureNodeRuntimeReadyBeforeInstall();
         const canProceed = nodeReady ? await ensureDesktopAppReadyBeforeInstall() : false;

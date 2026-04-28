@@ -754,6 +754,12 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                           href={currentDownloadHref}
                           label={`Télécharger ${currentOs.downloadLabel}`}
                         />
+                        <a
+                          href="/tuto"
+                          className="inline-flex w-full items-center justify-center rounded-[1rem] border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto"
+                        >
+                          Ouvrir le guide manuel
+                        </a>
                         <SecondaryButton onClick={() => selectEnvironment("opencode")}>
                           Revenir sur OpenCode
                         </SecondaryButton>
@@ -799,6 +805,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                       <li>- Windows télécharge un fichier <InlineCode>.cmd</InlineCode> qui installe la vraie app desktop puis l’ouvre automatiquement</li>
                       <li>- Linux et macOS utilisent un script shell qui installe puis ouvre AIPilot Manager</li>
                       <li>- T3 Code est configuré à partir de Codex CLI, donc le manager traite Codex comme prérequis quand vous choisissez T3 Code</li>
+                      <li>- Le guide manuel complet est disponible à tout moment sur <InlineCode>/tuto</InlineCode> si vous voulez revoir chaque étape manuellement</li>
                     </ul>
                   </InfoPanel>
                 </div>

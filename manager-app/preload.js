@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld("aipilotManager", {
   runAction: (payload) => ipcRenderer.invoke("manager:run-action", payload),
   openExternal: (url) => ipcRenderer.invoke("manager:open-external", url),
   openPath: (targetPath) => ipcRenderer.invoke("manager:open-path", targetPath),
+  minimizeWindow: () => ipcRenderer.invoke("manager:window-minimize"),
+  toggleMaximizeWindow: () => ipcRenderer.invoke("manager:window-toggle-maximize"),
+  closeWindow: () => ipcRenderer.invoke("manager:window-close"),
   onActionLog: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on("manager:action-log", listener);

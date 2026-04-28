@@ -23,6 +23,8 @@ type AvailableDeployment = {
   recommended: boolean;
 };
 
+const DEFAULT_SUPPORT_VIDEO_URL = "https://youtu.be/WwDvzdM9YWw";
+
 function normalizeEnvironment(value: unknown): EnvironmentKey | undefined {
   if (value === "codex" || value === "t3code" || value === "opencode") {
     return value;
@@ -201,14 +203,24 @@ function buildAvailableDeployments(config: Awaited<ReturnType<typeof getStoredCo
 
 function buildManagerTutorials(config: Awaited<ReturnType<typeof getStoredConfig>>, tool: ToolDetails) {
   const tutorials = parseTutorialLinks(config.managerTutorialLinks);
-  const supportVideoUrl = safeTutorialUrl(config.supportVideoUrl);
+  const supportVideoUrl =
+    safeTutorialUrl(config.supportVideoUrl) || DEFAULT_SUPPORT_VIDEO_URL;
+  const siteUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
+    /\/$/,
+    "",
+  );
 
   if (supportVideoUrl) {
     tutorials.unshift({
-      label: "Vidéo de démarrage AIPilot",
+      label: "Téléchargement et configuration pas à pas",
       url: supportVideoUrl,
     });
   }
+
+  tutorials.push({
+    label: "Guide manuel complet AIPilot",
+    url: `${siteUrl}/tuto`,
+  });
 
   if (tool.officialAppUrl) {
     tutorials.push({
@@ -318,7 +330,8 @@ export async function POST(request: Request) {
       tier: license.tier,
     },
     manager: {
-      supportVideoUrl: config.supportVideoUrl ?? "",
+      supportVideoUrl:
+        safeTutorialUrl(config.supportVideoUrl) || DEFAULT_SUPPORT_VIDEO_URL,
       supportEmail: config.supportEmail ?? "",
       tutorials: buildManagerTutorials(config, tool),
     },
