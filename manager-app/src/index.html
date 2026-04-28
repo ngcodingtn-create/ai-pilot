@@ -201,171 +201,139 @@
           <section id="view-home" class="view is-active">
             <header class="page-header">
               <h1>Bienvenue dans AIPilot Manager 👋</h1>
-              <p>Votre copilote pour configurer, réparer et lancer vos outils de développement IA.</p>
+              <p>Suivez les étapes ci-dessous pour préparer et lancer votre outil IA.</p>
             </header>
 
-            <section class="progress-banner">
-              <article id="flow-license" class="progress-step-card">
-                <div class="step-icon-wrap">
-                  <span class="step-icon step-icon-blue">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                      <path d="M17.5 19H9a4 4 0 1 1 .92-7.89A5 5 0 1 1 17.5 19Z" />
-                    </svg>
-                  </span>
-                  <span class="step-check">✓</span>
-                </div>
-                <div class="step-copy">
-                  <strong>Licence connectée</strong>
-                  <span>Récupération de votre configuration AIPilot</span>
-                </div>
-              </article>
+            <section class="guided-home">
+              <div id="home-stepper" class="guided-stepper"></div>
 
-              <span class="progress-arrow">›</span>
+              <article class="content-card guided-card">
+                <div class="guided-card-heading">
+                  <span id="home-step-eyebrow" class="guided-eyebrow">Étape 1 sur 6</span>
+                  <h2 id="home-step-title">Connexion de licence</h2>
+                  <p id="home-step-subtitle">Connectez votre licence AIPilot pour récupérer votre configuration.</p>
+                </div>
 
-              <article id="flow-azure" class="progress-step-card">
-                <div class="step-icon-wrap">
-                  <span class="step-icon step-icon-azure">A</span>
-                  <span class="step-check">✓</span>
-                </div>
-                <div class="step-copy">
-                  <strong>Configuration Azure récupérée</strong>
-                  <span>Environnement prêt</span>
-                </div>
-              </article>
+                <div class="guided-card-grid">
+                  <section class="guided-main">
+                    <div id="home-panel-license" class="guided-panel is-visible">
+                      <div class="info-banner">
+                        <div class="info-banner-icon">i</div>
+                        <div class="info-banner-copy">
+                          <strong>Votre licence est fournie sur le portail AIPilot.</strong>
+                          <span>Elle permet d’accéder à la configuration et aux ressources Azure associées.</span>
+                        </div>
+                      </div>
 
-              <span class="progress-arrow">›</span>
-
-              <article id="flow-tools" class="progress-step-card">
-                <div class="step-icon-wrap">
-                  <span class="step-icon step-icon-orange">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                      <path d="m14.7 6.3 3-3" />
-                      <path d="m2 22 6-6" />
-                      <path d="m7 11 6 6" />
-                      <path d="m14 4 6 6" />
-                    </svg>
-                  </span>
-                  <span class="step-check">✓</span>
-                </div>
-                <div class="step-copy">
-                  <strong>Outils préparés</strong>
-                  <span>Composants installés et configurés</span>
-                </div>
-              </article>
-
-              <span class="progress-arrow">›</span>
-
-              <article id="flow-ready" class="progress-step-card">
-                <div class="step-icon-wrap">
-                  <span class="step-icon step-icon-solid">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                      <circle cx="12" cy="12" r="9" />
-                      <path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none" />
-                    </svg>
-                  </span>
-                </div>
-                <div class="step-copy">
-                  <strong>Prêt à lancer</strong>
-                  <span>Votre outil est prêt à être utilisé</span>
-                </div>
-              </article>
-            </section>
-
-            <section class="cards-row">
-              <article class="content-card">
-                <div class="card-header">
-                  <h2>État de la machine</h2>
-                </div>
-                <div id="machine-list" class="machine-list"></div>
-                <button id="home-open-diagnostics" class="footer-link" type="button">
-                  <span>Voir tous les diagnostics</span>
-                  <span class="icon-wrap icon-14">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
-                  </span>
-                </button>
-              </article>
-
-              <article class="content-card">
-                <div class="card-header">
-                  <h2>Configuration</h2>
-                </div>
-                <div id="config-list" class="config-list"></div>
-                <div id="config-form-wrap" class="config-form-wrap">
-                  <label class="field">
-                    <span>Clé de licence</span>
-                    <input id="license-key" type="text" placeholder="ABCD-1234-EFGH-5678" />
-                  </label>
-                  <label class="field">
-                    <span>Outil</span>
-                    <select id="environment">
-                      <option value="codex">Codex app</option>
-                      <option value="vscode-codex">VS Code Codex</option>
-                      <option value="t3code">T3 Code</option>
-                      <option value="opencode">OpenCode</option>
-                    </select>
-                  </label>
-                  <div class="field">
-                    <span>Dossier projet</span>
-                    <div class="inline-field">
-                      <input id="project-root" type="text" readonly placeholder="Optionnel" />
-                      <button id="choose-folder" class="small-secondary-button" type="button">Choisir</button>
+                      <div id="config-form-wrap" class="config-form-wrap guided-form">
+                        <label class="field">
+                          <span>Clé de licence</span>
+                          <input id="license-key" type="text" placeholder="Entrez votre clé de licence" />
+                        </label>
+                        <label class="field">
+                          <span>Outil</span>
+                          <select id="environment">
+                            <option value="codex">Codex app</option>
+                            <option value="vscode-codex">VS Code Codex</option>
+                            <option value="t3code">T3 Code</option>
+                            <option value="opencode">OpenCode</option>
+                          </select>
+                        </label>
+                        <div class="field">
+                          <span>Dossier projet</span>
+                          <div class="inline-field">
+                            <input id="project-root" type="text" readonly placeholder="Optionnel" />
+                            <button id="choose-folder" class="small-secondary-button" type="button">Choisir</button>
+                          </div>
+                        </div>
+                        <button id="connect" class="step-primary-button" type="button">Connecter la licence</button>
+                      </div>
                     </div>
-                  </div>
-                  <button id="connect" class="small-primary-button" type="button">Connecter la licence</button>
+
+                    <div id="home-panel-azure" class="guided-panel">
+                      <div id="config-list" class="config-list"></div>
+                      <div class="guided-panel-actions">
+                        <button id="home-open-configuration" class="small-secondary-button" type="button">Voir la configuration détaillée</button>
+                      </div>
+                    </div>
+
+                    <div id="home-panel-preparation" class="guided-panel">
+                      <div id="prep-operation-banner" class="operation-banner">
+                        <div class="operation-banner-head">
+                          <span id="prep-operation-status" class="verification-status">En attente</span>
+                          <strong id="prep-operation-title">Aucune action en cours</strong>
+                        </div>
+                        <p id="prep-operation-detail">AIPilot attend votre prochaine action.</p>
+                      </div>
+                      <div id="prep-list" class="prep-summary-list"></div>
+                      <div class="guided-panel-actions two-actions">
+                        <button id="home-run-preparation" class="small-primary-button" type="button">Installer et configurer</button>
+                        <button id="home-prep-repair" class="small-secondary-button" type="button">Réparer</button>
+                      </div>
+                    </div>
+
+                    <div id="home-panel-diagnostics" class="guided-panel">
+                      <div id="machine-list" class="machine-list"></div>
+                      <div id="issues-list" class="issues-list guided-issues"></div>
+                      <div class="guided-panel-actions two-actions">
+                        <button id="home-open-diagnostics" class="small-secondary-button" type="button">Voir tous les diagnostics</button>
+                        <button id="home-open-problems" class="small-secondary-button" type="button">Voir les problèmes</button>
+                      </div>
+                    </div>
+
+                    <div id="home-panel-ready" class="guided-panel">
+                      <div class="success-banner">
+                        <div class="success-banner-dot">✓</div>
+                        <div class="success-banner-copy">
+                          <strong>Votre environnement est prêt</strong>
+                          <span>Vous pouvez relancer un outil, vérifier la configuration ou réparer à tout moment.</span>
+                        </div>
+                      </div>
+                      <div class="guided-ready-grid">
+                        <div class="ready-mini-card">
+                          <span>Outil prêt</span>
+                          <strong id="home-ready-tool">-</strong>
+                        </div>
+                        <div class="ready-mini-card">
+                          <span>Modèle actif</span>
+                          <strong id="home-ready-model">-</strong>
+                        </div>
+                        <div class="ready-mini-card">
+                          <span>Diagnostics</span>
+                          <strong id="home-ready-diagnostics">-</strong>
+                        </div>
+                      </div>
+                      <div class="guided-panel-actions two-actions">
+                        <button id="home-open-tutorials" class="small-secondary-button" type="button">Ouvrir les tutoriels</button>
+                        <button id="home-open-updates" class="small-secondary-button" type="button">Voir les mises à jour</button>
+                      </div>
+                    </div>
+
+                    <div id="home-panel-launch" class="guided-panel">
+                      <button id="home-launch-tool" class="step-primary-button launch-home-button" type="button">Lancer l’outil</button>
+                      <p class="launch-home-note">Le lancement reste disponible à tout moment depuis le panneau de droite.</p>
+                    </div>
+                  </section>
+
+                  <aside class="guided-side">
+                    <div class="mini-section-head">
+                      <h3>Que fait cette étape ?</h3>
+                    </div>
+                    <div id="home-step-explainer" class="guided-explainer"></div>
+                <div class="guided-help-box">
+                  <strong>Besoin d’aide ?</strong>
+                  <p>Consultez notre guide de connexion de licence.</p>
+                  <button id="sidebar-open-tutorials-home" class="small-link" type="button">Ouvrir le tutoriel</button>
                 </div>
-                <button id="home-open-configuration" class="footer-link" type="button">
-                  <span>Voir la configuration détaillée</span>
-                  <span class="icon-wrap icon-14">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
-                  </span>
-                </button>
+                  </aside>
+                </div>
               </article>
 
-              <article class="content-card">
-                <div class="card-header">
-                  <h2>Préparation</h2>
+              <article class="content-card guided-progress-card">
+                <div class="mini-section-head">
+                  <h3>Votre progression</h3>
                 </div>
-                <div id="prep-list" class="prep-summary-list"></div>
-                <button id="home-run-preparation" class="footer-link" type="button">
-                  <span>Relancer la préparation</span>
-                  <span class="icon-wrap icon-14">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
-                  </span>
-                </button>
-              </article>
-            </section>
-
-            <section class="bottom-grid">
-              <article class="content-card problems-card">
-                <div class="card-header card-header-inline">
-                  <div class="problems-title-wrap">
-                    <h2>Problèmes détectés</h2>
-                    <span id="issues-count" class="issues-count">0</span>
-                  </div>
-                </div>
-                <div id="issues-list" class="issues-list"></div>
-                <button id="home-open-problems" class="footer-link footer-link-center" type="button">
-                  <span>Voir tous les problèmes</span>
-                  <span class="icon-wrap icon-14">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
-                  </span>
-                </button>
-              </article>
-
-              <article class="content-card tutorials-card">
-                <div class="card-header card-header-inline">
-                  <h2>Tutoriels & aide</h2>
-                  <button id="home-open-tutorials" class="small-link" type="button">Voir tout</button>
-                </div>
-                <div id="tutorials-list" class="tutorials-list"></div>
+                <div id="home-progress-strip" class="guided-progress-strip"></div>
               </article>
             </section>
 
@@ -385,7 +353,7 @@
                 <p id="update-message">Une nouvelle version d'AIPilot Manager est disponible.</p>
               </div>
               <div class="update-banner-actions">
-                <button id="home-open-updates" class="update-link-button" type="button">Voir les nouveautés</button>
+                <button id="home-open-release-notes" class="update-link-button" type="button">Voir les nouveautés</button>
                 <button id="install-update" class="install-update-button" type="button" disabled>
                   <span class="icon-wrap icon-15">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

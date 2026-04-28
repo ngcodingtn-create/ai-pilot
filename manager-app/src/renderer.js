@@ -12,6 +12,9 @@ const state = {
   currentAction: "",
   sidebarCollapsed: false,
   selectedModel: "",
+  homeStepSelection: 1,
+  lastDerivedHomeStep: 1,
+  lastLaunchCompleted: false,
 };
 
 const UI_STORAGE_KEY = "aipilot-manager-ui";
@@ -74,6 +77,18 @@ const elements = {
   dockToolSelect: document.querySelector("#dock-tool-select"),
   dockCodexControls: document.querySelector("#dock-codex-controls"),
   dockModelSelect: document.querySelector("#dock-model-select"),
+  homeStepper: document.querySelector("#home-stepper"),
+  homeStepEyebrow: document.querySelector("#home-step-eyebrow"),
+  homeStepTitle: document.querySelector("#home-step-title"),
+  homeStepSubtitle: document.querySelector("#home-step-subtitle"),
+  homeStepExplainer: document.querySelector("#home-step-explainer"),
+  homeProgressStrip: document.querySelector("#home-progress-strip"),
+  homePanelLicense: document.querySelector("#home-panel-license"),
+  homePanelAzure: document.querySelector("#home-panel-azure"),
+  homePanelPreparation: document.querySelector("#home-panel-preparation"),
+  homePanelDiagnostics: document.querySelector("#home-panel-diagnostics"),
+  homePanelReady: document.querySelector("#home-panel-ready"),
+  homePanelLaunch: document.querySelector("#home-panel-launch"),
   toolIcon: document.querySelector("#tool-icon"),
   toolLabel: document.querySelector("#tool-label"),
   toolStatus: document.querySelector("#tool-status"),
@@ -85,10 +100,17 @@ const elements = {
   homeOpenDiagnostics: document.querySelector("#home-open-diagnostics"),
   homeOpenConfiguration: document.querySelector("#home-open-configuration"),
   homeRunPreparation: document.querySelector("#home-run-preparation"),
+  homePrepRepair: document.querySelector("#home-prep-repair"),
   homeOpenProblems: document.querySelector("#home-open-problems"),
   homeOpenTutorials: document.querySelector("#home-open-tutorials"),
   homeOpenUpdates: document.querySelector("#home-open-updates"),
+  homeOpenReleaseNotes: document.querySelector("#home-open-release-notes"),
+  homeReadyTool: document.querySelector("#home-ready-tool"),
+  homeReadyModel: document.querySelector("#home-ready-model"),
+  homeReadyDiagnostics: document.querySelector("#home-ready-diagnostics"),
+  homeLaunchTool: document.querySelector("#home-launch-tool"),
   sidebarOpenTutorials: document.querySelector("#sidebar-open-tutorials"),
+  sidebarOpenTutorialsHome: document.querySelector("#sidebar-open-tutorials-home"),
   navHome: document.querySelector("#nav-home"),
   navConfiguration: document.querySelector("#nav-configuration"),
   navPreparation: document.querySelector("#nav-preparation"),
@@ -301,11 +323,183 @@ function setActiveView(view) {
 }
 
 function setFlowState(element, status) {
+  if (!element) return;
   element.dataset.status = status;
   const check = element.querySelector(".step-check");
   if (check) {
     check.style.display = status === "done" ? "grid" : "none";
   }
+}
+
+function getHomeToolLabel() {
+  return state.manifest?.tool?.label || getSelectedToolLabel();
+}
+
+function getHomeStepDefinitions() {
+  const toolLabel = getHomeToolLabel();
+  return [
+    {
+      index: 1,
+      key: "license",
+      title: "Licence",
+      short: "Se connecter",
+      heading: "Connexion de licence",
+      subtitle: "Connectez votre licence AIPilot pour récupérer votre configuration.",
+      explainer: [
+        {
+          title: "Vérifie la validité de votre licence",
+          text: "Nous confirmons que votre licence est active et autorisée.",
+        },
+        {
+          title: "Récupère votre configuration Azure",
+          text: "Le manager charge votre ressource, vos déploiements et les liens utiles.",
+        },
+        {
+          title: "Prépare la suite du parcours",
+          text: "Une fois la licence reconnue, AIPilot sait quel outil et quel modèle préparer.",
+        },
+      ],
+    },
+    {
+      index: 2,
+      key: "preparation",
+      title: "Préparation",
+      short: "Installer & configurer",
+      heading: `Préparation de ${toolLabel}`,
+      subtitle: "AIPilot installe les composants et écrit la configuration sans manipulations manuelles inutiles.",
+      explainer: [
+        {
+          title: "Installe les composants requis",
+          text: "Node.js, npm, CLI et dépendances sont vérifiés puis installés si nécessaire.",
+        },
+        {
+          title: "Écrit les bons fichiers",
+          text: "AIPilot prépare config.toml, auth.json ou la configuration OpenCode selon l’outil.",
+        },
+        {
+          title: "Met en place l’environnement Azure",
+          text: "Les variables et chemins utiles sont préparés pour éviter les erreurs au lancement.",
+        },
+      ],
+    },
+    {
+      index: 3,
+      key: "diagnostics",
+      title: "Diagnostics",
+      short: "Vérifier l’environnement",
+      heading: "Vérification finale de l’environnement",
+      subtitle: "AIPilot repère les points manquants, explique les problèmes et propose une réparation.",
+      explainer: [
+        {
+          title: "Contrôle l’état réel de la machine",
+          text: "Chaque dépendance critique est vérifiée avec un état prêt, optionnel ou à corriger.",
+        },
+        {
+          title: "Affiche les erreurs de façon utile",
+          text: "Les problèmes importants apparaissent avec leur cause et l’action recommandée.",
+        },
+        {
+          title: "Déclenche la réparation",
+          text: "Vous pouvez relancer une réparation automatique depuis cette étape si besoin.",
+        },
+      ],
+    },
+    {
+      index: 4,
+      key: "ready",
+      title: "Prêt à lancer",
+      short: "Tout est prêt",
+      heading: `${toolLabel} est prêt`,
+      subtitle: "Votre environnement est configuré et vérifié. Vous pouvez maintenant lancer l’outil.",
+      explainer: [
+        {
+          title: "Confirme l’état final",
+          text: "Le manager vérifie que les points obligatoires sont prêts avant le lancement.",
+        },
+        {
+          title: "Récapitule l’outil et le modèle",
+          text: "Vous voyez l’outil actif, le modèle Azure sélectionné et le statut des diagnostics.",
+        },
+        {
+          title: "Laisse l’accès au support",
+          text: "Tutoriels, diagnostics et réparation restent disponibles à tout moment après la préparation.",
+        },
+      ],
+    },
+    {
+      index: 5,
+      key: "launch",
+      title: "Lancer",
+      short: "Démarrer l’outil",
+      heading: `Lancer ${toolLabel}`,
+      subtitle: "AIPilot ouvre l’outil choisi avec la configuration déjà préparée pour cette machine.",
+      explainer: [
+        {
+          title: "Ouvre le bon outil",
+          text: `Le bouton de lancement démarre directement ${toolLabel} avec la configuration AIPilot en place.`,
+        },
+        {
+          title: "Conserve la maintenance",
+          text: "Après le premier lancement, l’application reste disponible pour réparer et relancer plus tard.",
+        },
+        {
+          title: "Reste guidé",
+          text: "Si quelque chose casse plus tard, repassez par Diagnostics ou Réparer sans tout refaire.",
+        },
+      ],
+    },
+  ];
+}
+
+function getDerivedHomeStep() {
+  if (!state.manifest) return 1;
+  if (state.lastLaunchCompleted) return 5;
+  if (state.currentAction === "install-configure") return 2;
+  if (state.currentAction === "diagnose" || state.currentAction === "repair") return 3;
+  if (state.lastDiagnostics?.overallOk) return 4;
+  return 2;
+}
+
+function getHomeMaxAccessibleStep() {
+  if (!state.manifest) return 1;
+  if (state.lastLaunchCompleted) return 5;
+  if (state.lastDiagnostics) {
+    return state.lastDiagnostics.overallOk ? 5 : 3;
+  }
+  return 2;
+}
+
+function getHomeStepStatus(stepIndex, currentStep) {
+  if (stepIndex < currentStep) return "done";
+  if (stepIndex === currentStep) {
+    if (state.currentAction && (stepIndex === 3 || stepIndex === 4)) {
+      return "loading";
+    }
+    return "active";
+  }
+  return "idle";
+}
+
+function getHomeStepSelection() {
+  const derivedStep = getDerivedHomeStep();
+  const maxAccessible = getHomeMaxAccessibleStep();
+  let selectedStep = state.homeStepSelection || derivedStep;
+
+  if (selectedStep > maxAccessible) {
+    selectedStep = derivedStep;
+  }
+
+  if (!state.homeStepSelection || state.homeStepSelection === state.lastDerivedHomeStep) {
+    selectedStep = derivedStep;
+  }
+
+  if (selectedStep < 1) {
+    selectedStep = 1;
+  }
+
+  state.lastDerivedHomeStep = derivedStep;
+  state.homeStepSelection = selectedStep;
+  return selectedStep;
 }
 
 function syncButtons() {
@@ -331,6 +525,8 @@ function syncButtons() {
   elements.prepInstall.disabled = disabled;
   elements.dockRepair.disabled = disabled;
   elements.homeRunPreparation.disabled = disabled;
+  elements.homePrepRepair.disabled = disabled;
+  elements.homeLaunchTool.disabled = disabled || !state.lastDiagnostics?.overallOk;
   elements.codexApplyLaunch.disabled = disabled || !isCodexFamilyEnvironment(elements.environment.value);
   elements.codexOpenConfig.disabled = !state.manifest || !isCodexFamilyEnvironment(elements.environment.value);
   elements.codexModelSelect.disabled = !state.manifest || !isCodexFamilyEnvironment(elements.environment.value);
@@ -418,8 +614,12 @@ function renderActivityFeed() {
       </article>
     `;
 
-  elements.prepActivityFeed.innerHTML = rows;
-  elements.diagnosticsActivityFeed.innerHTML = rows;
+  if (elements.prepActivityFeed) {
+    elements.prepActivityFeed.innerHTML = rows;
+  }
+  if (elements.diagnosticsActivityFeed) {
+    elements.diagnosticsActivityFeed.innerHTML = rows;
+  }
 }
 
 function renderOperationState() {
@@ -615,7 +815,7 @@ function renderConfigList() {
       </span>
     </div>
   `;
-  elements.configFormWrap.style.display = "none";
+  elements.configFormWrap.style.display = "flex";
 
   elements.configDetailList.innerHTML = `
     <dl>
@@ -715,7 +915,9 @@ function getIssueAction(check) {
 
 function renderIssues(diagnostics) {
   const issues = (diagnostics?.checks || []).filter((check) => !check.ok && !check.optional);
-  elements.issuesCount.textContent = String(issues.length);
+  if (elements.issuesCount) {
+    elements.issuesCount.textContent = String(issues.length);
+  }
 
   if (!issues.length) {
     elements.issuesList.innerHTML = `
@@ -850,13 +1052,15 @@ function renderTutorials(manifest) {
         array.findIndex((candidate) => candidate.url === item.url) === index,
     );
 
-  elements.tutorialsList.innerHTML = merged
-    .map((item, index) => {
-      const meta = inferTutorialMeta(item.label, item.url);
-      const row = tutorialRow(item.label, meta.tag, meta.subtitle);
-      return item.url ? `<button class="tutorial-open-button" type="button" data-tutorial-index="${index}">${row}</button>` : row;
-    })
-    .join("");
+  if (elements.tutorialsList) {
+    elements.tutorialsList.innerHTML = merged
+      .map((item, index) => {
+        const meta = inferTutorialMeta(item.label, item.url);
+        const row = tutorialRow(item.label, meta.tag, meta.subtitle);
+        return item.url ? `<button class="tutorial-open-button" type="button" data-tutorial-index="${index}">${row}</button>` : row;
+      })
+      .join("");
+  }
 
   elements.tutorialsLibrary.innerHTML = merged.length
     ? merged
@@ -874,7 +1078,9 @@ function renderTutorials(manifest) {
         .join("")
     : "<p>Aucun tutoriel supplémentaire configuré pour le moment.</p>";
 
-  attachTutorialOpeners(elements.tutorialsList, merged);
+  if (elements.tutorialsList) {
+    attachTutorialOpeners(elements.tutorialsList, merged);
+  }
   attachTutorialOpeners(elements.tutorialsLibrary, merged);
 }
 
@@ -895,6 +1101,7 @@ function renderDiagnostics(diagnostics) {
     elements.verificationChecklist.innerHTML = "<p>Aucune vérification exécutée pour le moment.</p>";
     elements.diagnostics.innerHTML = "<p>Aucune vérification exécutée pour le moment.</p>";
     renderOperationState();
+    renderGuidedHome();
     return;
   }
 
@@ -975,6 +1182,7 @@ function renderDiagnostics(diagnostics) {
     </dl>
   `;
   renderOperationState();
+  renderGuidedHome();
 }
 
 function renderSettingsSummary() {
@@ -998,6 +1206,131 @@ function renderAboutSummary() {
   `;
 }
 
+function renderHomeStepExplainer(step) {
+  const items = step.explainer
+    .map(
+      (item) => `
+        <article class="guided-explainer-item">
+          <span class="guided-explainer-bullet">${icon("checkCircle")}</span>
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <p>${escapeHtml(item.text)}</p>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+
+  elements.homeStepExplainer.innerHTML = items;
+}
+
+function showHomePanel(stepKey) {
+  const panelMap = {
+    license: elements.homePanelLicense,
+    azure: elements.homePanelAzure,
+    preparation: elements.homePanelPreparation,
+    diagnostics: elements.homePanelDiagnostics,
+    ready: elements.homePanelReady,
+    launch: elements.homePanelLaunch,
+  };
+
+  Object.entries(panelMap).forEach(([key, panel]) => {
+    panel?.classList.toggle("is-visible", key === stepKey);
+  });
+}
+
+function renderHomeProgressStrip(steps, selectedStep) {
+  const derivedStep = getDerivedHomeStep();
+  elements.homeProgressStrip.innerHTML = steps
+    .map((step) => {
+      const status = getHomeStepStatus(step.index, derivedStep);
+      return `
+        <button
+          type="button"
+          class="guided-progress-item is-${status} ${selectedStep === step.index ? "is-selected" : ""}"
+          data-home-step="${step.index}"
+        >
+          <span class="guided-progress-dot">${status === "done" ? "✓" : step.index}</span>
+          <span class="guided-progress-copy">
+            <strong>${escapeHtml(step.title)}</strong>
+            <small>${escapeHtml(
+              status === "done"
+                ? "Terminé"
+                : status === "active"
+                  ? "En cours"
+                  : selectedStep > step.index
+                    ? "Terminé"
+                    : "En attente",
+            )}</small>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+
+  elements.homeProgressStrip.querySelectorAll("[data-home-step]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextStep = Number(button.getAttribute("data-home-step"));
+      if (nextStep <= getHomeMaxAccessibleStep()) {
+        state.homeStepSelection = nextStep;
+        renderGuidedHome();
+      }
+    });
+  });
+}
+
+function renderHomeStepper(steps, selectedStep) {
+  const derivedStep = getDerivedHomeStep();
+  const maxAccessible = getHomeMaxAccessibleStep();
+  elements.homeStepper.innerHTML = steps
+    .map((step) => {
+      const status = getHomeStepStatus(step.index, derivedStep);
+      return `
+        <button
+          type="button"
+          class="guided-step-button is-${status} ${selectedStep === step.index ? "is-selected" : ""} ${step.index > maxAccessible ? "is-locked" : ""}"
+          data-home-step="${step.index}"
+          ${step.index > maxAccessible ? "disabled" : ""}
+        >
+          <span class="guided-step-index">${status === "done" ? "✓" : step.index}</span>
+          <span class="guided-step-copy">
+            <strong>${escapeHtml(step.title)}</strong>
+            <small>${escapeHtml(step.short)}</small>
+          </span>
+        </button>
+        ${step.index < steps.length ? '<span class="guided-step-connector">›</span>' : ""}
+      `;
+    })
+    .join("");
+
+  elements.homeStepper.querySelectorAll("[data-home-step]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.homeStepSelection = Number(button.getAttribute("data-home-step"));
+      renderGuidedHome();
+    });
+  });
+}
+
+function renderGuidedHome() {
+  const steps = getHomeStepDefinitions();
+  const selectedStep = getHomeStepSelection();
+  const activeStep = steps.find((step) => step.index === selectedStep) || steps[0];
+  const diagnosticsReady = state.lastDiagnostics?.overallOk;
+
+  elements.homeStepEyebrow.textContent = `Étape ${activeStep.index} sur ${steps.length}`;
+  elements.homeStepTitle.textContent = activeStep.heading;
+  elements.homeStepSubtitle.textContent = activeStep.subtitle;
+  renderHomeStepExplainer(activeStep);
+  renderHomeStepper(steps, selectedStep);
+  renderHomeProgressStrip(steps, selectedStep);
+  showHomePanel(activeStep.key);
+
+  elements.homeReadyTool.textContent = getHomeToolLabel();
+  elements.homeReadyModel.textContent = getCurrentModelLabel();
+  elements.homeReadyDiagnostics.textContent = diagnosticsReady ? "Tous les contrôles sont passés" : "Vérification requise";
+  elements.homeLaunchTool.textContent = toolLaunchLabels[elements.environment.value] || "Lancer l’outil";
+}
+
 function renderOverview() {
   syncFieldMirrors();
   renderWindowStatus();
@@ -1007,19 +1340,7 @@ function renderOverview() {
   renderSettingsSummary();
   renderAboutSummary();
   renderPrepList(state.progress);
-
-  if (!state.manifest) {
-    setFlowState(elements.flowLicense, "pending");
-    setFlowState(elements.flowAzure, "pending");
-    setFlowState(elements.flowTools, "pending");
-    setFlowState(elements.flowReady, "pending");
-    return;
-  }
-
-  setFlowState(elements.flowLicense, "done");
-  setFlowState(elements.flowAzure, "done");
-  setFlowState(elements.flowTools, state.lastDiagnostics?.overallOk ? "done" : "pending");
-  setFlowState(elements.flowReady, state.lastDiagnostics?.overallOk ? "active" : "pending");
+  renderGuidedHome();
 }
 
 function renderUpdateState(updateState) {
@@ -1051,6 +1372,7 @@ function setProgress(progress) {
   state.progress = progress;
   renderPrepList(progress);
   renderOperationState();
+  renderGuidedHome();
 }
 
 function createProgressModel(action) {
@@ -1118,6 +1440,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
   if (!licenseKey) throw new Error("Saisissez d’abord votre clé de licence.");
 
   elements.licenseKey.value = licenseKey;
+  state.lastLaunchCompleted = false;
   appendLog(`Connexion de la licence ${licenseKey}...`);
 
   const manifest = await window.aipilotManager.createSession({
@@ -1147,6 +1470,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
 async function applyEnvironmentPreference(nextEnvironment) {
   elements.environment.value = nextEnvironment;
   syncFieldMirrors("main");
+  state.lastLaunchCompleted = false;
   renderOverview();
   await persistState();
 
@@ -1238,6 +1562,7 @@ async function setupUpdates() {
 async function handleInstall() {
   setBusy(true);
   state.currentAction = "install-configure";
+  state.lastLaunchCompleted = false;
   try {
     setActiveView("preparation");
     setProgress(createProgressModel("install-configure"));
@@ -1253,12 +1578,14 @@ async function handleInstall() {
     state.currentAction = "";
     renderOperationState();
     setBusy(false);
+    renderOverview();
   }
 }
 
 async function handleRepair() {
   setBusy(true);
   state.currentAction = "repair";
+  state.lastLaunchCompleted = false;
   try {
     setActiveView("diagnostics");
     setProgress(createProgressModel("repair"));
@@ -1270,6 +1597,7 @@ async function handleRepair() {
     state.currentAction = "";
     renderOperationState();
     setBusy(false);
+    renderOverview();
   }
 }
 
@@ -1277,6 +1605,8 @@ async function handleLaunch() {
   setBusy(true);
   try {
     await runManagerAction("launch");
+    state.lastLaunchCompleted = true;
+    renderOverview();
   } catch (error) {
     appendLog(error instanceof Error ? error.message : "Erreur de lancement.");
   } finally {
@@ -1342,12 +1672,16 @@ async function bootstrap() {
   elements.navAbout.addEventListener("click", () => setActiveView("about"));
 
   elements.sidebarOpenTutorials.addEventListener("click", () => setActiveView("tutorials"));
+  elements.sidebarOpenTutorialsHome.addEventListener("click", () => setActiveView("tutorials"));
   elements.homeOpenDiagnostics.addEventListener("click", () => setActiveView("diagnostics"));
   elements.homeOpenConfiguration.addEventListener("click", () => setActiveView("configuration"));
   elements.homeRunPreparation.addEventListener("click", handleInstall);
+  elements.homePrepRepair.addEventListener("click", handleRepair);
   elements.homeOpenProblems.addEventListener("click", () => setActiveView("diagnostics"));
   elements.homeOpenTutorials.addEventListener("click", () => setActiveView("tutorials"));
   elements.homeOpenUpdates.addEventListener("click", () => setActiveView("updates"));
+  elements.homeOpenReleaseNotes.addEventListener("click", () => setActiveView("updates"));
+  elements.homeLaunchTool.addEventListener("click", handleLaunch);
   elements.dockChangeTool.addEventListener("click", () => setActiveView("configuration"));
 
   function syncSelectedModel(nextValue) {
@@ -1414,6 +1748,7 @@ async function bootstrap() {
       state.currentAction = "";
       renderOperationState();
       setBusy(false);
+      renderOverview();
     }
   });
   elements.prepDiagnose.addEventListener("click", async () => {
@@ -1429,6 +1764,7 @@ async function bootstrap() {
       state.currentAction = "";
       renderOperationState();
       setBusy(false);
+      renderOverview();
     }
   });
   elements.repair.addEventListener("click", handleRepair);
