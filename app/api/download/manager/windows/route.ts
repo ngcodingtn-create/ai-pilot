@@ -75,12 +75,16 @@ export async function GET(request: Request) {
       `  if ($probe) { $installedExe = $probe.FullName } ` +
       `} ` +
       `if (-not (Test-Path $installedExe)) { throw 'L''installation Windows n''a pas produit l''executable AIPilot Manager attendu.' } ` +
-      `$shell = New-Object -ComObject WScript.Shell; ` +
-      `$shortcut = $shell.CreateShortcut($desktopShortcut); ` +
-      `$shortcut.TargetPath = $installedExe; ` +
-      `$shortcut.WorkingDirectory = Split-Path $installedExe; ` +
-      `$shortcut.IconLocation = $installedExe; ` +
-      `$shortcut.Save(); ` +
+      `try { ` +
+      `  $shell = New-Object -ComObject WScript.Shell; ` +
+      `  $shortcut = $shell.CreateShortcut($desktopShortcut); ` +
+      `  $shortcut.TargetPath = $installedExe; ` +
+      `  $shortcut.WorkingDirectory = Split-Path $installedExe; ` +
+      `  $shortcut.IconLocation = $installedExe; ` +
+      `  $shortcut.Save(); ` +
+      `} catch { ` +
+      `  Write-Host 'Avertissement: impossible de creer le raccourci bureau. Le menu Demarrer reste disponible.'; ` +
+      `} ` +
       `Start-Process -FilePath $installedExe -ArgumentList @('--backend-url',$env:BACKEND_URL,'--environment',$env:TARGET_ENVIRONMENT,'--license-key',$env:LICENSE_KEY,'--auto-setup');"`,
     "if errorlevel 1 goto :launch_error",
     "echo.",
