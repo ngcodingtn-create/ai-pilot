@@ -1122,6 +1122,62 @@ async function configureCodex(manifest, logs) {
   };
 }
 
+async function ensureCodexConfigPresent(manifest, logs) {
+  const configPath = getCodexConfigPath();
+
+  if (await fileExists(configPath)) {
+    logs.push(`Vérification finale: config Codex détectée dans ${configPath}.`);
+    return configPath;
+  }
+
+  logs.push(
+    `Vérification finale: config Codex introuvable dans ${configPath}. Nouvelle tentative d'écriture...`,
+  );
+  await writeFileWithDirs(configPath, manifest.azure.codex.configToml);
+
+  if (await fileExists(configPath)) {
+    logs.push(`La configuration Codex a été recréée avec succès dans ${configPath}.`);
+    return configPath;
+  }
+
+  const downloadLabel =
+    manifest.tool.environment === "t3code" ? "Codex puis T3 Code" : "Codex";
+  const downloadUrl =
+    manifest.tool.environment === "t3code"
+      ? manifest.tool.officialAppUrl || "https://t3.codes/"
+      : manifest.tool.officialAppUrl || "https://developers.openai.com/codex/app/windows";
+
+  throw new Error(
+    `Le fichier ~/.codex/config.toml reste introuvable après réparation. Téléchargez d'abord ${downloadLabel} depuis ${downloadUrl}, ouvrez l'app une première fois, puis relancez AIPilot Manager.`,
+  );
+}
+
+async function ensureManagedConfiguration(manifest, projectRoot, logs) {
+  if (manifest.tool.environment === "opencode") {
+    const globalConfigPath = getOpenCodeGlobalConfigPath();
+    const authPath = getOpenCodeAuthPath();
+
+    if (await fileExists(globalConfigPath)) {
+      logs.push(`Vérification finale: config OpenCode détectée dans ${globalConfigPath}.`);
+    } else {
+      logs.push(
+        `Vérification finale: config OpenCode introuvable dans ${globalConfigPath}. Nouvelle tentative d'écriture...`,
+      );
+      await configureOpenCode(manifest, projectRoot, logs);
+    }
+
+    if (!(await fileExists(authPath))) {
+      throw new Error(
+        `Le fichier d'authentification OpenCode reste introuvable dans ${authPath}. Réessayez l'installation ou relancez la réparation.`,
+      );
+    }
+
+    return globalConfigPath;
+  }
+
+  return ensureCodexConfigPresent(manifest, logs);
+}
+
 async function configureOpenCode(manifest, projectRoot, logs) {
   const globalConfigPath = getOpenCodeGlobalConfigPath();
   const authPath = getOpenCodeAuthPath();
@@ -1266,8 +1322,11 @@ async function installTool(manifest, logs) {
     requiresDesktopApp(manifest.tool.environment) &&
     !(await isDesktopAppInstalled(manifest.tool.environment))
   ) {
+    const appLabel = manifest.tool.environment === "t3code" ? "T3 Code" : "Codex";
+    const downloadUrl = manifest.tool.officialAppUrl || "https://developers.openai.com/codex/app/windows";
+    logs.push(`${appLabel} n'est pas détecté sur cette machine.`);
     throw new Error(
-      `Installez d'abord l'app ${manifest.tool.label} officielle, puis relancez l'installation AIPilot pour réparer le CLI et la configuration.`,
+      `Installez d'abord l'app ${appLabel} officielle depuis ${downloadUrl}, ouvrez-la une première fois, puis relancez AIPilot Manager pour réparer le CLI et la configuration.`,
     );
   }
 
@@ -1555,8 +1614,9 @@ async function executeManagerAction(action, payload, event) {
     logSink.push("Installation et configuration démarrées. Cela peut prendre quelques minutes selon votre connexion.");
     await installTool(manifest, logSink);
     const configurationResult = await configureTool(manifest, projectRoot, logSink);
+    const verifiedConfigPath = await ensureManagedConfiguration(manifest, projectRoot, logSink);
     logSink.push("Installation et configuration terminées.");
-    logSink.push(`Configuration prête: ${getSetupGuidance(manifest, projectRoot).primaryConfigPath}`);
+    logSink.push(`Configuration prête: ${verifiedConfigPath}`);
     logSink.push("Vous pouvez ouvrir le fichier de configuration ou le dossier associé directement depuis le manager.");
     if (process.platform === "win32") {
       logSink.push("Windows: redémarrez le PC avant d’ouvrir l’outil pour garantir la prise en compte des variables Azure.");
@@ -1572,8 +1632,9 @@ async function executeManagerAction(action, payload, event) {
     logSink.push("Réparation complète en cours: vérification du runtime, du CLI, de l’app et de la configuration...");
     await installTool(manifest, logSink);
     const configurationResult = await configureTool(manifest, projectRoot, logSink);
+    const verifiedConfigPath = await ensureManagedConfiguration(manifest, projectRoot, logSink);
     logSink.push("Réparation terminée.");
-    logSink.push(`Configuration prête: ${getSetupGuidance(manifest, projectRoot).primaryConfigPath}`);
+    logSink.push(`Configuration prête: ${verifiedConfigPath}`);
     if (process.platform === "win32") {
       logSink.push("Windows: redémarrez le PC avant d’ouvrir l’outil pour garantir la prise en compte des variables Azure.");
       await promptRestartRecommendation(configurationResult);
