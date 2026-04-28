@@ -348,7 +348,8 @@ export default async function AdminPage({
                                 defaultValue="opencode"
                                 options={[
                                   { label: "OpenCode", value: "opencode" },
-                                  { label: "Codex", value: "codex" },
+                                  { label: "Codex app", value: "codex" },
+                                  { label: "VS Code Codex", value: "vscode-codex" },
                                   { label: "T3 Code", value: "t3code" },
                                 ]}
                               />
@@ -378,7 +379,7 @@ export default async function AdminPage({
                           <MiniMetric label="Demandes traitées" value={String(acceptedRequests.length)} />
                           <MiniMetric
                             label="Répartition outils"
-                            value={`${licenses.filter((item) => item.preferredEnvironment === "codex").length}/${licenses.filter((item) => item.preferredEnvironment === "t3code").length}/${licenses.filter((item) => item.preferredEnvironment === "opencode").length}`}
+                            value={`${licenses.filter((item) => item.preferredEnvironment === "codex").length}/${licenses.filter((item) => item.preferredEnvironment === "vscode-codex").length}/${licenses.filter((item) => item.preferredEnvironment === "t3code").length}/${licenses.filter((item) => item.preferredEnvironment === "opencode").length}`}
                           />
                           <MiniMetric
                             label="Source de vérité"
@@ -452,7 +453,7 @@ export default async function AdminPage({
                                       <Badge tone="blue">{license.tier.toUpperCase()}</Badge>
                                     </TableCell>
                                     <TableCell>
-                                      <Badge tone="slate">{license.preferredEnvironment}</Badge>
+                                      <Badge tone="slate">{formatEnvironmentLabel(license.preferredEnvironment)}</Badge>
                                     </TableCell>
                                     <TableCell>
                                       <Badge tone={license.status === "active" ? "emerald" : "amber"}>
@@ -550,7 +551,7 @@ export default async function AdminPage({
                                       </div>
                                     </TableCell>
                                     <TableCell>
-                                      <Badge tone="blue">{request.preferredEnvironment}</Badge>
+                                      <Badge tone="blue">{formatEnvironmentLabel(request.preferredEnvironment)}</Badge>
                                     </TableCell>
                                     <TableCell>
                                       <Badge tone="slate">{request.requestedOs}</Badge>
@@ -930,7 +931,7 @@ function MobileLicenseCards({
           </code>
 
           <div className="mt-4 space-y-2 text-sm text-slate-600">
-            <p>Outil: {license.preferredEnvironment}</p>
+            <p>Outil: {formatEnvironmentLabel(license.preferredEnvironment)}</p>
             <p>
               Dernière activité:{" "}
               {license.lastValidatedAt
@@ -979,7 +980,7 @@ function MobileRequestCards({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Badge tone="blue">{request.preferredEnvironment}</Badge>
+            <Badge tone="blue">{formatEnvironmentLabel(request.preferredEnvironment)}</Badge>
             <Badge tone="slate">{request.requestedOs}</Badge>
           </div>
 
@@ -1035,6 +1036,13 @@ function MobileRequestCards({
 
 function readSection(value: string | undefined): AdminSection {
   return value === "subscriptions" || value === "requests" ? value : "dashboard";
+}
+
+function formatEnvironmentLabel(value: string) {
+  if (value === "codex") return "Codex app";
+  if (value === "vscode-codex") return "VS Code Codex";
+  if (value === "t3code") return "T3 Code";
+  return "OpenCode";
 }
 
 function buildTutorialPreview(

@@ -300,7 +300,8 @@
                   <label class="field">
                     <span>Outil</span>
                     <select id="environment">
-                      <option value="codex">Codex</option>
+                      <option value="codex">Codex app</option>
+                      <option value="vscode-codex">VS Code Codex</option>
                       <option value="t3code">T3 Code</option>
                       <option value="opencode">OpenCode</option>
                     </select>
@@ -420,7 +421,8 @@
                     <label class="field">
                       <span>Outil</span>
                       <select id="config-environment">
-                        <option value="codex">Codex</option>
+                        <option value="codex">Codex app</option>
+                        <option value="vscode-codex">VS Code Codex</option>
                         <option value="t3code">T3 Code</option>
                         <option value="opencode">OpenCode</option>
                       </select>
@@ -444,6 +446,27 @@
                   <div id="config-detail-list" class="summary-block"></div>
                 </section>
               </div>
+
+              <section id="codex-launcher-card" class="stack-card codex-launcher-card">
+                <div class="mini-section-head">
+                  <h3>Lanceur Codex app Azure</h3>
+                  <p>Ne passez pas par le sélecteur visuel de modèles de Codex app. Choisissez ici le bon déploiement Azure, AIPilot réécrit le config.toml puis relance Codex app proprement.</p>
+                </div>
+                <div class="codex-launcher-grid">
+                  <label class="field">
+                    <span>Modèle Azure</span>
+                    <select id="codex-model-select"></select>
+                  </label>
+                </div>
+                <div class="launcher-note">
+                  <strong>Ce que fait AIPilot</strong>
+                  <p>Le manager met à jour <code>~/.codex/config.toml</code>, garde Azure comme provider, ferme Codex app si besoin, puis la relance avec le bon déploiement.</p>
+                </div>
+                <div class="view-actions">
+                  <button id="codex-apply-launch" class="small-primary-button" type="button" disabled>Appliquer et lancer Codex app</button>
+                  <button id="codex-open-config" class="small-secondary-button" type="button" disabled>Ouvrir config.toml</button>
+                </div>
+              </section>
             </article>
           </section>
 
@@ -568,7 +591,8 @@
                   <label class="field">
                     <span>Outil IA préféré</span>
                     <select id="settings-preferred-tool">
-                      <option value="codex">Codex</option>
+                      <option value="codex">Codex app</option>
+                      <option value="vscode-codex">VS Code Codex</option>
                       <option value="t3code">T3 Code</option>
                       <option value="opencode">OpenCode</option>
                     </select>
@@ -613,10 +637,10 @@
           <div class="tool-selector-card">
             <div class="tool-selector-left">
               <span class="tool-selector-icon">
-                <img id="tool-icon" src="./assets/tool-codex.png" alt="Icône Codex" />
+                <img id="tool-icon" src="./assets/tool-codex.png" alt="Icône Codex app" />
               </span>
               <div class="tool-selector-copy">
-                <strong id="tool-label">Codex</strong>
+                <strong id="tool-label">Codex app</strong>
                 <span>Sélectionnez l’outil à préparer et lancer</span>
               </div>
             </div>
@@ -627,11 +651,19 @@
           <label class="tool-select-block">
             <span>Choisir l’outil</span>
             <select id="dock-tool-select" class="tool-select-input">
-              <option value="codex">Codex</option>
+              <option value="codex">Codex app</option>
+              <option value="vscode-codex">VS Code Codex</option>
               <option value="t3code">T3 Code</option>
               <option value="opencode">OpenCode</option>
             </select>
           </label>
+
+          <div id="dock-codex-controls" class="dock-codex-controls">
+            <label class="tool-select-block">
+              <span>Modèle Azure</span>
+              <select id="dock-model-select" class="tool-select-input"></select>
+            </label>
+          </div>
 
           <button id="dock-launch" class="launch-primary-button" type="button" disabled>
             <span class="icon-wrap icon-17">
@@ -639,7 +671,7 @@
                 <path d="m8 5 11 7-11 7z" />
               </svg>
             </span>
-            <span id="launch-label">Lancer Codex</span>
+            <span id="launch-label">Lancer Codex app</span>
           </button>
 
           <button id="dock-install" class="right-link-button" type="button" disabled>

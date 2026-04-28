@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { getSql } from "./db";
 
-export type AccessRequestEnvironment = "codex" | "t3code" | "opencode";
+export type AccessRequestEnvironment = "codex" | "vscode-codex" | "t3code" | "opencode";
 export type AccessRequestOs = "windows" | "linux" | "macos";
 export type AccessRequestStatus = "pending" | "accepted";
 

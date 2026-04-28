@@ -1,7 +1,7 @@
 import { getStoredConfig } from "@/lib/config-store";
 import { findLicenseByKey } from "@/lib/license-store";
 
-type EnvironmentKey = "codex" | "t3code" | "opencode";
+type EnvironmentKey = "codex" | "vscode-codex" | "t3code" | "opencode";
 
 type ToolDetails = {
   label: string;
@@ -9,6 +9,7 @@ type ToolDetails = {
   notes: string[];
   officialAppUrl?: string;
   officialCliUrl?: string;
+  officialIdeUrl?: string;
 };
 
 type TutorialLink = {
@@ -26,7 +27,12 @@ type AvailableDeployment = {
 const DEFAULT_SUPPORT_VIDEO_URL = "https://youtu.be/WwDvzdM9YWw";
 
 function normalizeEnvironment(value: unknown): EnvironmentKey | undefined {
-  if (value === "codex" || value === "t3code" || value === "opencode") {
+  if (
+    value === "codex" ||
+    value === "vscode-codex" ||
+    value === "t3code" ||
+    value === "opencode"
+  ) {
     return value;
   }
 
@@ -40,10 +46,8 @@ function buildAzureBaseUrl(resourceName: string) {
 function buildCodexConfig(
   resourceName: string,
   deployment: string,
-  availableDeployments: AvailableDeployment[],
 ) {
   const baseUrl = buildAzureBaseUrl(resourceName);
-  const gpt55 = availableDeployments.find((item) => item.id === "gpt-5.5");
 
   return `model = "${deployment}"
 model_provider = "azure"
@@ -51,7 +55,7 @@ model_reasoning_effort = "medium"
 profile = "azure-medium"
 
 [model_providers.azure]
-name = "Azure Openai"
+name = "AIPilot AI"
 base_url = "${baseUrl}"
 env_key = "AZURE_OPENAI_API_KEY"
 wire_api = "responses"
@@ -60,9 +64,6 @@ wire_api = "responses"
 model_provider = "azure"
 model = "${deployment}"
 model_reasoning_effort = "medium"
-
-[profiles.azure-medium.windows]
-sandbox = "elevated"
 
 [profiles.azure-high]
 model_provider = "azure"
@@ -73,29 +74,6 @@ model_reasoning_effort = "high"
 model_provider = "azure"
 model = "${deployment}"
 model_reasoning_effort = "xhigh"
-
-${
-  gpt55
-    ? `[profiles.azure-55-medium]
-model_provider = "azure"
-model = "${gpt55.deployment}"
-model_reasoning_effort = "medium"
-
-[profiles.azure-55-high]
-model_provider = "azure"
-model = "${gpt55.deployment}"
-model_reasoning_effort = "high"
-
-[profiles.azure-55-xhigh]
-model_provider = "azure"
-model = "${gpt55.deployment}"
-model_reasoning_effort = "xhigh"
-
-`
-    : ""
-}
-[windows]
-sandbox = "elevated"
 `;
 }
 
@@ -236,6 +214,13 @@ function buildManagerTutorials(config: Awaited<ReturnType<typeof getStoredConfig
     });
   }
 
+  if (tool.officialIdeUrl) {
+    tutorials.push({
+      label: `Codex dans VS Code`,
+      url: tool.officialIdeUrl,
+    });
+  }
+
   tutorials.push({
     label: "Portail AIPilot",
     url: "https://ai-pilot-ten.vercel.app",
@@ -247,15 +232,34 @@ function buildManagerTutorials(config: Awaited<ReturnType<typeof getStoredConfig
 function buildToolDetails(environment: EnvironmentKey): ToolDetails {
   if (environment === "codex") {
     return {
-      label: "Codex",
+      label: "Codex app",
       projectRootRecommended: false,
       notes: [
         "Installez d'abord l'app desktop Codex officielle. Ensuite AIPilot vérifie sa présence, répare Codex CLI, écrit ~/.codex/config.toml et injecte la configuration Azure.",
         "Si vous voyez `404 The API deployment for this resource does not exist`, vérifiez dans l'admin AIPilot que le champ de déploiement contient le nom exact du déploiement Azure AI Foundry, pas juste un nom de modèle supposé.",
+        "Le changement de modèle se fait ici dans AIPilot Manager: le bon déploiement Azure est écrit dans ~/.codex/config.toml, puis Codex app est relancée.",
+        "Pour Codex dans VS Code, installez l'extension officielle, vérifiez ~/.codex/auth.json, puis ouvrez votre projet avec `code .`.",
         "Sur Windows, un terminal WSL2 reste recommandé si l'utilisateur veut un workflow CLI plus stable.",
       ],
       officialAppUrl: "https://developers.openai.com/codex/app",
       officialCliUrl: "https://github.com/openai/codex/releases",
+      officialIdeUrl: "https://developers.openai.com/codex/ide/features",
+    };
+  }
+
+  if (environment === "vscode-codex") {
+    return {
+      label: "VS Code Codex",
+      projectRootRecommended: true,
+      notes: [
+        "AIPilot prépare Codex CLI, écrit ~/.codex/config.toml, crée ~/.codex/auth.json pour Azure API Key, puis ouvre Visual Studio Code sur votre dossier projet.",
+        "L’extension officielle Codex dans VS Code est installée ou réparée automatiquement si la commande `code` est disponible sur cette machine.",
+        "Le modèle Azure actif est piloté par AIPilot Manager: GPT-5.4 reste le défaut, et GPT-5.5 peut être appliqué avant l’ouverture de VS Code.",
+        "Si VS Code n’est pas encore installé, téléchargez-le d’abord depuis le site officiel puis relancez AIPilot Manager.",
+      ],
+      officialAppUrl: "https://code.visualstudio.com/download",
+      officialCliUrl: "https://github.com/openai/codex/releases",
+      officialIdeUrl: "https://developers.openai.com/codex/ide/features",
     };
   }
 
@@ -266,10 +270,12 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       notes: [
         "Installez d'abord l'app desktop T3 Code officielle depuis t3.codes. Ensuite AIPilot vérifie sa présence, prépare Codex CLI comme prérequis et injecte la configuration Azure.",
         "Si T3 Code affiche `404 The API deployment for this resource does not exist`, le problème vient presque toujours du nom de déploiement Azure configuré dans AIPilot admin.",
+        "Si vous utilisez aussi Codex dans VS Code, gardez la même config ~/.codex/config.toml et le même auth.json côté utilisateur.",
         "Si le binaire T3 local n'est pas disponible, le manager peut lancer le fallback officiel via npx.",
       ],
       officialAppUrl: "https://t3.codes/",
       officialCliUrl: "https://github.com/openai/codex/releases",
+      officialIdeUrl: "https://developers.openai.com/codex/ide/features",
     };
   }
 
@@ -342,6 +348,7 @@ export async function POST(request: Request) {
       notes: tool.notes,
       officialAppUrl: tool.officialAppUrl ?? "",
       officialCliUrl: tool.officialCliUrl ?? "",
+      officialIdeUrl: tool.officialIdeUrl ?? "",
     },
     azure: {
       apiKey: effectiveApiKey,
@@ -351,7 +358,7 @@ export async function POST(request: Request) {
       availableDeployments,
       codex: {
         baseUrl: buildAzureBaseUrl(resourceName),
-        configToml: buildCodexConfig(resourceName, deployment, availableDeployments),
+        configToml: buildCodexConfig(resourceName, deployment),
       },
       opencode: {
         config: buildOpenCodeConfig(resourceName, deployment, availableDeployments),

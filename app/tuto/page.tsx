@@ -1,10 +1,10 @@
-const codexConfig = `model = "gpt-5.4-1"
+const codexConfig54 = `model = "gpt-5.4-1"
 model_provider = "azure"
 model_reasoning_effort = "medium"
 profile = "azure-medium"
 
 [model_providers.azure]
-name = "Azure Openai"
+name = "AIPilot AI"
 base_url = "https://admin-3342-resource.openai.azure.com/openai/v1"
 env_key = "AZURE_OPENAI_API_KEY"
 wire_api = "responses"
@@ -13,9 +13,6 @@ wire_api = "responses"
 model_provider = "azure"
 model = "gpt-5.4-1"
 model_reasoning_effort = "medium"
-
-[profiles.azure-medium.windows]
-sandbox = "elevated"
 
 [profiles.azure-high]
 model_provider = "azure"
@@ -26,9 +23,39 @@ model_reasoning_effort = "high"
 model_provider = "azure"
 model = "gpt-5.4-1"
 model_reasoning_effort = "xhigh"
+`;
 
-[windows]
-sandbox = "elevated"`;
+const codexConfig55 = `model = "gpt-5.5-1"
+model_provider = "azure"
+model_reasoning_effort = "medium"
+profile = "azure-medium"
+
+[model_providers.azure]
+name = "AIPilot AI"
+base_url = "https://admin-3342-resource.openai.azure.com/openai/v1"
+env_key = "AZURE_OPENAI_API_KEY"
+wire_api = "responses"
+
+[profiles.azure-medium]
+model_provider = "azure"
+model = "gpt-5.5-1"
+model_reasoning_effort = "medium"
+
+[profiles.azure-high]
+model_provider = "azure"
+model = "gpt-5.5-1"
+model_reasoning_effort = "high"
+
+[profiles.azure-xhigh]
+model_provider = "azure"
+model = "gpt-5.5-1"
+model_reasoning_effort = "xhigh"
+`;
+
+const codexVsCodeAuth = `{
+  "auth_mode": "apikey",
+  "AZURE_OPENAI_API_KEY": "VOTRE_CLE_AZURE"
+}`;
 
 const opencodeConfig = `{
   "$schema": "https://opencode.ai/config.json",
@@ -70,7 +97,7 @@ export default function TutoPage() {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <FactCard title="Vidéo pas à pas" text="Regardez d’abord la vidéo de démarrage AIPilot pour le parcours visuel complet." />
-            <FactCard title="Codex & T3 Code" text="Reposent sur la configuration Codex Azure et sur la variable AZURE_OPENAI_API_KEY." />
+            <FactCard title="Codex app & T3 Code" text="Reposent sur le même ~/.codex/config.toml et la variable AZURE_OPENAI_API_KEY." />
             <FactCard title="OpenCode" text="Utilise sa propre configuration JSON et un fichier d’authentification Azure séparé." />
             <FactCard title="Point critique" text="Toujours utiliser openai.azure.com et le nom exact du déploiement Azure." />
           </div>
@@ -92,6 +119,7 @@ export default function TutoPage() {
             <div className="space-y-3 text-sm">
               <LinkRow href="https://youtu.be/WwDvzdM9YWw" label="Vidéo officielle AIPilot pas à pas" />
               <LinkRow href="https://developers.openai.com/codex/app" label="Télécharger Codex" />
+              <LinkRow href="https://developers.openai.com/codex/ide/features" label="Codex dans VS Code" />
               <LinkRow href="https://t3.codes/" label="Télécharger T3 Code" />
               <LinkRow href="https://opencode.ai/install" label="Installer OpenCode CLI" />
             </div>
@@ -101,33 +129,44 @@ export default function TutoPage() {
         <section className="grid gap-6 xl:grid-cols-2">
           <Panel title="Codex" eyebrow="Configuration manuelle">
             <p className="text-sm leading-7 text-slate-700">
-              Codex a besoin de l’application desktop officielle, du CLI Codex, puis de la configuration Azure dans <InlineCode>~/.codex/config.toml</InlineCode>.
+              Codex app a besoin de l’application desktop officielle, du CLI Codex, puis de la configuration Azure dans <InlineCode>~/.codex/config.toml</InlineCode>.
             </p>
             <Checklist
               items={[
                 "Installez l’app Codex officielle.",
                 "Installez le CLI avec npm: npm install -g @openai/codex@latest.",
                 "Définissez AZURE_OPENAI_API_KEY au niveau utilisateur, et si possible aussi au niveau machine sur Windows.",
-                "Écrivez la configuration TOML ci-dessous.",
-                "Ouvrez Codex, cliquez sur Enter API key, puis revenez dans AIPilot Manager pour Connecter et Installer.",
+                "Choisissez GPT-5.4 ou GPT-5.5 depuis AIPilot Manager, qui réécrit ensuite exactement le config.toml.",
+                "Écrivez ou vérifiez ensuite la configuration TOML ci-dessous.",
+                "Ouvrez Codex app, cliquez sur Enter API key, puis revenez dans AIPilot Manager pour Connecter et Installer.",
               ]}
             />
-            <Subhead>Configuration Codex validée</Subhead>
-            <CodeBlock>{codexConfig}</CodeBlock>
+            <Subhead>Configuration Codex app validée — GPT-5.4</Subhead>
+            <CodeBlock>{codexConfig54}</CodeBlock>
+            <Subhead>Configuration Codex app validée — GPT-5.5</Subhead>
+            <CodeBlock>{codexConfig55}</CodeBlock>
             <Subhead>Windows PowerShell</Subhead>
             <CodeBlock>{`[Environment]::SetEnvironmentVariable("AZURE_OPENAI_API_KEY", "VOTRE_CLE_AZURE", "User")`}</CodeBlock>
+            <Subhead>VS Code</Subhead>
+            <Checklist
+              items={[
+                "Installez l’extension officielle Codex dans VS Code.",
+                "L’extension réutilise la même configuration ~/.codex/config.toml que Codex CLI.",
+                "Gardez gpt-5.4-1 comme modèle par défaut dans config.toml, puis laissez AIPilot Manager passer à gpt-5.5-1 quand vous le souhaitez.",
+              ]}
+            />
           </Panel>
 
           <Panel title="T3 Code" eyebrow="Configuration manuelle">
             <p className="text-sm leading-7 text-slate-700">
-              T3 Code utilise le provider Codex. Donc la partie Azure passe d’abord par la même configuration Codex que ci-dessus, puis T3 Code doit voir le bon modèle Azure.
+              T3 Code utilise le provider Codex. Donc la partie Azure passe d’abord par la même configuration Codex que ci-dessus, puis T3 Code doit relancer le bon déploiement Azure via le même <InlineCode>~/.codex/config.toml</InlineCode>.
             </p>
             <Checklist
               items={[
                 "Installez T3 Code depuis t3.codes.",
                 "Assurez-vous que Codex CLI fonctionne localement avec npm.",
                 "Gardez la même variable AZURE_OPENAI_API_KEY et le même ~/.codex/config.toml.",
-                "Dans T3 Code, choisissez le modèle Azure ajouté par AIPilot, par exemple gpt-5.4-1 ou gpt-5.5-1.",
+                "Dans T3 Code, laissez AIPilot Manager appliquer gpt-5.4-1 ou gpt-5.5-1 avant le lancement.",
                 "Si T3 plante au démarrage du provider Codex, revenez dans AIPilot Manager puis cliquez sur Réparer pour réécrire codexBinaryPath et la config T3.",
               ]}
             />
@@ -136,6 +175,37 @@ export default function TutoPage() {
               <li>Le déploiement Azure doit exister réellement dans Azure AI Foundry.</li>
               <li>Le nom du déploiement doit être exact: <InlineCode>gpt-5.4-1</InlineCode> ou <InlineCode>gpt-5.5-1</InlineCode>.</li>
               <li>Le provider doit bien utiliser <InlineCode>https://admin-3342-resource.openai.azure.com/openai/v1</InlineCode>.</li>
+            </ul>
+          </Panel>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-2">
+          <Panel title="Codex dans VS Code" eyebrow="Extension officielle">
+            <p className="text-sm leading-7 text-slate-700">
+              Codex dans VS Code réutilise le même <InlineCode>~/.codex/config.toml</InlineCode>, mais demande aussi une extension officielle et un <InlineCode>~/.codex/auth.json</InlineCode> utilisateur.
+            </p>
+            <Checklist
+              items={[
+                "Installez l’extension officielle Codex dans VS Code.",
+                "Créez ~/.codex/auth.json avec auth_mode=apikey et votre clé Azure.",
+                "Gardez le même ~/.codex/config.toml que Codex app.",
+                "Ouvrez votre projet depuis PowerShell avec code .",
+                "Dans la sidebar Codex, choisissez API Key si une demande de connexion apparaît.",
+              ]}
+            />
+            <Subhead>auth.json validé</Subhead>
+            <CodeBlock>{codexVsCodeAuth}</CodeBlock>
+            <Subhead>Lancement depuis PowerShell</Subhead>
+            <CodeBlock>{`code .`}</CodeBlock>
+          </Panel>
+
+          <Panel title="Vérifier Codex VS Code" eyebrow="Contrôles">
+            <ul className="space-y-3 text-sm leading-7 text-slate-700">
+              <li>VS Code doit être installé et idéalement accessible via la commande <InlineCode>code</InlineCode>.</li>
+              <li>L’extension officielle Codex doit être présente dans vos extensions VS Code.</li>
+              <li>Le fichier <InlineCode>~/.codex/auth.json</InlineCode> doit exister avec <InlineCode>auth_mode = apikey</InlineCode>.</li>
+              <li>Le fichier <InlineCode>~/.codex/config.toml</InlineCode> doit rester aligné avec le déploiement Azure choisi par AIPilot.</li>
+              <li>Si l’extension ne démarre pas, revenez dans AIPilot Manager puis utilisez <InlineCode>Vérifier maintenant</InlineCode> et <InlineCode>Réparer</InlineCode>.</li>
             </ul>
           </Panel>
         </section>
@@ -164,6 +234,7 @@ export default function TutoPage() {
               <li>Le site Azure doit être <InlineCode>openai.azure.com</InlineCode>, jamais <InlineCode>services.ai.azure.com</InlineCode>.</li>
               <li>Le modèle par défaut AIPilot est <InlineCode>gpt-5.4-1</InlineCode>.</li>
               <li>Le second déploiement disponible peut être <InlineCode>gpt-5.5-1</InlineCode>.</li>
+              <li>Codex app, T3 Code, et l’extension Codex VS Code doivent tous partager le même <InlineCode>~/.codex/config.toml</InlineCode>.</li>
               <li>La clé API Azure doit être valide et active.</li>
               <li>Sur Windows, redémarrer le PC après modification des variables reste recommandé.</li>
               <li>Si un outil semble prêt mais ne répond pas, ouvrez AIPilot Manager et utilisez <InlineCode>Vérifier maintenant</InlineCode> puis <InlineCode>Réparer</InlineCode>.</li>

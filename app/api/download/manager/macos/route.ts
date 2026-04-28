@@ -18,7 +18,9 @@ const FILES = [
 ];
 
 function readEnvironment(value: string | null) {
-  return value === "codex" || value === "t3code" ? value : "opencode";
+  return value === "codex" || value === "vscode-codex" || value === "t3code"
+    ? value
+    : "opencode";
 }
 
 function readLicenseKey(value: string | null) {

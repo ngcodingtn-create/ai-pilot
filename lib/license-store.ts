@@ -5,7 +5,7 @@ import { getSql } from "./db";
 import { decryptString, encryptString } from "./crypto";
 
 export type LicenseTier = "starter" | "pro" | "max";
-export type LicenseEnvironment = "codex" | "t3code" | "opencode";
+export type LicenseEnvironment = "codex" | "vscode-codex" | "t3code" | "opencode";
 export type LicenseStatus = "active" | "disabled";
 
 export type LicenseRecord = {

@@ -492,6 +492,14 @@ function getCodexConfigPath() {
   return path.join(getCodexHome(), "config.toml");
 }
 
+function getCodexLauncherSelectionPath() {
+  return path.join(getCodexHome(), "aipilot-launcher.json");
+}
+
+function getCodexAuthPath() {
+  return path.join(getCodexHome(), "auth.json");
+}
+
 function getOpenCodeGlobalConfigPath() {
   return path.join(os.homedir(), ".config", "opencode", "opencode.json");
 }
@@ -520,6 +528,50 @@ function getT3ClientSettingsPath() {
   return path.join(getT3Home(), "userdata", "client-settings.json");
 }
 
+function getVsCodeExtensionsRoots() {
+  return [
+    path.join(os.homedir(), ".vscode", "extensions"),
+    path.join(os.homedir(), ".vscode-insiders", "extensions"),
+  ];
+}
+
+async function hasCodexVsCodeExtensionInstalled() {
+  for (const root of getVsCodeExtensionsRoots()) {
+    try {
+      const entries = await fs.readdir(root, { withFileTypes: true });
+      if (
+        entries.some(
+          (entry) =>
+            entry.isDirectory() &&
+            entry.name.toLowerCase().startsWith("openai.chatgpt-"),
+        )
+      ) {
+        return true;
+      }
+    } catch {
+      // Ignore missing directories.
+    }
+  }
+
+  return false;
+}
+
+async function isVisualStudioCodeInstalled() {
+  if (await commandExists("code")) {
+    return true;
+  }
+
+  if (process.platform === "win32") {
+    return Boolean(await findWindowsStartApp(["Visual Studio Code", "VS Code"]));
+  }
+
+  if (process.platform === "darwin") {
+    return macApplicationExists(["Visual Studio Code"]);
+  }
+
+  return false;
+}
+
 function getSetupGuidance(manifest, projectRoot) {
   if (manifest.tool.environment === "opencode") {
     return {
@@ -537,7 +589,24 @@ function getSetupGuidance(manifest, projectRoot) {
     };
   }
 
-  const toolLabel = manifest.tool.environment === "t3code" ? "T3 Code" : "Codex";
+  if (manifest.tool.environment === "vscode-codex") {
+    return {
+      primaryConfigPath: getCodexConfigPath(),
+      configDirectoryPath: getCodexHome(),
+      prompt:
+        "AIPilot a préparé Codex pour VS Code. Ouvrez votre projet dans Visual Studio Code pour commencer.",
+      nextSteps: [
+        "Le fichier ~/.codex/config.toml contient déjà l'endpoint Azure AIPilot et le déploiement sélectionné.",
+        "Le fichier ~/.codex/auth.json est créé avec le mode API key pour que l'extension Codex lise la clé Azure directement.",
+        projectRoot
+          ? `VS Code sera ouvert directement sur ${projectRoot}.`
+          : "Choisissez un dossier projet pour ouvrir VS Code directement sur le bon workspace.",
+        "Si l’extension Codex ou auth.json changent, cliquez sur Réparer pour tout resynchroniser.",
+      ],
+    };
+  }
+
+  const toolLabel = manifest.tool.environment === "t3code" ? "T3 Code" : "Codex app";
   const primaryConfigPath =
     manifest.tool.environment === "t3code" ? getT3SettingsPath() : getCodexConfigPath();
   const configDirectoryPath =
@@ -549,14 +618,93 @@ function getSetupGuidance(manifest, projectRoot) {
     configDirectoryPath,
     prompt: `La configuration Codex a déjà été écrite par AIPilot. Ouvrez ${toolLabel} ou Codex CLI pour commencer.`,
     nextSteps: [
-      "Le fichier ~/.codex/config.toml contient déjà l'endpoint Azure AIPilot et le déploiement configuré.",
+      "Le fichier ~/.codex/config.toml contient déjà l'endpoint Azure AIPilot et le déploiement sélectionné.",
       manifest.tool.environment === "t3code"
         ? "AIPilot enregistre aussi le déploiement Azure dans ~/.t3/userdata/settings.json et le place dans les favoris pour qu'il ressorte automatiquement dans T3 Code."
-        : "Le modèle Azure est prêt côté Codex.",
+        : "Le modèle Azure est prêt côté Codex app et côté extension VS Code Codex.",
       "Si l'app desktop n'est pas encore installée sur Windows, vous pouvez lancer Codex CLI tout de suite ou ouvrir la page officielle de téléchargement.",
       "Si vous changez de licence ou de machine, cliquez sur Réparer pour réinjecter la configuration.",
     ],
   };
+}
+
+function applyCodexSelectionToConfigToml(configToml, model, _effort) {
+  let next = String(configToml || "");
+
+  if (model) {
+    next = next.replace(/^model = ".*?"$/gm, `model = "${model}"`);
+  }
+
+  return next;
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function applyRuntimeSelectionToManifest(manifest, selectedModel) {
+  const next = cloneJson(manifest);
+  const deployments = Array.isArray(next?.azure?.availableDeployments)
+    ? next.azure.availableDeployments
+    : [];
+  const matchedDeployment = deployments.find(
+    (item) =>
+      String(item?.deployment || "").trim() === String(selectedModel || "").trim(),
+  );
+
+  if (matchedDeployment) {
+    next.azure.deployment = matchedDeployment.deployment;
+    next.azure.selectedModelLabel = matchedDeployment.label;
+  }
+
+  const model = matchedDeployment?.deployment || next?.azure?.deployment;
+  const effort = "medium";
+
+  if (next?.azure?.codex?.configToml) {
+    next.azure.codex.configToml = applyCodexSelectionToConfigToml(
+      next.azure.codex.configToml,
+      model,
+      effort,
+    );
+  }
+
+  next.azure.activeReasoningEffort = effort;
+  return next;
+}
+
+async function saveCodexLauncherSelection(model) {
+  const payload = {
+    model: String(model || "").trim(),
+    updatedAt: new Date().toISOString(),
+  };
+  await writeFileWithDirs(
+    getCodexLauncherSelectionPath(),
+    `${JSON.stringify(payload, null, 2)}\n`,
+  );
+}
+
+async function closeDesktopProcessesForEnvironment(environment, logs) {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const byEnvironment = {
+    codex: ["Codex.exe"],
+    "vscode-codex": ["Code.exe"],
+    t3code: ["t3code.exe", "T3 Code.exe"],
+    opencode: ["OpenCode.exe"],
+  };
+
+  for (const processName of byEnvironment[environment] || []) {
+    try {
+      logs.push(`Fermeture éventuelle de ${processName} avant relance...`);
+      await runCommand("taskkill", ["/IM", processName, "/F"], {
+        timeoutMs: 15000,
+      });
+    } catch {
+      // Ignore if the process was not running.
+    }
+  }
 }
 
 function stringifyCommand(parts) {
@@ -931,6 +1079,9 @@ async function isDesktopAppInstalled(environment) {
     if (environment === "codex") {
       return Boolean(await findWindowsStartApp(["Codex"]));
     }
+    if (environment === "vscode-codex") {
+      return Boolean(await findWindowsStartApp(["Visual Studio Code", "VS Code"])) || (await commandExists("code"));
+    }
     if (environment === "t3code") {
       return Boolean(await findWindowsStartApp(["T3 Code"]));
     }
@@ -940,6 +1091,9 @@ async function isDesktopAppInstalled(environment) {
   if (process.platform === "darwin") {
     if (environment === "codex") {
       return macApplicationExists(["Codex"]);
+    }
+    if (environment === "vscode-codex") {
+      return macApplicationExists(["Visual Studio Code"]) || (await commandExists("code"));
     }
     if (environment === "t3code") {
       return macApplicationExists(["T3 Code"]);
@@ -951,7 +1105,7 @@ async function isDesktopAppInstalled(environment) {
 }
 
 function requiresDesktopApp(environment) {
-  return environment === "codex" || environment === "t3code";
+  return environment === "codex" || environment === "vscode-codex" || environment === "t3code";
 }
 
 async function getInstallReadiness(environment) {
@@ -1170,8 +1324,17 @@ function buildOpenCodeRuntimeConfig(manifest) {
 
 async function configureCodex(manifest, logs) {
   const configPath = getCodexConfigPath();
+  const resolvedConfigToml = String(manifest?.azure?.codex?.configToml ?? "");
+  const selectedModel = manifest?.azure?.deployment;
   logs.push(`Écriture de la configuration Codex dans ${configPath}`);
-  await writeFileWithDirs(configPath, manifest.azure.codex.configToml);
+  await writeFileWithDirs(configPath, resolvedConfigToml);
+  await normalizeCodexConfigToml(
+    manifest,
+    logs,
+    "Synchronisation du config.toml minimal AIPilot pour Codex app.",
+  );
+  await saveCodexLauncherSelection(selectedModel);
+  logs.push(`Modèle actif AIPilot: ${selectedModel}.`);
 
   const availableDeploymentNames = Array.isArray(manifest.azure.availableDeployments)
     ? manifest.azure.availableDeployments
@@ -1284,30 +1447,100 @@ async function configureCodex(manifest, logs) {
   };
 }
 
-async function ensureCodexConfigPresent(manifest, logs) {
-  const configPath = getCodexConfigPath();
+function buildCodexVsCodeAuth(apiKey) {
+  return {
+    auth_mode: "apikey",
+    AZURE_OPENAI_API_KEY: apiKey,
+  };
+}
 
-  if (await fileExists(configPath)) {
-    logs.push(`Vérification finale: config Codex détectée dans ${configPath}.`);
-    return configPath;
+async function configureVsCodeCodex(manifest, logs) {
+  const configResult = await configureCodex(manifest, logs);
+  const authPath = getCodexAuthPath();
+  logs.push(`Écriture du fichier auth.json Codex VS Code dans ${authPath}`);
+  await writeFileWithDirs(
+    authPath,
+    `${JSON.stringify(buildCodexVsCodeAuth(manifest.azure.apiKey), null, 2)}\n`,
+  );
+
+  return configResult;
+}
+
+async function normalizeCodexConfigToml(manifest, logs, reason = "") {
+  if (manifest.tool.environment !== "codex" && manifest.tool.environment !== "vscode-codex") {
+    return "";
   }
 
-  logs.push(
-    `Vérification finale: config Codex introuvable dans ${configPath}. Nouvelle tentative d'écriture...`,
+  const minimalConfig = String(manifest?.azure?.codex?.configToml ?? "");
+  if (!minimalConfig) {
+    return "";
+  }
+
+  const configPath = getCodexConfigPath();
+  await writeFileWithDirs(configPath, minimalConfig);
+
+  if (reason) {
+    logs.push(reason);
+  }
+
+  return configPath;
+}
+
+async function enforceMinimalCodexConfigAfterLaunch(manifest, logs) {
+  if (manifest.tool.environment !== "codex" && manifest.tool.environment !== "vscode-codex") {
+    return;
+  }
+
+  const retryDelays = [1500, 4000, 8000, 12000];
+
+  for (const delayMs of retryDelays) {
+    setTimeout(async () => {
+      try {
+        await normalizeCodexConfigToml(
+          manifest,
+          logs,
+          `Réécriture du config.toml minimal AIPilot ${Math.round(delayMs / 1000)}s après ouverture de Codex app.`,
+        );
+      } catch (error) {
+        logs.push(
+          `Impossible de réécrire le config.toml minimal après ouverture de Codex app: ${
+            error instanceof Error ? error.message : "erreur inconnue"
+          }`,
+        );
+      }
+    }, delayMs);
+  }
+}
+
+async function ensureCodexConfigPresent(manifest, logs) {
+  const configPath = getCodexConfigPath();
+  const resolvedConfigToml = String(manifest?.azure?.codex?.configToml ?? "");
+
+  logs.push(`Vérification finale: alignement du config.toml Codex dans ${configPath}.`);
+  await writeFileWithDirs(configPath, resolvedConfigToml);
+  await normalizeCodexConfigToml(
+    manifest,
+    logs,
+    "Le config.toml Codex a été réécrit au format minimal AIPilot.",
   );
-  await writeFileWithDirs(configPath, manifest.azure.codex.configToml);
 
   if (await fileExists(configPath)) {
-    logs.push(`La configuration Codex a été recréée avec succès dans ${configPath}.`);
+    logs.push(`La configuration Codex est prête dans ${configPath}.`);
     return configPath;
   }
 
   const downloadLabel =
-    manifest.tool.environment === "t3code" ? "Codex puis T3 Code" : "Codex";
+    manifest.tool.environment === "t3code"
+      ? "Codex puis T3 Code"
+      : manifest.tool.environment === "vscode-codex"
+        ? "Visual Studio Code puis Codex"
+        : "Codex";
   const downloadUrl =
     manifest.tool.environment === "t3code"
       ? manifest.tool.officialAppUrl || "https://t3.codes/"
-      : manifest.tool.officialAppUrl || "https://developers.openai.com/codex/app/windows";
+      : manifest.tool.environment === "vscode-codex"
+        ? manifest.tool.officialAppUrl || "https://code.visualstudio.com/download"
+        : manifest.tool.officialAppUrl || "https://developers.openai.com/codex/app/windows";
 
   throw new Error(
     `Le fichier ~/.codex/config.toml reste introuvable après réparation. Téléchargez d'abord ${downloadLabel} depuis ${downloadUrl}, ouvrez l'app une première fois, puis relancez AIPilot Manager.`,
@@ -1467,6 +1700,39 @@ async function installT3Code(logs) {
   );
 }
 
+async function installVsCodeCodex(logs) {
+  logs.push("Préparation de VS Code Codex...");
+  await installCodex(logs);
+
+  const vscodeInstalled = await isVisualStudioCodeInstalled();
+  ensureCommandOrThrow(
+    vscodeInstalled,
+    "Installez d'abord Visual Studio Code depuis https://code.visualstudio.com/download, puis relancez AIPilot Manager.",
+  );
+
+  if (await commandExists("code")) {
+    try {
+      logs.push("Installation ou mise à jour de l'extension officielle Codex dans VS Code...");
+      await runCommand("code", ["--install-extension", "openai.chatgpt", "--force"], {
+        cwd: os.homedir(),
+        timeoutMs: 180000,
+        timeoutMessage:
+          "L'installation de l'extension Codex dans VS Code prend trop de temps. Ouvrez VS Code puis installez l'extension manuellement si besoin.",
+      });
+    } catch (error) {
+      logs.push(
+        `Impossible de finaliser automatiquement l'extension Codex dans VS Code. Vous pourrez l'installer depuis le marketplace si besoin: ${
+          error instanceof Error ? error.message : "erreur inconnue"
+        }`,
+      );
+    }
+  } else {
+    logs.push(
+      "La commande `code` n'est pas disponible. VS Code est détecté, mais l'extension Codex devra peut-être être installée manuellement depuis le marketplace.",
+    );
+  }
+}
+
 async function installOpenCode(logs) {
   logs.push("Préparation de l'installation OpenCode...");
   await ensureNodeRuntime(logs);
@@ -1489,8 +1755,17 @@ async function installTool(manifest, logs) {
     requiresDesktopApp(manifest.tool.environment) &&
     !(await isDesktopAppInstalled(manifest.tool.environment))
   ) {
-    const appLabel = manifest.tool.environment === "t3code" ? "T3 Code" : "Codex";
-    const downloadUrl = manifest.tool.officialAppUrl || "https://developers.openai.com/codex/app/windows";
+    const appLabel =
+      manifest.tool.environment === "t3code"
+        ? "T3 Code"
+        : manifest.tool.environment === "vscode-codex"
+          ? "Visual Studio Code"
+          : "Codex app";
+    const downloadUrl =
+      manifest.tool.officialAppUrl ||
+      (manifest.tool.environment === "vscode-codex"
+        ? "https://code.visualstudio.com/download"
+        : "https://developers.openai.com/codex/app/windows");
     logs.push(`${appLabel} n'est pas détecté sur cette machine.`);
     throw new Error(
       `Installez d'abord l'app ${appLabel} officielle depuis ${downloadUrl}, ouvrez-la une première fois, puis relancez AIPilot Manager pour réparer le CLI et la configuration.`,
@@ -1498,7 +1773,7 @@ async function installTool(manifest, logs) {
   }
 
   if (manifest.tool.environment === "codex") {
-    logs.push("Étape 1/2: installation des composants Codex...");
+    logs.push("Étape 1/2: installation des composants Codex app...");
     await installCodex(logs);
     return;
   }
@@ -1509,11 +1784,41 @@ async function installTool(manifest, logs) {
     return;
   }
 
+  if (manifest.tool.environment === "vscode-codex") {
+    logs.push("Étape 1/2: installation des composants VS Code Codex...");
+    await installVsCodeCodex(logs);
+    return;
+  }
+
   logs.push("Étape 1/2: installation des composants OpenCode...");
   await installOpenCode(logs);
 }
 
 async function tryLaunchDesktopApp(environment, logs) {
+  if (environment === "vscode-codex") {
+    if (await commandExists("code")) {
+      return false;
+    }
+
+    if (process.platform === "win32") {
+      const startApp = await findWindowsStartApp(["Visual Studio Code", "VS Code"]);
+      if (startApp?.AppID) {
+        logs.push("Ouverture de Visual Studio Code...");
+        await launchWindowsStartApp(startApp.AppID);
+        return true;
+      }
+    }
+
+    if (process.platform === "darwin") {
+      if (await launchMacApplication(["Visual Studio Code"])) {
+        logs.push("Ouverture de Visual Studio Code...");
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   if (process.platform === "win32") {
     const startApp =
       environment === "codex"
@@ -1556,6 +1861,14 @@ async function getLaunchCommand(environment) {
     return codexLaunchCommand;
   }
 
+  if (environment === "vscode-codex") {
+    ensureCommandOrThrow(
+      await commandExists("code"),
+      "Visual Studio Code est installé mais la commande `code` est introuvable. Activez-la depuis VS Code ou réinstallez l'application.",
+    );
+    return ["code"];
+  }
+
   if (environment === "t3code") {
     if (await commandExists("t3")) {
       return ["t3"];
@@ -1584,7 +1897,10 @@ async function buildDiagnostics(manifest, projectRoot) {
   const npxAvailable = await commandExists("npx");
   const opencodeAvailable = await commandExists("opencode");
   const desktopAppAvailable = await isDesktopAppInstalled(manifest.tool.environment);
+  const vscodeAvailable = await isVisualStudioCodeInstalled();
+  const codexVsCodeExtensionAvailable = await hasCodexVsCodeExtensionInstalled();
   const codexConfigPath = getCodexConfigPath();
+  const codexAuthPath = getCodexAuthPath();
   const t3SettingsPath = getT3SettingsPath();
   const openCodeGlobalConfigPath = getOpenCodeGlobalConfigPath();
   const openCodeAuthPath = getOpenCodeAuthPath();
@@ -1635,12 +1951,22 @@ async function buildDiagnostics(manifest, projectRoot) {
       },
     );
   } else {
+    const vscodeCodexMode = manifest.tool.environment === "vscode-codex";
     checks.push(
       {
-        label: manifest.tool.environment === "codex" ? "App Codex" : "App T3 Code",
+        label:
+          manifest.tool.environment === "codex"
+            ? "App Codex"
+            : manifest.tool.environment === "t3code"
+              ? "App T3 Code"
+              : "Visual Studio Code",
         ok: desktopAppAvailable,
         optional: false,
-        details: desktopAppAvailable ? "Installée" : "Installez l'app officielle avant de continuer",
+        details: desktopAppAvailable
+          ? "Installée"
+          : manifest.tool.environment === "vscode-codex"
+            ? "Installez Visual Studio Code avant de continuer"
+            : "Installez l'app officielle avant de continuer",
       },
       {
         label: "Commande Codex",
@@ -1653,6 +1979,32 @@ async function buildDiagnostics(manifest, projectRoot) {
         ok: await fileExists(codexConfigPath),
         optional: false,
         details: codexConfigPath,
+      },
+      {
+        label: "Visual Studio Code",
+        ok: vscodeAvailable,
+        optional: !vscodeCodexMode,
+        details: vscodeAvailable
+          ? "Disponible"
+          : vscodeCodexMode
+            ? "VS Code est requis pour cet outil"
+            : "Optionnel: installez VS Code pour utiliser Codex dans l’éditeur",
+      },
+      {
+        label: "Extension Codex VS Code",
+        ok: codexVsCodeExtensionAvailable,
+        optional: !vscodeCodexMode,
+        details: codexVsCodeExtensionAvailable
+          ? "Extension officielle détectée"
+          : vscodeCodexMode
+            ? "L’extension officielle Codex est requise"
+            : "Optionnel: installez l’extension officielle Codex dans VS Code",
+      },
+      {
+        label: "auth.json Codex VS Code",
+        ok: await fileExists(codexAuthPath),
+        optional: !vscodeCodexMode,
+        details: codexAuthPath,
       },
     );
 
@@ -1705,6 +2057,10 @@ async function configureTool(manifest, projectRoot, logs) {
     return configureOpenCode(manifest, projectRoot, logs);
   }
 
+  if (manifest.tool.environment === "vscode-codex") {
+    return configureVsCodeCodex(manifest, logs);
+  }
+
   return configureCodex(manifest, logs);
 }
 
@@ -1729,20 +2085,26 @@ async function promptRestartRecommendation(configurationResult) {
 
 async function launchTool(manifest, projectRoot, logs) {
   if (await tryLaunchDesktopApp(manifest.tool.environment, logs)) {
+    await enforceMinimalCodexConfigAfterLaunch(manifest, logs);
     return;
   }
 
   const launchCommand = await getLaunchCommand(manifest.tool.environment);
-  const [command, ...args] = launchCommand;
+  const args =
+    manifest.tool.environment === "vscode-codex"
+      ? [...launchCommand.slice(1), projectRoot || os.homedir()]
+      : launchCommand.slice(1);
+  const [command] = launchCommand;
   const cwd = projectRoot || os.homedir();
 
-  logs.push(`Lancement: ${stringifyCommand(launchCommand)}`);
+  logs.push(`Lancement: ${stringifyCommand([command, ...args])}`);
 
   if (process.platform === "win32") {
     const commandLine = stringifyCommand([command, ...args]);
     await runCommand("cmd.exe", ["/c", "start", "", "cmd.exe", "/k", commandLine], {
       cwd,
     });
+    await enforceMinimalCodexConfigAfterLaunch(manifest, logs);
     return;
   }
 
@@ -1752,6 +2114,7 @@ async function launchTool(manifest, projectRoot, logs) {
     stdio: "ignore",
   });
   child.unref();
+  await enforceMinimalCodexConfigAfterLaunch(manifest, logs);
 }
 
 async function executeManagerAction(action, payload, event) {
@@ -1765,7 +2128,10 @@ async function executeManagerAction(action, payload, event) {
       }
     },
   };
-  const manifest = payload.manifest;
+  const manifest = applyRuntimeSelectionToManifest(
+    payload.manifest,
+    payload.selectedModel,
+  );
   const projectRoot = payload.projectRoot || "";
 
   if (!manifest) {
@@ -1815,6 +2181,26 @@ async function executeManagerAction(action, payload, event) {
   }
 
   if (action === "launch") {
+    if (
+      manifest.tool.environment === "codex" ||
+      manifest.tool.environment === "vscode-codex" ||
+      manifest.tool.environment === "t3code"
+    ) {
+      logSink.push(
+        `Application du modèle ${manifest.azure.deployment} avec effort ${
+          manifest.azure.activeReasoningEffort || "medium"
+        } avant lancement...`,
+      );
+      if (manifest.tool.environment === "vscode-codex") {
+        await configureVsCodeCodex(manifest, logSink);
+      } else {
+        await configureCodex(manifest, logSink);
+      }
+      await ensureManagedConfiguration(manifest, projectRoot, logSink);
+      if (manifest.tool.environment !== "vscode-codex") {
+        await closeDesktopProcessesForEnvironment(manifest.tool.environment, logSink);
+      }
+    }
     logSink.push("Lancement de l'outil...");
     await launchTool(manifest, projectRoot, logSink);
     return {

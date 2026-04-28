@@ -11,7 +11,7 @@ export type HomeConfig = {
 };
 
 type OsKey = "windows" | "linux" | "macos";
-type EnvironmentKey = "codex" | "t3code" | "opencode";
+type EnvironmentKey = "codex" | "vscode-codex" | "t3code" | "opencode";
 type PersistedState = {
   currentStep?: number;
   licenseKey?: string;
@@ -54,7 +54,9 @@ const LICENSE_KEY_LENGTH = 16;
 const LICENSE_PATTERN = /^[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}$/;
 
 function getTotalStepsForEnvironment(environment: EnvironmentKey) {
-  return environment === "codex" ? CODEX_TOTAL_STEPS : DEFAULT_TOTAL_STEPS;
+  return environment === "codex" || environment === "vscode-codex"
+    ? CODEX_TOTAL_STEPS
+    : DEFAULT_TOTAL_STEPS;
 }
 
 export default function HomeClient({ config }: { config: HomeConfig }) {
@@ -128,6 +130,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         );
         setSelectedEnvironment(
           parsed.selectedEnvironment === "codex" ||
+            parsed.selectedEnvironment === "vscode-codex" ||
             parsed.selectedEnvironment === "t3code" ||
             parsed.selectedEnvironment === "opencode"
             ? parsed.selectedEnvironment
@@ -204,6 +207,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
         if (
           payload.preferredEnvironment === "codex" ||
+          payload.preferredEnvironment === "vscode-codex" ||
           payload.preferredEnvironment === "t3code" ||
           payload.preferredEnvironment === "opencode"
         ) {
@@ -382,7 +386,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
       <section
         className={`mt-6 grid gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${
-          selectedEnvironment === "codex"
+          selectedEnvironment === "codex" || selectedEnvironment === "vscode-codex"
             ? "grid-cols-2 xl:grid-cols-5"
             : "grid-cols-2 lg:grid-cols-4"
         }`}
@@ -391,7 +395,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         <StepperItem step="2" title="Licence" state={getStepState(visibleStep, 2)} />
         <StepperItem step="3" title="Environnement" state={getStepState(visibleStep, 3)} />
         <StepperItem step="4" title="Téléchargement" state={getStepState(visibleStep, 4)} />
-        {selectedEnvironment === "codex" ? (
+        {selectedEnvironment === "codex" || selectedEnvironment === "vscode-codex" ? (
           <StepperItem step="5" title="Tutoriel final" state={getStepState(visibleStep, 5)} />
         ) : null}
       </section>
@@ -816,6 +820,9 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           {visibleStep === 5 && selectedEnvironment === "codex" ? (
             <CodexFinalTutorial />
           ) : null}
+          {visibleStep === 5 && selectedEnvironment === "vscode-codex" ? (
+            <CodexVsCodeFinalTutorial />
+          ) : null}
         </div>
 
         <div className="border-t border-slate-200 bg-slate-50/80 p-5 sm:p-6">
@@ -900,11 +907,17 @@ function getWizardTitle(
   if (currentStep === 1) return "Choisissez votre système";
   if (currentStep === 2) return "Entrez votre clé de licence";
   if (currentStep === 3) return "Choisissez votre environnement de coding";
-  if (currentStep === 4 && selectedEnvironment === "codex") {
-    return `Téléchargez Codex pour ${selectedOsLabel}`;
+  if (
+    currentStep === 4 &&
+    (selectedEnvironment === "codex" || selectedEnvironment === "vscode-codex")
+  ) {
+    return `Téléchargez ${selectedEnvironmentLabel} pour ${selectedOsLabel}`;
   }
   if (currentStep === 5 && selectedEnvironment === "codex") {
     return "Étape finale Codex";
+  }
+  if (currentStep === 5 && selectedEnvironment === "vscode-codex") {
+    return "Étape finale VS Code Codex";
   }
   return `Téléchargez ${selectedEnvironmentLabel} pour ${selectedOsLabel}`;
 }
@@ -931,8 +944,16 @@ function getWizardDescription(
     return `Téléchargez ici AIPilot Manager pour ${selectedOsLabel}. Une fois le téléchargement terminé, l’étape suivante vous montrera exactement quoi faire dans Codex et dans le manager.`;
   }
 
+  if (currentStep === 4 && selectedEnvironment === "vscode-codex") {
+    return `Téléchargez ici AIPilot Manager pour ${selectedOsLabel}. L’étape suivante vous montrera comment ouvrir VS Code Codex, connecter la licence, puis laisser AIPilot réparer l’extension et la configuration Azure.`;
+  }
+
   if (currentStep === 5 && selectedEnvironment === "codex") {
     return "Suivez ce mini tutoriel final pour terminer l’installation proprement: ouvrir Codex, cliquer sur Enter API key, puis revenir dans AIPilot Manager pour connecter la licence et lancer l’installation.";
+  }
+
+  if (currentStep === 5 && selectedEnvironment === "vscode-codex") {
+    return "Suivez ce mini tutoriel final pour terminer l’installation proprement: ouvrir VS Code, laisser AIPilot connecter Codex, puis cliquer sur Installer et configurer pour réparer auth.json, config.toml et l’extension.";
   }
 
   return `Sur la base de ${selectedOsLabel} et ${selectedEnvironmentLabel}, vous récupérez ici un téléchargement prérempli qui ouvre AIPilot Manager avec votre licence et le bon outil.`;
@@ -948,12 +969,15 @@ function getNextLabel(
     return canAdvance ? "Suivant: environnement" : "Vérifiez la licence";
   }
   if (currentStep === 3) {
-    return selectedEnvironment === "codex"
-      ? "Suivant: téléchargement Codex"
+    return selectedEnvironment === "codex" || selectedEnvironment === "vscode-codex"
+      ? `Suivant: téléchargement ${selectedEnvironment === "codex" ? "Codex" : "VS Code Codex"}`
       : "Suivant: téléchargement";
   }
   if (currentStep === 4 && selectedEnvironment === "codex") {
     return "Suivant: étape finale Codex";
+  }
+  if (currentStep === 4 && selectedEnvironment === "vscode-codex") {
+    return "Suivant: étape finale VS Code Codex";
   }
   return "Recommencer";
 }
@@ -975,6 +999,10 @@ function getFooterMessage(
 
   if (currentStep === 5 && selectedEnvironment === "codex") {
     return "Une fois ce mini tutoriel terminé, ouvrez Codex puis laissez AIPilot Manager finir la configuration Azure pour vous.";
+  }
+
+  if (currentStep === 5 && selectedEnvironment === "vscode-codex") {
+    return "Une fois ce mini tutoriel terminé, ouvrez VS Code puis laissez AIPilot Manager finir la configuration Azure, l’extension Codex et auth.json pour vous.";
   }
 
   if (currentStep < totalSteps) {
@@ -1112,6 +1140,20 @@ function getEnvironmentOptions() {
       positioning: "Idéal pour celles et ceux qui veulent l'outil officiel et le workflow agentique le plus fort",
       compatibility: "Totalement aligné avec la vision AIPilot et la configuration Azure documentée dans le dossier",
       installState: "AIPilot Manager sait maintenant installer et configurer le parcours Codex CLI dans ce repo",
+    },
+    "vscode-codex": {
+      key: "vscode-codex" as const,
+      label: "VS Code Codex",
+      status: "available" as const,
+      statusLabel: "Disponible aujourd’hui",
+      description:
+        "Codex directement dans Visual Studio Code, avec l’extension officielle et la configuration Azure gérées par AIPilot.",
+      positioning:
+        "Idéal si vous voulez rester dans VS Code tout en gardant le moteur Codex relié à Azure OpenAI",
+      compatibility:
+        "AIPilot prépare Codex CLI, auth.json, config.toml et ouvre Visual Studio Code sur votre dossier projet",
+      installState:
+        "Le manager vérifie VS Code, répare l’extension Codex et ouvre l’éditeur avec votre configuration Azure",
     },
     t3code: {
       key: "t3code" as const,
@@ -1412,6 +1454,81 @@ function CodexFinalTutorial() {
             placeholderLabel="Ajoutez la capture AIPilot Manager"
             placeholderPath="public/tutorials/aipilot-manager-connect-install.png"
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CodexVsCodeFinalTutorial() {
+  return (
+    <div className="overflow-hidden rounded-[1.9rem] border border-indigo-200 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_38%),linear-gradient(180deg,#eef4ff_0%,#ffffff_100%)] shadow-[0_18px_50px_rgba(59,130,246,0.08)]">
+      <div className="border-b border-indigo-200/80 px-5 py-5 sm:px-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.16em] text-indigo-800">
+            ÉTAPE 5
+          </span>
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+            ÉTAPE FINALE VS CODE CODEX
+          </span>
+        </div>
+        <h3 className="mt-4 text-2xl font-bold text-slate-950 sm:text-3xl">
+          Après le téléchargement, laissez AIPilot préparer Codex dans Visual Studio Code
+        </h3>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700 sm:text-base">
+          Ouvrez Visual Studio Code, revenez dans <InlineCode>AIPilot Manager</InlineCode>, puis cliquez sur <InlineCode>Connecter ma licence</InlineCode> et <InlineCode>Installer et configurer</InlineCode>. AIPilot prépare alors Codex CLI, <InlineCode>auth.json</InlineCode>, <InlineCode>config.toml</InlineCode> et ouvre VS Code sur votre dossier projet.
+        </p>
+      </div>
+
+      <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <TutorialStepCard
+            step="1"
+            title="Téléchargez"
+            text="Téléchargez puis installez AIPilot Manager depuis l’étape précédente."
+          />
+          <TutorialStepCard
+            step="2"
+            title="Ouvrez VS Code"
+            text="Installez ou ouvrez Visual Studio Code sur votre machine."
+          />
+          <TutorialStepCard
+            step="3"
+            title="Extension Codex"
+            text="AIPilot pourra installer ou réparer l’extension officielle Codex pour vous."
+          />
+          <TutorialStepCard
+            step="4"
+            title="Connecter ma licence"
+            text="Revenez dans AIPilot Manager et cliquez sur Connecter ma licence."
+          />
+          <TutorialStepCard
+            step="5"
+            title="Installer et configurer"
+            text="Cliquez sur Installer et configurer. AIPilot prépare Codex pour VS Code et ouvre votre projet."
+          />
+        </div>
+
+        <div className="rounded-[1.5rem] border border-indigo-100 bg-white/95 p-5">
+          <ol className="space-y-2 text-sm leading-7 text-slate-700">
+            <li>1. Téléchargez AIPilot Manager puis terminez son installation.</li>
+            <li>2. Installez Visual Studio Code si besoin, puis ouvrez-le au moins une fois.</li>
+            <li>3. Revenez dans <InlineCode>AIPilot Manager</InlineCode>.</li>
+            <li>4. Cliquez sur <InlineCode>Connecter ma licence</InlineCode>.</li>
+            <li>5. Cliquez ensuite sur <InlineCode>Installer et configurer</InlineCode>.</li>
+            <li>6. AIPilot vérifie Codex CLI, crée <InlineCode>~/.codex/auth.json</InlineCode>, écrit <InlineCode>~/.codex/config.toml</InlineCode> et prépare l’extension Codex dans VS Code.</li>
+            <li>7. Enfin, AIPilot ouvre Visual Studio Code directement sur votre dossier projet.</li>
+          </ol>
+        </div>
+
+        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+          <p className="text-sm font-bold text-slate-950">Ce que fait AIPilot pour VS Code Codex</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <SummaryRow label="config.toml" value="Préparé automatiquement dans ~/.codex" />
+            <SummaryRow label="auth.json" value="Créé avec auth_mode=apikey pour Azure" />
+            <SummaryRow label="Extension" value="Extension officielle Codex installée ou réparée" />
+            <SummaryRow label="Ouverture finale" value="VS Code s’ouvre sur votre dossier projet" />
+          </div>
         </div>
       </div>
     </div>

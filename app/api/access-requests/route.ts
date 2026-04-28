@@ -5,7 +5,9 @@ import {
 } from "@/lib/access-request-store";
 
 function readEnvironment(value: unknown): AccessRequestEnvironment {
-  return value === "codex" || value === "t3code" ? value : "opencode";
+  return value === "codex" || value === "vscode-codex" || value === "t3code"
+    ? value
+    : "opencode";
 }
 
 function readOs(value: unknown): AccessRequestOs {

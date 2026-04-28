@@ -25,7 +25,9 @@ function readTier(value: FormDataEntryValue | null): LicenseTier {
 }
 
 function readEnvironment(value: FormDataEntryValue | null): LicenseEnvironment {
-  return value === "codex" || value === "t3code" ? value : "opencode";
+  return value === "codex" || value === "vscode-codex" || value === "t3code"
+    ? value
+    : "opencode";
 }
 
 function readStatus(value: FormDataEntryValue | null): LicenseStatus {

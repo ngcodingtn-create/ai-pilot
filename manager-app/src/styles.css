@@ -581,6 +581,46 @@ select {
   gap: 16px;
 }
 
+.codex-launcher-card {
+  margin-top: 16px;
+}
+
+.codex-launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.launcher-note {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.launcher-note strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+.launcher-note p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.launcher-note code {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: #0f172a;
+}
+
 .preparation-layout {
   grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
 }
@@ -1319,6 +1359,12 @@ select {
   gap: 6px;
 }
 
+.dock-codex-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .tool-select-block > span {
   color: var(--text-secondary);
   font-size: 12px;
@@ -1493,6 +1539,7 @@ select {
 .summary-row dd {
   margin: 0;
   color: var(--text-primary);
+  word-break: break-word;
 }
 
 .summary-row dd > div {
@@ -1647,6 +1694,7 @@ select {
 
   .bottom-grid,
   .split-view-grid,
+  .codex-launcher-grid,
   .preparation-layout {
     grid-template-columns: 1fr;
   }

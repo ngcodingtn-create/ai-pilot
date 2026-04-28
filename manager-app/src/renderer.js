@@ -11,6 +11,7 @@ const state = {
   activity: [],
   currentAction: "",
   sidebarCollapsed: false,
+  selectedModel: "",
 };
 
 const UI_STORAGE_KEY = "aipilot-manager-ui";
@@ -30,6 +31,10 @@ const elements = {
   configList: document.querySelector("#config-list"),
   configFormWrap: document.querySelector("#config-form-wrap"),
   configDetailList: document.querySelector("#config-detail-list"),
+  codexLauncherCard: document.querySelector("#codex-launcher-card"),
+  codexModelSelect: document.querySelector("#codex-model-select"),
+  codexApplyLaunch: document.querySelector("#codex-apply-launch"),
+  codexOpenConfig: document.querySelector("#codex-open-config"),
   prepList: document.querySelector("#prep-list"),
   prepDetailList: document.querySelector("#prep-detail-list"),
   prepGuidance: document.querySelector("#prep-guidance"),
@@ -67,6 +72,8 @@ const elements = {
   dockRepair: document.querySelector("#dock-repair"),
   dockChangeTool: document.querySelector("#dock-change-tool"),
   dockToolSelect: document.querySelector("#dock-tool-select"),
+  dockCodexControls: document.querySelector("#dock-codex-controls"),
+  dockModelSelect: document.querySelector("#dock-model-select"),
   toolIcon: document.querySelector("#tool-icon"),
   toolLabel: document.querySelector("#tool-label"),
   toolStatus: document.querySelector("#tool-status"),
@@ -115,19 +122,22 @@ const elements = {
 };
 
 const toolLaunchLabels = {
-  codex: "Lancer Codex",
+  codex: "Lancer Codex app",
+  "vscode-codex": "Ouvrir VS Code Codex",
   t3code: "Lancer T3 Code",
   opencode: "Lancer OpenCode",
 };
 
 const toolNameMap = {
-  codex: "Codex",
+  codex: "Codex app",
+  "vscode-codex": "VS Code Codex",
   t3code: "T3 Code",
   opencode: "OpenCode",
 };
 
 const toolIconMap = {
   codex: "./assets/tool-codex.png",
+  "vscode-codex": "./assets/tool-codex.png",
   t3code: "./assets/tool-t3code.png",
   opencode: "./assets/tool-opencode.png",
 };
@@ -201,6 +211,44 @@ function normalizeLicenseKey(value) {
 function getSelectedToolLabel() {
   const env = elements.environment.value || elements.configEnvironment.value;
   return toolNameMap[env] || "OpenCode";
+}
+
+function isCodexFamilyEnvironment(environment) {
+  return environment === "codex" || environment === "vscode-codex" || environment === "t3code";
+}
+
+function getAvailableDeployments() {
+  const deployments = Array.isArray(state.manifest?.azure?.availableDeployments)
+    ? state.manifest.azure.availableDeployments
+    : [];
+
+  return deployments.filter((item) => item?.deployment);
+}
+
+function syncCodexSelectionState() {
+  const deployments = getAvailableDeployments();
+  const deploymentValues = deployments.map((item) => item.deployment);
+  const defaultModel = state.manifest?.azure?.deployment || deploymentValues[0] || "";
+
+  if (!deploymentValues.includes(state.selectedModel)) {
+    state.selectedModel = defaultModel;
+  }
+}
+
+function getCurrentModelLabel() {
+  const matched = getAvailableDeployments().find(
+    (item) => item.deployment === state.selectedModel,
+  );
+  return matched?.label || matched?.deployment || state.selectedModel || "-";
+}
+
+function buildActionPayload(action) {
+  return {
+    action,
+    manifest: state.manifest,
+    projectRoot: state.projectRoot,
+    selectedModel: state.selectedModel,
+  };
 }
 
 function icon(name) {
@@ -283,6 +331,10 @@ function syncButtons() {
   elements.prepInstall.disabled = disabled;
   elements.dockRepair.disabled = disabled;
   elements.homeRunPreparation.disabled = disabled;
+  elements.codexApplyLaunch.disabled = disabled || !isCodexFamilyEnvironment(elements.environment.value);
+  elements.codexOpenConfig.disabled = !state.manifest || !isCodexFamilyEnvironment(elements.environment.value);
+  elements.codexModelSelect.disabled = !state.manifest || !isCodexFamilyEnvironment(elements.environment.value);
+  elements.dockModelSelect.disabled = !state.manifest || !isCodexFamilyEnvironment(elements.environment.value);
 
   elements.diagnose.textContent =
     state.busy && state.currentAction === "diagnose" ? "Vérification en cours..." : "Vérifier mon installation";
@@ -425,6 +477,48 @@ function renderToolDock() {
   elements.toolStatus.textContent = status;
   elements.toolStatus.className =
     status === "Prêt" ? "tool-ready-badge" : "tool-ready-badge tool-ready-badge-warn";
+
+  const showCodexControls = isCodexFamilyEnvironment(env);
+  elements.dockCodexControls.style.display = showCodexControls ? "flex" : "none";
+}
+
+function renderCodexControls() {
+  const env = elements.environment.value || state.manifest?.tool?.environment || "codex";
+  const show = Boolean(state.manifest) && isCodexFamilyEnvironment(env);
+  elements.codexLauncherCard.style.display = show ? "block" : "none";
+  elements.dockCodexControls.style.display = show ? "flex" : "none";
+
+  if (!show) {
+    return;
+  }
+
+  syncCodexSelectionState();
+  const options = getAvailableDeployments();
+  const optionMarkup = options.length
+    ? options
+        .map(
+          (item) =>
+            `<option value="${escapeHtml(item.deployment)}">${escapeHtml(item.label)} — ${escapeHtml(item.deployment)}</option>`,
+        )
+        .join("")
+    : `<option value="">Aucun modèle Azure chargé</option>`;
+
+  elements.codexModelSelect.innerHTML = optionMarkup;
+  elements.dockModelSelect.innerHTML = optionMarkup;
+  elements.codexModelSelect.value = state.selectedModel || "";
+  elements.dockModelSelect.value = state.selectedModel || "";
+  elements.codexApplyLaunch.textContent =
+    env === "t3code"
+      ? "Appliquer et lancer T3 Code"
+      : env === "vscode-codex"
+        ? "Appliquer et ouvrir VS Code Codex"
+        : "Appliquer et lancer Codex app";
+  elements.codexOpenConfig.textContent =
+    env === "t3code"
+      ? "Ouvrir la config T3 / Codex"
+      : env === "vscode-codex"
+        ? "Ouvrir auth.json et config.toml"
+        : "Ouvrir config.toml";
 }
 
 function getRecommendationForCheck(check) {
@@ -433,6 +527,9 @@ function getRecommendationForCheck(check) {
   if (label.includes("node")) return "Installez ou réparez Node.js pour permettre les installations CLI.";
   if (label.includes("npm")) return "Réparer va remettre npm dans l’environnement utilisateur.";
   if (label.includes("git")) return "Configurez Git ou laissez AIPilot vous guider pour corriger ce point.";
+  if (label.includes("visual studio code")) return "Installez VS Code si vous voulez utiliser Codex directement dans l’éditeur.";
+  if (label.includes("extension codex")) return "Installez l’extension officielle Codex dans VS Code puis relancez une vérification.";
+  if (label.includes("auth.json")) return "Créez ~/.codex/auth.json avec auth_mode=apikey et votre clé Azure, puis rouvrez VS Code.";
   if (label.includes("codex")) return "Installez l’application officielle si nécessaire, puis relancez Réparer.";
   if (label.includes("opencode")) return "Réinstallez OpenCode CLI ou relancez Installer et configurer.";
   if (label.includes("azure")) return "Réécrivez les variables Azure puis relancez la vérification.";
@@ -487,12 +584,16 @@ function renderConfigList() {
         <div class="summary-row"><dt>Client</dt><dd>Aucun client connecté</dd></div>
         <div class="summary-row"><dt>Licence</dt><dd>Saisissez la clé reçue après paiement</dd></div>
         <div class="summary-row"><dt>Ressource Azure</dt><dd>Chargée automatiquement après connexion</dd></div>
+        <div class="summary-row"><dt>Déploiement actif</dt><dd>Chargé automatiquement après connexion</dd></div>
       </dl>
     `;
     return;
   }
 
   const azure = state.manifest.azure || {};
+  const availableLabels = Array.isArray(azure.availableDeployments)
+    ? azure.availableDeployments.map((item) => item.label).filter(Boolean)
+    : [];
   elements.configList.innerHTML = `
     <div class="config-pair">
       <span class="config-label">Azure Tenant</span>
@@ -521,8 +622,10 @@ function renderConfigList() {
       <div class="summary-row"><dt>Client</dt><dd>${escapeHtml(state.manifest.license?.customerName || "-")}</dd></div>
       <div class="summary-row"><dt>Licence</dt><dd>${escapeHtml(state.manifest.license?.licenseKey || elements.licenseKey.value)}</dd></div>
       <div class="summary-row"><dt>Ressource Azure</dt><dd>${escapeHtml(azure.resourceName || "-")}</dd></div>
-      <div class="summary-row"><dt>Déploiement</dt><dd>${escapeHtml(azure.deployment || "-")}</dd></div>
-      <div class="summary-row"><dt>Modèles disponibles</dt><dd>${escapeHtml((azure.availableModelLabels || [azure.selectedModelLabel || "GPT-5.4"]).join(", "))}</dd></div>
+      <div class="summary-row"><dt>Déploiement actif</dt><dd>${escapeHtml(state.selectedModel || azure.deployment || "-")}</dd></div>
+      <div class="summary-row"><dt>Nom du modèle</dt><dd>${escapeHtml(getCurrentModelLabel())}</dd></div>
+      <div class="summary-row"><dt>Modèles disponibles</dt><dd>${escapeHtml((availableLabels.length ? availableLabels : [azure.selectedModelLabel || "GPT-5.4"]).join(", "))}</dd></div>
+      <div class="summary-row"><dt>Règle AIPilot</dt><dd>Le modèle est choisi ici par AIPilot Manager puis écrit dans config.toml avant l’ouverture de Codex.</dd></div>
     </dl>
   `;
 }
@@ -899,6 +1002,7 @@ function renderOverview() {
   syncFieldMirrors();
   renderWindowStatus();
   renderToolDock();
+  renderCodexControls();
   renderConfigList();
   renderSettingsSummary();
   renderAboutSummary();
@@ -1027,6 +1131,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
   if (manifest.tool.environment) {
     elements.environment.value = manifest.tool.environment;
   }
+  syncCodexSelectionState();
 
   renderOverview();
   renderTutorials(manifest);
@@ -1066,11 +1171,7 @@ async function runManagerAction(action, logAction = true) {
   if (!state.manifest) return;
   if (logAction) appendLog(`Action: ${action}`);
 
-  const result = await window.aipilotManager.runAction({
-    action,
-    manifest: state.manifest,
-    projectRoot: state.projectRoot,
-  });
+  const result = await window.aipilotManager.runAction(buildActionPayload(action));
 
   renderDiagnostics(result.diagnostics);
   renderOverview();
@@ -1249,6 +1350,13 @@ async function bootstrap() {
   elements.homeOpenUpdates.addEventListener("click", () => setActiveView("updates"));
   elements.dockChangeTool.addEventListener("click", () => setActiveView("configuration"));
 
+  function syncSelectedModel(nextValue) {
+    state.selectedModel = nextValue;
+    elements.codexModelSelect.value = nextValue;
+    elements.dockModelSelect.value = nextValue;
+    renderOverview();
+  }
+
   elements.licenseKey.addEventListener("input", (event) => {
     event.target.value = normalizeLicenseKey(event.target.value);
     syncFieldMirrors("main");
@@ -1360,6 +1468,29 @@ async function bootstrap() {
 
   elements.installUpdate.addEventListener("click", installPendingUpdate);
   elements.installUpdateSecondary.addEventListener("click", installPendingUpdate);
+  elements.codexModelSelect.addEventListener("change", (event) =>
+    syncSelectedModel(event.target.value),
+  );
+  elements.dockModelSelect.addEventListener("change", (event) =>
+    syncSelectedModel(event.target.value),
+  );
+  elements.codexOpenConfig.addEventListener("click", async () => {
+    const targetPath =
+      state.manifest?.setup?.primaryConfigPath || state.manifest?.setup?.configDirectoryPath;
+    if (!targetPath) {
+      appendLog("Le chemin de configuration Codex n’est pas encore disponible.");
+      return;
+    }
+    await window.aipilotManager.openPath(targetPath);
+  });
+  elements.codexApplyLaunch.addEventListener("click", async () => {
+    setBusy(true);
+    try {
+      await handleLaunch();
+    } finally {
+      setBusy(false);
+    }
+  });
 
   elements.licenseKey.addEventListener("change", persistState);
   elements.environment.addEventListener("change", async (event) => {
