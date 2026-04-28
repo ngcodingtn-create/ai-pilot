@@ -11,6 +11,7 @@ export type StoredConfig = {
   supportEmail?: string;
   supportVideoUrl?: string;
   managerUpdateUrl?: string;
+  managerTutorialLinks?: string;
 };
 
 type LocalConfigFile = {
@@ -22,6 +23,7 @@ type LocalConfigFile = {
   supportEmail?: string;
   supportVideoUrl?: string;
   managerUpdateUrl?: string;
+  managerTutorialLinks?: string;
 };
 
 type LocalOpenCodeRuntimeConfig = {
@@ -41,6 +43,7 @@ const DEFAULTS: StoredConfig = {
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "",
   supportVideoUrl: process.env.NEXT_PUBLIC_SUPPORT_VIDEO_URL ?? "",
   managerUpdateUrl: process.env.MANAGER_UPDATE_URL ?? "",
+  managerTutorialLinks: "",
 };
 
 export const LOCAL_CONFIG_RELATIVE_PATH = ".opencode/portal-config.json";
@@ -108,6 +111,7 @@ async function saveLocalConfig(config: StoredConfig) {
     supportEmail: config.supportEmail,
     supportVideoUrl: config.supportVideoUrl,
     managerUpdateUrl: config.managerUpdateUrl,
+    managerTutorialLinks: config.managerTutorialLinks,
     azureApiKey: current.azureApiKey,
     azureApiKeyEncrypted: current.azureApiKeyEncrypted,
   };
@@ -171,6 +175,7 @@ export async function saveStoredConfig(config: StoredConfig) {
   await setValue("supportEmail", config.supportEmail ?? "");
   await setValue("supportVideoUrl", config.supportVideoUrl ?? "");
   await setValue("managerUpdateUrl", config.managerUpdateUrl ?? "");
+  await setValue("managerTutorialLinks", config.managerTutorialLinks ?? "");
 
   if (config.azureApiKey) {
     await setValue("azureApiKey", config.azureApiKey, true);
@@ -205,6 +210,8 @@ export async function getStoredConfig(): Promise<StoredConfig> {
       supportEmail: local.supportEmail ?? DEFAULTS.supportEmail,
       supportVideoUrl: local.supportVideoUrl ?? DEFAULTS.supportVideoUrl,
       managerUpdateUrl: local.managerUpdateUrl ?? DEFAULTS.managerUpdateUrl,
+      managerTutorialLinks:
+        local.managerTutorialLinks ?? DEFAULTS.managerTutorialLinks,
     };
   }
 
@@ -234,6 +241,7 @@ export async function getStoredConfig(): Promise<StoredConfig> {
     if (row.key === "supportEmail") config.supportEmail = value;
     if (row.key === "supportVideoUrl") config.supportVideoUrl = value;
     if (row.key === "managerUpdateUrl") config.managerUpdateUrl = value;
+    if (row.key === "managerTutorialLinks") config.managerTutorialLinks = value;
   }
 
   config.azureResourceName =

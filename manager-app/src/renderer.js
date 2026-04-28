@@ -14,6 +14,8 @@ const elements = {
   platformChip: document.querySelector("#platform-chip"),
   versionChip: document.querySelector("#version-chip"),
   portalText: document.querySelector("#portal-text"),
+  overview: document.querySelector("#overview"),
+  tutorials: document.querySelector("#tutorials"),
   updateMessage: document.querySelector("#update-message"),
   updateSummary: document.querySelector("#update-summary"),
   connect: document.querySelector("#connect"),
@@ -55,6 +57,13 @@ function normalizeLicenseKey(value) {
   return groups ? groups.join("-") : "";
 }
 
+function getSelectedToolLabel() {
+  const value = elements.environment.value;
+  if (value === "codex") return "Codex";
+  if (value === "t3code") return "T3 Code";
+  return "OpenCode";
+}
+
 function syncButtons() {
   const connected = Boolean(state.manifest);
   const disabled = !connected || state.busy;
@@ -66,8 +75,7 @@ function syncButtons() {
   elements.installConfigure.disabled = disabled;
   elements.repair.disabled = disabled;
   elements.launch.disabled = disabled;
-  elements.watchVideo.disabled =
-    disabled || !state.manifest?.manager?.supportVideoUrl;
+  elements.watchVideo.disabled = disabled || !state.manifest?.manager?.supportVideoUrl;
   elements.checkUpdates.disabled =
     state.busy || !state.updateState?.enabled || state.updateState?.checking;
   elements.installUpdate.disabled = !state.updateState?.downloaded || state.busy;
@@ -107,10 +115,40 @@ function badge(ok, optional) {
   return '<span class="badge badge-warning">À corriger</span>';
 }
 
+function renderOverview() {
+  if (!state.manifest) {
+    elements.overview.innerHTML = `
+      <div class="stack-list">
+        <p>1. Entrez votre clé de licence pour récupérer votre configuration.</p>
+        <p>2. Cliquez sur <strong>Installer et configurer</strong> pour laisser AIPilot préparer l’outil.</p>
+        <p>3. En cas de souci, utilisez <strong>Réparer mon installation</strong>.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const toolLabel = state.manifest.tool.label || getSelectedToolLabel();
+  const projectText = state.projectRoot
+    ? `Le dossier projet sélectionné est ${escapeHtml(state.projectRoot)}.`
+    : "Aucun dossier projet spécifique n’est encore choisi.";
+  const supportEmail = state.manifest.manager?.supportEmail
+    ? `Support: ${escapeHtml(state.manifest.manager.supportEmail)}`
+    : "Support disponible via le portail AIPilot.";
+
+  elements.overview.innerHTML = `
+    <div class="stack-list">
+      <p><strong>Étape suivante recommandée:</strong> cliquez sur <strong>Installer et configurer</strong> pour préparer ${escapeHtml(toolLabel)} automatiquement.</p>
+      <p><strong>Réparer</strong> relance une vérification complète, remet les fichiers de configuration, la clé Azure et les réglages importants.</p>
+      <p>${projectText}</p>
+      <p>${supportEmail}</p>
+    </div>
+  `;
+}
+
 function renderUpdateState(updateState) {
   state.updateState = updateState;
   elements.updateMessage.textContent =
-    updateState?.message || "Mises à jour non configurées.";
+    updateState?.message || "Les mises à jour automatiques ne sont pas encore prêtes.";
 
   if (!updateState) {
     elements.updateSummary.innerHTML = "<p>Aucune information de mise à jour.</p>";
@@ -119,21 +157,21 @@ function renderUpdateState(updateState) {
   }
 
   const statusBadge = updateState.downloaded
-    ? '<span class="badge badge-success">Prête</span>'
+    ? '<span class="badge badge-success">Prête à installer</span>'
     : updateState.enabled
-      ? '<span class="badge badge-neutral">Active</span>'
-      : '<span class="badge badge-warning">Inactive</span>';
+      ? '<span class="badge badge-success">Surveillance active</span>'
+      : '<span class="badge badge-warning">Désactivée</span>';
 
   elements.updateSummary.innerHTML = `
     <dl>
       <div class="summary-row"><dt>Version actuelle</dt><dd>${escapeHtml(updateState.currentVersion || "-")}</dd></div>
-      <div class="summary-row"><dt>Version dispo</dt><dd>${escapeHtml(updateState.availableVersion || "Aucune")}</dd></div>
-      <div class="summary-row"><dt>Canal</dt><dd>${statusBadge}</dd></div>
-      <div class="summary-row"><dt>URL</dt><dd>${escapeHtml(updateState.updateUrl || "Non configurée")}</dd></div>
+      <div class="summary-row"><dt>Nouvelle version</dt><dd>${escapeHtml(updateState.availableVersion || "Aucune pour le moment")}</dd></div>
+      <div class="summary-row"><dt>État</dt><dd>${statusBadge}<div>AIPilot Manager vérifie les mises à jour automatiquement quand la configuration est prête.</div></dd></div>
+      <div class="summary-row"><dt>Source</dt><dd>${escapeHtml(updateState.updateUrl || "Non configurée")}</dd></div>
     </dl>
     ${
       updateState.error
-        ? `<div class="summary-section"><h3>Erreur</h3><div class="stack-list"><p>${escapeHtml(updateState.error)}</p></div></div>`
+        ? `<div class="summary-section"><h3>À vérifier</h3><div class="stack-list"><p>${escapeHtml(updateState.error)}</p></div></div>`
         : ""
     }
   `;
@@ -143,7 +181,7 @@ function renderUpdateState(updateState) {
 
 function renderSessionSummary(manifest) {
   if (!manifest) {
-    elements.sessionSummary.innerHTML = "<p>Connectez une licence pour récupérer le manifest.</p>";
+    elements.sessionSummary.innerHTML = "<p>Connectez une licence pour voir le résumé.</p>";
     return;
   }
 
@@ -153,13 +191,13 @@ function renderSessionSummary(manifest) {
     <dl>
       <div class="summary-row"><dt>Client</dt><dd>${escapeHtml(manifest.license.customerName)}</dd></div>
       <div class="summary-row"><dt>Licence</dt><dd>${escapeHtml(manifest.license.key)}</dd></div>
-      <div class="summary-row"><dt>Outil</dt><dd>${escapeHtml(manifest.tool.label || manifest.tool.environment)}</dd></div>
-      <div class="summary-row"><dt>Azure</dt><dd>${escapeHtml(manifest.azure.resourceName)}</dd></div>
-      <div class="summary-row"><dt>Déploiement</dt><dd>${escapeHtml(manifest.azure.deployment)}</dd></div>
+      <div class="summary-row"><dt>Outil choisi</dt><dd>${escapeHtml(manifest.tool.label || manifest.tool.environment)}</dd></div>
+      <div class="summary-row"><dt>Ressource Azure</dt><dd>${escapeHtml(manifest.azure.resourceName)}</dd></div>
+      <div class="summary-row"><dt>Déploiement Azure</dt><dd>${escapeHtml(manifest.azure.deployment)}</dd></div>
     </dl>
     ${
       notes.length
-        ? `<div class="summary-section"><h3>Notes</h3><div class="stack-list">${notes
+        ? `<div class="summary-section"><h3>Informations utiles</h3><div class="stack-list">${notes
             .map((note) => `<p>${escapeHtml(note)}</p>`)
             .join("")}</div></div>`
         : ""
@@ -169,7 +207,7 @@ function renderSessionSummary(manifest) {
 
 function renderDiagnostics(diagnostics) {
   if (!diagnostics) {
-    elements.diagnostics.innerHTML = "<p>Aucun diagnostic exécuté.</p>";
+    elements.diagnostics.innerHTML = "<p>Aucune vérification exécutée pour le moment.</p>";
     return;
   }
 
@@ -183,7 +221,7 @@ function renderDiagnostics(diagnostics) {
           (check) => `
             <div class="summary-row">
               <dt>${escapeHtml(check.label)}</dt>
-              <dd>${badge(check.ok, check.optional)} <div>${escapeHtml(check.details || "")}</div></dd>
+              <dd>${badge(check.ok, check.optional)}<div>${escapeHtml(check.details || "")}</div></dd>
             </div>
           `,
         )
@@ -191,7 +229,7 @@ function renderDiagnostics(diagnostics) {
     </dl>
     ${
       notes.length
-        ? `<div class="summary-section"><h3>Conseils</h3><div class="stack-list">${notes
+        ? `<div class="summary-section"><h3>Conseils simples</h3><div class="stack-list">${notes
             .map((note) => `<p>${escapeHtml(note)}</p>`)
             .join("")}</div></div>`
         : ""
@@ -202,7 +240,7 @@ function renderDiagnostics(diagnostics) {
 function renderSetupGuidance(manifest) {
   if (!manifest?.setup) {
     elements.setupGuidance.innerHTML =
-      "<p>Installez ou réparez un outil pour afficher les fichiers de configuration et les actions recommandées.</p>";
+      "<p>Installez ou réparez un outil pour afficher les fichiers de configuration.</p>";
     syncButtons();
     return;
   }
@@ -214,11 +252,11 @@ function renderSetupGuidance(manifest) {
     <dl>
       <div class="summary-row"><dt>Fichier principal</dt><dd>${escapeHtml(setup.primaryConfigPath || "Aucun")}</dd></div>
       <div class="summary-row"><dt>Dossier config</dt><dd>${escapeHtml(setup.configDirectoryPath || "Aucun")}</dd></div>
-      <div class="summary-row"><dt>État attendu</dt><dd>${escapeHtml(setup.prompt || "")}</dd></div>
+      <div class="summary-row"><dt>Ce que cela veut dire</dt><dd>${escapeHtml(setup.prompt || "")}</dd></div>
     </dl>
     ${
       notes.length
-        ? `<div class="summary-section"><h3>Étapes recommandées</h3><div class="stack-list">${notes
+        ? `<div class="summary-section"><h3>Prochaines étapes</h3><div class="stack-list">${notes
             .map((note) => `<p>${escapeHtml(note)}</p>`)
             .join("")}</div></div>`
         : ""
@@ -226,6 +264,51 @@ function renderSetupGuidance(manifest) {
   `;
 
   syncButtons();
+}
+
+function renderTutorials(manifest) {
+  const tutorials = Array.isArray(manifest?.manager?.tutorials)
+    ? manifest.manager.tutorials
+    : [];
+
+  if (!tutorials.length) {
+    elements.tutorials.innerHTML =
+      "<p>Ajoutez des liens dans l’admin AIPilot pour afficher les tutoriels ici.</p>";
+    return;
+  }
+
+  elements.tutorials.innerHTML = `
+    <div class="tutorial-grid">
+      ${tutorials
+        .map(
+          (tutorial) => `
+            <article class="tutorial-card">
+              <div class="tutorial-copy">
+                <strong>${escapeHtml(tutorial.label || "Tutoriel")}</strong>
+                <span>${escapeHtml(tutorial.url || "")}</span>
+              </div>
+              <a class="tutorial-link" href="${escapeHtml(tutorial.url || "#")}" data-open-external="${escapeHtml(tutorial.url || "")}">
+                Ouvrir
+              </a>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+
+  elements.tutorials.querySelectorAll("[data-open-external]").forEach((anchor) => {
+    anchor.addEventListener("click", async (event) => {
+      event.preventDefault();
+      const url = anchor.getAttribute("data-open-external");
+      if (!url) {
+        return;
+      }
+
+      await window.aipilotManager.openExternal(url);
+      appendLog(`Ouverture du tutoriel: ${url}`);
+    });
+  });
 }
 
 async function connectSession({ autoDiagnose = true } = {}) {
@@ -252,8 +335,10 @@ async function connectSession({ autoDiagnose = true } = {}) {
     elements.environment.value = manifest.tool.environment;
   }
 
+  renderOverview();
   renderSessionSummary(manifest);
   renderSetupGuidance(manifest);
+  renderTutorials(manifest);
   appendLog(`Licence connectée pour ${manifest.license.customerName}.`);
   await persistState();
   syncButtons();
@@ -279,6 +364,7 @@ async function runManagerAction(action, logAction = true) {
   });
 
   renderDiagnostics(result.diagnostics);
+  renderOverview();
 }
 
 async function ensureNodeRuntimeReadyBeforeInstall() {
@@ -295,7 +381,7 @@ async function ensureNodeRuntimeReadyBeforeInstall() {
   }
 
   const wantsInstall = window.confirm(
-    "Node.js et npm sont requis pour continuer. Voulez-vous laisser AIPilot Manager les installer automatiquement maintenant ?",
+    "Node.js et npm sont nécessaires pour continuer. Voulez-vous laisser AIPilot Manager les installer automatiquement maintenant ?",
   );
 
   if (!wantsInstall) {
@@ -333,11 +419,11 @@ async function ensureDesktopAppReadyBeforeInstall() {
 
   const label = state.manifest.tool.label || environment;
   const wantsOpen = window.confirm(
-    `${label} doit d'abord être installé comme app desktop officielle avant que AIPilot ne répare le CLI et la configuration.\n\nCliquez sur OK pour ouvrir la page officielle de téléchargement, installez l'app, puis revenez ici et cliquez à nouveau sur Installer.`,
+    `${label} doit d'abord être installé comme application officielle avant que AIPilot ne termine la configuration.\n\nCliquez sur OK pour ouvrir la page officielle, installez l'application, puis revenez ici et cliquez à nouveau sur Installer et configurer.`,
   );
 
   appendLog(
-    `${label} n'est pas encore installé. Installez l'app officielle puis relancez l'installation AIPilot.`,
+    `${label} n'est pas encore installé. Installez l'application officielle puis relancez l'installation AIPilot.`,
   );
 
   if (wantsOpen && state.manifest.tool.officialAppUrl) {
@@ -376,7 +462,9 @@ async function bootstrap() {
     elements.projectRoot.value = state.defaults.projectRoot;
   }
 
+  renderOverview();
   renderSetupGuidance(null);
+  renderTutorials(null);
 
   const initialUpdateState = await window.aipilotManager.getUpdateState();
   renderUpdateState(initialUpdateState);
@@ -402,21 +490,7 @@ async function bootstrap() {
     state.projectRoot = directory;
     elements.projectRoot.value = directory;
     appendLog(`Dossier projet: ${directory}`);
-    if (state.manifest) {
-      renderSetupGuidance({
-        ...state.manifest,
-        setup: {
-          ...state.manifest.setup,
-          nextSteps: Array.isArray(state.manifest.setup?.nextSteps)
-            ? state.manifest.setup.nextSteps.map((line) =>
-                line.includes("Choisissez un dossier projet")
-                  ? `La configuration projet sera utilisée dans ${directory}.`
-                  : line,
-              )
-            : state.manifest.setup?.nextSteps,
-        },
-      });
-    }
+    renderOverview();
     await persistState();
   });
 
@@ -477,7 +551,7 @@ async function bootstrap() {
     try {
       await runManagerAction("diagnose");
     } catch (error) {
-      appendLog(error instanceof Error ? error.message : "Erreur de diagnostic.");
+      appendLog(error instanceof Error ? error.message : "Erreur de vérification.");
     } finally {
       setBusy(false);
     }
@@ -485,7 +559,7 @@ async function bootstrap() {
 
   elements.watchVideo.addEventListener("click", async () => {
     if (!state.manifest?.manager.supportVideoUrl) {
-      appendLog("Aucune vidéo configurée.");
+      appendLog("Aucune vidéo principale n'est configurée.");
       return;
     }
 
@@ -552,7 +626,10 @@ async function bootstrap() {
   });
 
   elements.licenseKey.addEventListener("change", persistState);
-  elements.environment.addEventListener("change", persistState);
+  elements.environment.addEventListener("change", async () => {
+    renderOverview();
+    await persistState();
+  });
 
   syncButtons();
 
@@ -578,7 +655,7 @@ async function bootstrap() {
           ? await ensureDesktopAppReadyBeforeInstall()
           : false;
         if (canProceed) {
-          appendLog("Mode automatique: installation, configuration, puis lancement...");
+          appendLog("Mode automatique: installation, configuration, puis ouverture...");
           await runManagerAction("install-configure");
           await runManagerAction("launch");
         }

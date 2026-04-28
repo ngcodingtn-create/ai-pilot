@@ -11,6 +11,11 @@ type ToolDetails = {
   officialCliUrl?: string;
 };
 
+type TutorialLink = {
+  label: string;
+  url: string;
+};
+
 function normalizeEnvironment(value: unknown): EnvironmentKey | undefined {
   if (value === "codex" || value === "t3code" || value === "opencode") {
     return value;
@@ -32,7 +37,7 @@ model_reasoning_effort = "medium"
 profile = "azure-medium"
 
 [model_providers.azure]
-name = "AIPilot AI"
+name = "Azure Openai"
 base_url = "${baseUrl}"
 env_key = "AZURE_OPENAI_API_KEY"
 wire_api = "responses"
@@ -86,6 +91,88 @@ function buildOpenCodeAuth(apiKey: string) {
   };
 }
 
+function safeTutorialUrl(value: string | undefined) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      return parsed.toString();
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function parseTutorialLinks(value: string | undefined) {
+  return String(value ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [labelPart, urlPart] = line.split("|");
+      const url = safeTutorialUrl((urlPart ?? labelPart).trim());
+      if (!url) {
+        return null;
+      }
+
+      const label = (urlPart ? labelPart : "Tutoriel AIPilot").trim() || "Tutoriel AIPilot";
+      return { label, url };
+    })
+    .filter((item): item is TutorialLink => Boolean(item));
+}
+
+function dedupeTutorialLinks(items: TutorialLink[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${item.label}|${item.url}`;
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildManagerTutorials(config: Awaited<ReturnType<typeof getStoredConfig>>, tool: ToolDetails) {
+  const tutorials = parseTutorialLinks(config.managerTutorialLinks);
+  const supportVideoUrl = safeTutorialUrl(config.supportVideoUrl);
+
+  if (supportVideoUrl) {
+    tutorials.unshift({
+      label: "Vidéo de démarrage AIPilot",
+      url: supportVideoUrl,
+    });
+  }
+
+  if (tool.officialAppUrl) {
+    tutorials.push({
+      label: `Télécharger ${tool.label}`,
+      url: tool.officialAppUrl,
+    });
+  }
+
+  if (tool.officialCliUrl && tool.officialCliUrl !== tool.officialAppUrl) {
+    tutorials.push({
+      label: `Guide ${tool.label}`,
+      url: tool.officialCliUrl,
+    });
+  }
+
+  tutorials.push({
+    label: "Portail AIPilot",
+    url: "https://ai-pilot-ten.vercel.app",
+  });
+
+  return dedupeTutorialLinks(tutorials);
+}
+
 function buildToolDetails(environment: EnvironmentKey): ToolDetails {
   if (environment === "codex") {
     return {
@@ -93,6 +180,7 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       projectRootRecommended: false,
       notes: [
         "Installez d'abord l'app desktop Codex officielle. Ensuite AIPilot vérifie sa présence, répare Codex CLI, écrit ~/.codex/config.toml et injecte la configuration Azure.",
+        "Si vous voyez `404 The API deployment for this resource does not exist`, vérifiez dans l'admin AIPilot que le champ de déploiement contient le nom exact du déploiement Azure AI Foundry, pas juste un nom de modèle supposé.",
         "Sur Windows, un terminal WSL2 reste recommandé si l'utilisateur veut un workflow CLI plus stable.",
       ],
       officialAppUrl: "https://developers.openai.com/codex/app/windows",
@@ -106,6 +194,7 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       projectRootRecommended: false,
       notes: [
         "Installez d'abord l'app desktop T3 Code officielle depuis t3.codes. Ensuite AIPilot vérifie sa présence, prépare Codex CLI comme prérequis et injecte la configuration Azure.",
+        "Si T3 Code affiche `404 The API deployment for this resource does not exist`, le problème vient presque toujours du nom de déploiement Azure configuré dans AIPilot admin.",
         "Si le binaire T3 local n'est pas disponible, le manager peut lancer le fallback officiel via npx.",
       ],
       officialAppUrl: "https://t3.codes/",
@@ -171,6 +260,7 @@ export async function POST(request: Request) {
     manager: {
       supportVideoUrl: config.supportVideoUrl ?? "",
       supportEmail: config.supportEmail ?? "",
+      tutorials: buildManagerTutorials(config, tool),
     },
     tool: {
       environment: selectedEnvironment,

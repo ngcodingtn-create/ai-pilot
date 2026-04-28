@@ -449,6 +449,15 @@ async function writeFileWithDirs(filePath, content) {
   await fs.writeFile(filePath, content, "utf8");
 }
 
+async function readJsonFile(filePath, fallback) {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
 async function fileExists(filePath) {
   if (!filePath) {
     return false;
@@ -486,6 +495,18 @@ function getOpenCodeLocalConfig(projectRoot) {
   return path.join(projectRoot, ".opencode", "config.json");
 }
 
+function getT3Home() {
+  return process.env.T3CODE_HOME?.trim() || path.join(os.homedir(), ".t3");
+}
+
+function getT3SettingsPath() {
+  return path.join(getT3Home(), "userdata", "settings.json");
+}
+
+function getT3ClientSettingsPath() {
+  return path.join(getT3Home(), "userdata", "client-settings.json");
+}
+
 function getSetupGuidance(manifest, projectRoot) {
   if (manifest.tool.environment === "opencode") {
     return {
@@ -504,12 +525,21 @@ function getSetupGuidance(manifest, projectRoot) {
   }
 
   const toolLabel = manifest.tool.environment === "t3code" ? "T3 Code" : "Codex";
+  const primaryConfigPath =
+    manifest.tool.environment === "t3code" ? getT3SettingsPath() : getCodexConfigPath();
+  const configDirectoryPath =
+    manifest.tool.environment === "t3code"
+      ? path.dirname(getT3SettingsPath())
+      : getCodexHome();
   return {
-    primaryConfigPath: getCodexConfigPath(),
-    configDirectoryPath: getCodexHome(),
+    primaryConfigPath,
+    configDirectoryPath,
     prompt: `La configuration Codex a déjà été écrite par AIPilot. Ouvrez ${toolLabel} ou Codex CLI pour commencer.`,
     nextSteps: [
       "Le fichier ~/.codex/config.toml contient déjà l'endpoint Azure AIPilot et le déploiement configuré.",
+      manifest.tool.environment === "t3code"
+        ? "AIPilot enregistre aussi le déploiement Azure dans ~/.t3/userdata/settings.json et le place dans les favoris pour qu'il ressorte automatiquement dans T3 Code."
+        : "Le modèle Azure est prêt côté Codex.",
       "Si l'app desktop n'est pas encore installée sur Windows, vous pouvez lancer Codex CLI tout de suite ou ouvrir la page officielle de téléchargement.",
       "Si vous changez de licence ou de machine, cliquez sur Réparer pour réinjecter la configuration.",
     ],
@@ -991,6 +1021,79 @@ async function configureCodex(manifest, logs) {
   logs.push(`Écriture de la configuration Codex dans ${configPath}`);
   await writeFileWithDirs(configPath, manifest.azure.codex.configToml);
 
+  if (manifest.tool.environment === "t3code") {
+    const t3SettingsPath = getT3SettingsPath();
+    const t3ClientSettingsPath = getT3ClientSettingsPath();
+    const currentSettings = await readJsonFile(t3SettingsPath, {});
+    const currentClientSettings = await readJsonFile(t3ClientSettingsPath, {});
+    const currentProviders =
+      currentSettings && typeof currentSettings === "object" ? currentSettings.providers : {};
+    const currentCodexProvider =
+      currentProviders && typeof currentProviders === "object" ? currentProviders.codex : {};
+    const currentCustomModels = Array.isArray(currentCodexProvider?.customModels)
+      ? currentCodexProvider.customModels
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      : [];
+    const nextCustomModels = Array.from(
+      new Set([manifest.azure.deployment, ...currentCustomModels]),
+    );
+
+    const nextSettings = {
+      ...(currentSettings && typeof currentSettings === "object" ? currentSettings : {}),
+      textGenerationModelSelection: {
+        provider: "codex",
+        model: manifest.azure.deployment,
+      },
+      providers: {
+        ...(currentProviders && typeof currentProviders === "object" ? currentProviders : {}),
+        codex: {
+          ...(currentCodexProvider && typeof currentCodexProvider === "object"
+            ? currentCodexProvider
+            : {}),
+          customModels: nextCustomModels,
+        },
+      },
+    };
+
+    logs.push(`Écriture de la configuration T3 Code dans ${t3SettingsPath}`);
+    await writeFileWithDirs(
+      t3SettingsPath,
+      `${JSON.stringify(nextSettings, null, 2)}\n`,
+    );
+
+    const currentFavorites = Array.isArray(currentClientSettings?.favorites)
+      ? currentClientSettings.favorites.filter(
+          (favorite) =>
+            favorite &&
+            typeof favorite === "object" &&
+            (favorite.provider !== "codex" || favorite.model !== manifest.azure.deployment),
+        )
+      : [];
+
+    const nextClientSettings = {
+      ...(currentClientSettings && typeof currentClientSettings === "object"
+        ? currentClientSettings
+        : {}),
+      favorites: [
+        {
+          provider: "codex",
+          model: manifest.azure.deployment,
+        },
+        ...currentFavorites,
+      ],
+    };
+
+    logs.push(`Mise en favori du modèle Azure dans ${t3ClientSettingsPath}`);
+    await writeFileWithDirs(
+      t3ClientSettingsPath,
+      `${JSON.stringify(nextClientSettings, null, 2)}\n`,
+    );
+    logs.push(
+      `T3 Code verra automatiquement le modèle ${manifest.azure.deployment} dans son sélecteur et dans les favoris.`,
+    );
+  }
+
   const machineScopeApplied = await setUserEnvironmentVariables(
     {
       AZURE_OPENAI_API_KEY: manifest.azure.apiKey,
@@ -1241,6 +1344,7 @@ async function buildDiagnostics(manifest, projectRoot) {
   const opencodeAvailable = await commandExists("opencode");
   const desktopAppAvailable = await isDesktopAppInstalled(manifest.tool.environment);
   const codexConfigPath = getCodexConfigPath();
+  const t3SettingsPath = getT3SettingsPath();
   const openCodeGlobalConfigPath = getOpenCodeGlobalConfigPath();
   const openCodeAuthPath = getOpenCodeAuthPath();
 
@@ -1316,11 +1420,17 @@ async function buildDiagnostics(manifest, projectRoot) {
         label: "Accès T3 Code",
         ok: t3Available || npxAvailable,
         optional: false,
-        details: t3Available
-          ? "Commande locale détectée"
-          : npxAvailable
-            ? "Fallback npx disponible"
-            : "Ni t3 ni npx",
+          details: t3Available
+            ? "Commande locale détectée"
+            : npxAvailable
+              ? "Fallback npx disponible"
+              : "Ni t3 ni npx",
+      });
+      checks.push({
+        label: "Modèle T3 Code",
+        ok: await fileExists(t3SettingsPath),
+        optional: false,
+        details: t3SettingsPath,
       });
     }
   }

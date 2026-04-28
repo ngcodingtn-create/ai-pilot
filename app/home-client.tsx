@@ -18,6 +18,11 @@ type PersistedState = {
   selectedOs?: OsKey;
 };
 
+type AccessRequestState =
+  | { status: "idle"; message?: undefined }
+  | { status: "submitting"; message?: undefined }
+  | { status: "success" | "error"; message: string };
+
 type LicenseValidation =
   | {
       status: "idle" | "checking";
@@ -57,6 +62,11 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
   const [detectedOs, setDetectedOs] = useState<OsKey | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isReady, setIsReady] = useState(false);
+  const [requestName, setRequestName] = useState("");
+  const [requestWhatsapp, setRequestWhatsapp] = useState("");
+  const [accessRequest, setAccessRequest] = useState<AccessRequestState>({
+    status: "idle",
+  });
 
   const osOptions = getOsOptions();
   const environmentOptions = getEnvironmentOptions();
@@ -235,6 +245,62 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
     setSelectedEnvironment(environment);
     if (currentStep < 3) {
       setCurrentStep(3);
+    }
+  }
+
+  async function submitAccessRequest() {
+    if (!requestName.trim() || !requestWhatsapp.trim()) {
+      setAccessRequest({
+        status: "error",
+        message: "Entrez votre nom et votre numéro WhatsApp.",
+      });
+      return;
+    }
+
+    setAccessRequest({ status: "submitting" });
+
+    try {
+      const response = await fetch("/api/access-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          customerName: requestName,
+          whatsappNumber: requestWhatsapp,
+          preferredEnvironment: selectedEnvironment,
+          requestedOs: selectedOs,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.ok) {
+        setAccessRequest({
+          status: "error",
+          message:
+            payload.error ?? "Impossible d’envoyer la demande pour le moment.",
+        });
+        return;
+      }
+
+      setRequestName("");
+      setRequestWhatsapp("");
+      setAccessRequest({
+        status: "success",
+        message:
+          payload.message ??
+          "Votre demande a été envoyée. Nous vous contacterons sur WhatsApp.",
+      });
+    } catch {
+      setAccessRequest({
+        status: "error",
+        message: "Erreur réseau. Réessayez dans un instant.",
+      });
     }
   }
 
@@ -481,14 +547,70 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   </div>
                 </div>
 
-                <InfoPanel title="Notes rapides" tone="slate">
-                  <ul className="space-y-2 text-sm leading-7 text-slate-700">
-                    <li>- La clé vous est envoyée après le paiement via D17</li>
-                    <li>- Gardez les tirets si le message les contient déjà</li>
-                    <li>- En cas de doute, copiez-collez la clé complète au lieu de la retaper</li>
-                    <li>- Une licence active valide automatiquement l’accès à l’étape suivante</li>
-                  </ul>
-                </InfoPanel>
+                  <div className="space-y-4">
+                    <InfoPanel title="Pas encore de licence ?" tone="blue">
+                      <p className="text-sm leading-7 text-slate-700">
+                        Envoyez une demande d’accès avec votre nom et votre numéro
+                      WhatsApp. L’admin recevra la demande, générera votre clé de
+                      licence, puis vous l’enverra directement sur WhatsApp.
+                    </p>
+
+                    <div className="mt-4 space-y-3">
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-medium text-slate-900">
+                          Nom complet
+                        </span>
+                        <input
+                          type="text"
+                          value={requestName}
+                          onChange={(event) => setRequestName(event.target.value)}
+                          placeholder="Ex: Mohamed Amine"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-medium text-slate-900">
+                          Numéro WhatsApp
+                        </span>
+                        <input
+                          type="text"
+                          value={requestWhatsapp}
+                          onChange={(event) => setRequestWhatsapp(event.target.value)}
+                          placeholder="Ex: +21612345678"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={submitAccessRequest}
+                        disabled={accessRequest.status === "submitting"}
+                        className="inline-flex items-center justify-center rounded-xl border border-sky-200 bg-sky-100 px-4 py-2.5 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {accessRequest.status === "submitting"
+                          ? "Envoi..."
+                          : "Demander l’accès"}
+                      </button>
+                      <span className="text-xs text-slate-500">
+                        Environnement demandé: {currentEnvironment.label} · OS: {currentOs.label}
+                      </span>
+                    </div>
+
+                    {accessRequest.status === "success" ? (
+                      <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                        {accessRequest.message}
+                      </p>
+                    ) : null}
+                    {accessRequest.status === "error" ? (
+                      <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                        {accessRequest.message}
+                      </p>
+                    ) : null}
+                  </InfoPanel>
+                </div>
               </div>
             </>
           ) : null}
@@ -624,9 +746,9 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                 <div className="space-y-4">
                   <InfoPanel title="Que fait l’installateur actuel ?" tone="slate">
                     <ul className="space-y-2 text-sm leading-7 text-slate-700">
-                      <li>- Il télécharge le launcher AIPilot Manager adapté au système choisi</li>
-                      <li>- Sous Windows, le bootstrap installe maintenant AIPilot Manager comme une vraie app visible sur le bureau et dans le menu Démarrer</li>
-                      <li>- Il ouvre ensuite l’application manager, préremplie avec votre licence et l’outil sélectionné</li>
+                      <li>- Il télécharge AIPilot Manager dans le format adapté à votre système</li>
+                      <li>- Sous Windows, l’installateur place AIPilot Manager comme une vraie app visible sur le bureau et dans le menu Démarrer</li>
+                      <li>- Il ouvre ensuite l’application, préremplie avec votre licence et l’outil sélectionné</li>
                       <li>
                         -{" "}
                         {config.includeApiKeyInInstaller
@@ -639,8 +761,8 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
                   <InfoPanel title="Points importants" tone="blue">
                     <ul className="space-y-2 text-sm leading-7 text-slate-700">
-                      <li>- Windows utilise un bootstrap <InlineCode>.cmd</InlineCode> qui installe la vraie app desktop puis l’ouvre automatiquement</li>
-                      <li>- Linux et macOS utilisent un script shell qui récupère puis lance le manager</li>
+                      <li>- Windows télécharge un fichier <InlineCode>.cmd</InlineCode> qui installe la vraie app desktop puis l’ouvre automatiquement</li>
+                      <li>- Linux et macOS utilisent un script shell qui installe puis ouvre AIPilot Manager</li>
                       <li>- T3 Code est configuré à partir de Codex CLI, donc le manager traite Codex comme prérequis quand vous choisissez T3 Code</li>
                     </ul>
                   </InfoPanel>
@@ -823,7 +945,7 @@ function getOsOptions() {
       label: "Windows",
       tag: "Le plus courant",
       description:
-        "Windows 10/11. Le téléchargement actuel fournit un bootstrap `.cmd` qui installe AIPilot Manager sur la machine, crée les raccourcis, puis ouvre l'app.",
+        "Windows 10/11. Le téléchargement actuel fournit un fichier `.cmd` qui installe AIPilot Manager sur la machine, crée les raccourcis, puis ouvre l'app.",
       downloadHref: "/api/download/manager/windows",
       downloadLabel: "Installer AIPilot Manager pour Windows (.cmd)",
     },
@@ -832,7 +954,7 @@ function getOsOptions() {
       label: "Linux",
       tag: "Dev & serveurs",
       description:
-        "Ubuntu, Debian et autres distributions Linux. Le téléchargement actuel fournit un script shell qui installe puis lance AIPilot Manager.",
+        "Ubuntu, Debian et autres distributions Linux. Le téléchargement actuel fournit un script shell qui installe puis ouvre AIPilot Manager.",
       downloadHref: "/api/download/manager/linux",
       downloadLabel: "AIPilot Manager pour Linux (.sh)",
     },
@@ -841,7 +963,7 @@ function getOsOptions() {
       label: "macOS",
       tag: "MacBook / iMac",
       description:
-        "macOS Intel ou Apple Silicon. Le téléchargement actuel fournit un script qui récupère et lance AIPilot Manager.",
+        "macOS Intel ou Apple Silicon. Le téléchargement actuel fournit un script qui installe puis ouvre AIPilot Manager.",
       downloadHref: "/api/download/manager/macos",
       downloadLabel: "AIPilot Manager pour macOS (.sh)",
     },
