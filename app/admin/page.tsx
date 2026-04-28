@@ -436,12 +436,12 @@ export default async function AdminPage({
                                       <p className="font-semibold text-slate-950">
                                         {license.customerName}
                                       </p>
-                                      <p className="mt-1 text-slate-500">
+                                      <p className="mt-1 break-words text-slate-500">
                                         {license.customerEmail || "Email non renseigné"}
                                       </p>
                                     </TableCell>
                                     <TableCell>
-                                      <code className="rounded bg-slate-100 px-2 py-1 font-mono text-[13px] text-slate-900">
+                                      <code className="break-all rounded bg-slate-100 px-2 py-1 font-mono text-[13px] text-slate-900">
                                         {license.licenseKey}
                                       </code>
                                       <p className="mt-2 text-xs text-slate-500">
@@ -459,7 +459,7 @@ export default async function AdminPage({
                                         {license.status === "active" ? "Active" : "Suspendue"}
                                       </Badge>
                                     </TableCell>
-                                    <TableCell className="text-slate-600">
+                                    <TableCell className="break-words text-slate-600">
                                       {license.lastValidatedAt
                                         ? formatDateTime(license.lastValidatedAt)
                                         : formatDateTime(license.createdAt)}
@@ -534,7 +534,7 @@ export default async function AdminPage({
                                     </TableCell>
                                     <TableCell>
                                       <div className="space-y-2">
-                                        <p className="text-slate-700">{request.whatsappNumber}</p>
+                                        <p className="break-all text-slate-700">{request.whatsappNumber}</p>
                                         <a
                                           href={buildWhatsAppUrl(
                                             request.whatsappNumber,
@@ -543,7 +543,7 @@ export default async function AdminPage({
                                           )}
                                           target="_blank"
                                           rel="noreferrer"
-                                          className="text-xs font-medium text-sky-700 hover:text-sky-900"
+                                          className="break-all text-xs font-medium text-sky-700 hover:text-sky-900"
                                         >
                                           Ouvrir WhatsApp
                                         </a>
@@ -582,7 +582,7 @@ export default async function AdminPage({
                                         </form>
                                       ) : (
                                         <div className="space-y-2">
-                                          <code className="block rounded bg-slate-100 px-2 py-1 font-mono text-[13px] text-slate-900">
+                                          <code className="block break-all rounded bg-slate-100 px-2 py-1 font-mono text-[13px] text-slate-900">
                                             {request.generatedLicenseKey ?? "Clé non disponible"}
                                           </code>
                                           <span className="text-xs text-slate-500">Déjà traitée</span>
@@ -682,7 +682,7 @@ function HeroHeader({
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[24rem]">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-3 lg:min-w-[24rem]">
             <MetricCard label="Licences" value={String(licenseCount)} />
             <MetricCard label="Actives" value={String(activeCount)} />
             <MetricCard label="En attente" value={String(pendingCount)} />
@@ -745,7 +745,7 @@ function SectionIntro({
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 backdrop-blur">
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white/85 p-4 backdrop-blur">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
@@ -781,17 +781,17 @@ function Field({
   helperText?: string;
 }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="mb-2 block text-sm font-medium text-slate-900">{label}</span>
       <input
-        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
         name={name}
         defaultValue={defaultValue}
         placeholder={placeholder}
         type={type ?? "text"}
       />
       {helperText ? (
-        <span className="mt-2 block text-xs leading-6 text-slate-500">{helperText}</span>
+        <span className="mt-2 block break-words text-xs leading-6 text-slate-500">{helperText}</span>
       ) : null}
     </label>
   );
@@ -809,12 +809,12 @@ function SelectField({
   options: Array<{ label: string; value: string }>;
 }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="mb-2 block text-sm font-medium text-slate-900">{label}</span>
       <select
         name={name}
         defaultValue={defaultValue}
-        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -840,17 +840,17 @@ function TextAreaField({
   helperText?: string;
 }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="mb-2 block text-sm font-medium text-slate-900">{label}</span>
       <textarea
         name={name}
         defaultValue={defaultValue}
         placeholder={placeholder}
         rows={4}
-        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
       />
       {helperText ? (
-        <span className="mt-2 block text-xs leading-6 text-slate-500">{helperText}</span>
+        <span className="mt-2 block break-words text-xs leading-6 text-slate-500">{helperText}</span>
       ) : null}
     </label>
   );
@@ -900,7 +900,7 @@ function TopLink({ href, children }: { href: string; children: React.ReactNode }
   return (
     <a
       href={href}
-      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+      className="inline-flex min-w-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
     >
       {children}
     </a>
@@ -922,7 +922,7 @@ function MobileLicenseCards({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-950">{license.customerName}</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 break-words text-xs text-slate-500">
                 {license.customerEmail || "Email non renseigné"}
               </p>
             </div>
@@ -934,7 +934,7 @@ function MobileLicenseCards({
             </div>
           </div>
 
-          <code className="mt-4 block rounded-xl bg-white px-3 py-2 font-mono text-[13px] text-slate-900">
+          <code className="mt-4 block break-all rounded-xl bg-white px-3 py-2 font-mono text-[13px] text-slate-900">
             {license.licenseKey}
           </code>
 
@@ -980,7 +980,7 @@ function MobileRequestCards({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-950">{request.customerName}</p>
-              <p className="mt-1 text-sm text-slate-700">{request.whatsappNumber}</p>
+              <p className="mt-1 break-all text-sm text-slate-700">{request.whatsappNumber}</p>
             </div>
             <Badge tone={request.status === "pending" ? "amber" : "emerald"}>
               {request.status === "pending" ? "En attente" : "Acceptée"}
@@ -1004,7 +1004,7 @@ function MobileRequestCards({
             )}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex text-sm font-medium text-sky-700 hover:text-sky-900"
+            className="mt-3 inline-flex break-all text-sm font-medium text-sky-700 hover:text-sky-900"
           >
             Ouvrir WhatsApp
           </a>
@@ -1031,7 +1031,7 @@ function MobileRequestCards({
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Clé générée
               </p>
-              <code className="mt-2 block font-mono text-[13px] text-slate-900">
+              <code className="mt-2 block break-all font-mono text-[13px] text-slate-900">
                 {request.generatedLicenseKey ?? "Clé non disponible"}
               </code>
             </div>

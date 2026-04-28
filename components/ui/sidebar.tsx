@@ -8,7 +8,12 @@ export function SidebarLayout({
   sidebar: React.ReactNode;
   children: React.ReactNode;
 }) {
-  return <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">{sidebar}{children}</div>;
+  return (
+    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+      {sidebar}
+      {children}
+    </div>
+  );
 }
 
 export function Sidebar({
@@ -52,7 +57,7 @@ export function SidebarGroup({
           {title}
         </p>
       ) : null}
-      <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
+      <div className="grid gap-2 sm:grid-cols-3 lg:block lg:space-y-2">
         {children}
       </div>
     </div>
@@ -76,7 +81,7 @@ export function SidebarItem({
     <a
       href={href}
       className={cn(
-        "min-w-[14rem] rounded-2xl border px-4 py-3 transition lg:block",
+        "w-full min-w-0 rounded-2xl border px-4 py-3 transition lg:block",
         active
           ? "border-sky-300 bg-sky-100 text-sky-950 shadow-sm"
           : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white",

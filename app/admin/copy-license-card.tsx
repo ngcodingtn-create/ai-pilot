@@ -34,7 +34,7 @@ export default function CopyLicenseCard({
                 <span className="font-semibold">Client:</span> {customer}
               </p>
               {whatsapp ? (
-                <p>
+                <p className="break-all">
                   <span className="font-semibold">WhatsApp:</span> {whatsapp}
                 </p>
               ) : null}
@@ -59,7 +59,7 @@ export default function CopyLicenseCard({
           <input
             readOnly
             value={licenseKey}
-            className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 font-mono text-sm text-slate-900"
+            className="w-full min-w-0 rounded-xl border border-emerald-300 bg-white px-3 py-2.5 font-mono text-sm text-slate-900"
           />
           <Button type="button" onClick={copyLicense} variant="success" className="sm:w-auto">
             {copied ? "Copiée" : "Copier la clé"}
