@@ -2,6 +2,7 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { listAccessRequests } from "@/lib/access-request-store";
 import { getStoredConfig, LOCAL_CONFIG_RELATIVE_PATH } from "@/lib/config-store";
 import { listLicenseKeys } from "@/lib/license-store";
+import { buildWhatsAppUrl, normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -617,19 +618,34 @@ export default async function AdminPage({
                                     </TableCell>
                                     <TableCell>
                                       <div className="space-y-2">
-                                        <p className="break-all text-slate-700">{request.whatsappNumber}</p>
-                                        <a
-                                          href={buildWhatsAppUrl(
-                                            request.whatsappNumber,
-                                            request.generatedLicenseKey,
-                                            request.customerName,
-                                          )}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="break-all text-xs font-medium text-sky-700 hover:text-sky-900"
-                                        >
-                                          Ouvrir WhatsApp
-                                        </a>
+                                        <p className="break-all text-slate-700">
+                                          {normalizeTunisiaWhatsappNumber(request.whatsappNumber)?.display ??
+                                            request.whatsappNumber}
+                                        </p>
+                                        {buildAdminWhatsAppUrl(
+                                          request.whatsappNumber,
+                                          request.generatedLicenseKey,
+                                          request.customerName,
+                                        ) ? (
+                                          <a
+                                            href={
+                                              buildAdminWhatsAppUrl(
+                                                request.whatsappNumber,
+                                                request.generatedLicenseKey,
+                                                request.customerName,
+                                              ) ?? undefined
+                                            }
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="break-all text-xs font-medium text-sky-700 hover:text-sky-900"
+                                          >
+                                            Ouvrir WhatsApp
+                                          </a>
+                                        ) : (
+                                          <p className="text-xs font-medium text-rose-700">
+                                            Numéro WhatsApp à corriger
+                                          </p>
+                                        )}
                                       </div>
                                     </TableCell>
                                     <TableCell>
@@ -1055,7 +1071,10 @@ function MobileRequestCards({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-950">{request.customerName}</p>
-              <p className="mt-1 break-all text-sm text-slate-700">{request.whatsappNumber}</p>
+              <p className="mt-1 break-all text-sm text-slate-700">
+                {normalizeTunisiaWhatsappNumber(request.whatsappNumber)?.display ??
+                  request.whatsappNumber}
+              </p>
             </div>
             <Badge tone={request.status === "pending" ? "amber" : "emerald"}>
               {request.status === "pending" ? "En attente" : "Acceptée"}
@@ -1071,18 +1090,30 @@ function MobileRequestCards({
             Demandée le {formatDateTime(request.createdAt)}
           </p>
 
-          <a
-            href={buildWhatsAppUrl(
-              request.whatsappNumber,
-              request.generatedLicenseKey,
-              request.customerName,
-            )}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex break-all text-sm font-medium text-sky-700 hover:text-sky-900"
-          >
-            Ouvrir WhatsApp
-          </a>
+          {buildAdminWhatsAppUrl(
+            request.whatsappNumber,
+            request.generatedLicenseKey,
+            request.customerName,
+          ) ? (
+            <a
+              href={
+                buildAdminWhatsAppUrl(
+                  request.whatsappNumber,
+                  request.generatedLicenseKey,
+                  request.customerName,
+                ) ?? undefined
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex break-all text-sm font-medium text-sky-700 hover:text-sky-900"
+            >
+              Ouvrir WhatsApp
+            </a>
+          ) : (
+            <p className="mt-3 text-sm font-medium text-rose-700">
+              Numéro WhatsApp à corriger avant l’envoi.
+            </p>
+          )}
 
           {request.status === "pending" ? (
             <form action={acceptAccessRequestAction} className="mt-4 space-y-3">
@@ -1242,16 +1273,15 @@ function normalizeTutorialUrl(value: string | undefined) {
   return "";
 }
 
-function buildWhatsAppUrl(
+function buildAdminWhatsAppUrl(
   whatsappNumber: string,
   licenseKey: string | undefined,
   customerName: string,
 ) {
-  const digits = whatsappNumber.replace(/[^\d]/g, "");
   const message = licenseKey
     ? `Bonjour ${customerName}, voici votre clé de licence AIPilot : ${licenseKey}`
     : `Bonjour ${customerName}, votre demande AIPilot est bien reçue.`;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+  return buildWhatsAppUrl(whatsappNumber, message);
 }
 
 function formatDateTime(value: string) {

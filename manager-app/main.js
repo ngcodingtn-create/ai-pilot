@@ -668,6 +668,10 @@ function applyRuntimeSelectionToManifest(manifest, selectedModel) {
     );
   }
 
+  if (next?.azure?.opencode?.config && typeof next.azure.opencode.config === "object") {
+    next.azure.opencode.config.model = `azure/${model}`;
+  }
+
   next.azure.activeReasoningEffort = effort;
   return next;
 }
@@ -1310,15 +1314,50 @@ async function setUserEnvironmentVariables(vars, logs) {
 }
 
 function buildOpenCodeRuntimeConfig(manifest) {
+  const deployments = Array.isArray(manifest?.azure?.availableDeployments)
+    ? manifest.azure.availableDeployments
+    : [];
+  const models = Object.fromEntries(
+    [
+      ...deployments.map((item) => ({
+        deployment: item.deployment,
+        label: item.label,
+      })),
+      {
+        deployment: "gpt-5.3-codex",
+        label: "GPT-5.3 Codex",
+      },
+    ]
+      .filter(
+        (item, index, list) =>
+          list.findIndex((entry) => entry.deployment === item.deployment) === index,
+      )
+      .map((item) => [
+        item.deployment,
+        {
+          id: item.deployment,
+          name: `${item.label} (AIPilot)`,
+          options: {
+            reasoningEffort: "high",
+          },
+        },
+      ]),
+  );
+
   return {
-    providers: {
+    $schema: "https://opencode.ai/config.json",
+    model: `azure/${manifest.azure.deployment}`,
+    provider: {
       azure: {
-        resourceName: manifest.azure.resourceName,
-        apiKey: manifest.azure.apiKey,
-        deployment: manifest.azure.deployment,
+        npm: "@ai-sdk/azure",
+        options: {
+          resourceName: manifest.azure.resourceName,
+          apiKey: manifest.azure.apiKey,
+        },
+        models,
+        env: ["AZURE_RESOURCE_NAME", "AZURE_OPENAI_API_KEY"],
       },
     },
-    defaultProvider: "azure",
   };
 }
 
@@ -2201,6 +2240,13 @@ async function executeManagerAction(action, payload, event) {
         await closeDesktopProcessesForEnvironment(manifest.tool.environment, logSink);
       }
     }
+    if (manifest.tool.environment === "opencode") {
+      logSink.push(
+        `Application du modèle ${manifest.azure.deployment} dans la configuration OpenCode avant lancement...`,
+      );
+      await configureOpenCode(manifest, projectRoot, logSink);
+      await ensureManagedConfiguration(manifest, projectRoot, logSink);
+    }
     logSink.push("Lancement de l'outil...");
     await launchTool(manifest, projectRoot, logSink);
     return {
@@ -2217,6 +2263,7 @@ ipcMain.handle("manager:get-defaults", async () => {
   return {
     backendUrl: defaults.backendUrl,
     platform: PLATFORM_KEY,
+    homeDir: os.homedir(),
     licenseKey: defaults.licenseKey,
     environment: defaults.environment,
     projectRoot: defaults.projectRoot,

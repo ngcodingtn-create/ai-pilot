@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 
 export type HomeConfig = {
   azureResourceName: string;
@@ -59,6 +60,13 @@ function getTotalStepsForEnvironment(environment: EnvironmentKey) {
     : DEFAULT_TOTAL_STEPS;
 }
 
+function normalizeWhatsappInput(value: string) {
+  const raw = String(value ?? "");
+  const hasLeadingPlus = raw.trim().startsWith("+");
+  const digits = raw.replace(/[^\d]/g, "");
+  return hasLeadingPlus ? `+${digits}` : digits;
+}
+
 export default function HomeClient({ config }: { config: HomeConfig }) {
   const [selectedOs, setSelectedOs] = useState<OsKey>("windows");
   const [selectedEnvironment, setSelectedEnvironment] =
@@ -76,6 +84,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
     status: "idle",
   });
   const totalSteps = getTotalStepsForEnvironment(selectedEnvironment);
+  const normalizedRequestWhatsapp = normalizeTunisiaWhatsappNumber(requestWhatsapp);
 
   const osOptions = getOsOptions();
   const environmentOptions = getEnvironmentOptions();
@@ -95,6 +104,8 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
     normalizedLicenseKey,
     selectedEnvironment,
   );
+  const currentManualGuideHref = getManualGuideHref(selectedOs);
+  const currentManualGuideLabel = getManualGuideLabel(selectedOs);
   const currentDownloadCommand = buildManagerDownloadCommand(
     selectedOs,
     config.siteUrl,
@@ -281,6 +292,15 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
       return;
     }
 
+    if (!normalizedRequestWhatsapp) {
+      setAccessRequest({
+        status: "error",
+        message:
+          "Le numéro WhatsApp n’a pas pu être compris. Corrigez-le au format tunisien, par exemple +216 29 293 038.",
+      });
+      return;
+    }
+
     setAccessRequest({ status: "submitting" });
 
     try {
@@ -291,7 +311,7 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
         },
         body: JSON.stringify({
           customerName: requestName,
-          whatsappNumber: requestWhatsapp,
+          whatsappNumber: normalizedRequestWhatsapp.e164,
           preferredEnvironment: selectedEnvironment,
           requestedOs: selectedOs,
         }),
@@ -368,21 +388,25 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
           <Badge tone="amber">Téléchargement selon votre OS</Badge>
         </div>
 
-        <div className="mt-6 grid gap-3 lg:grid-cols-3">
-          <QuickFact
-            title="Que fait ce portail ?"
-            text="Le portail organise votre parcours de téléchargement selon votre système, votre licence et l'environnement choisi."
-          />
+          <div className="mt-6 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+            <QuickFact
+              title="Que fait ce portail ?"
+              text="Le portail organise votre parcours de téléchargement selon votre système, votre licence et l'environnement choisi."
+            />
           <QuickFact
             title="Quels environnements ?"
             text="Codex, T3 Code et OpenCode passent tous par AIPilot Manager, qui récupère ensuite la bonne configuration Azure côté serveur."
           />
-          <QuickFact
-            title="Qu'est-ce qui est prêt maintenant ?"
-            text="Le repo gère maintenant le parcours licence, l'espace admin Neon, le téléchargement du manager et la configuration/réparation des outils depuis la même expérience."
-          />
-        </div>
-      </header>
+            <QuickFact
+              title="Qu'est-ce qui est prêt maintenant ?"
+              text="Le repo gère maintenant le parcours licence, l'espace admin Neon, le téléchargement du manager et la configuration/réparation des outils depuis la même expérience."
+            />
+            <QuickFact
+              title="Comment recevez-vous la clé API ?"
+              text="Après validation ou paiement, l’équipe AIPilot vous envoie la clé API nécessaire sur WhatsApp pour le guide manuel et les réparations avancées."
+            />
+          </div>
+        </header>
 
       <section
         className={`mt-6 grid gap-3 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${
@@ -509,11 +533,11 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
 
           {visibleStep === 2 ? (
             <>
-              <NoticeCard
-                tone="emerald"
-                title="Entrez votre clé de licence telle que vous l'avez reçue"
-                text="Utilisez le format habituel: XXXX-XXXX-XXXX-XXXX. Dès que le format est correct, le portail vérifie la licence côté serveur avant de vous laisser continuer."
-              />
+                <NoticeCard
+                  tone="emerald"
+                  title="Entrez votre clé de licence telle que vous l'avez reçue"
+                  text="Utilisez le format habituel: XXXX-XXXX-XXXX-XXXX. Cette clé de licence vous est généralement envoyée sur WhatsApp par l’équipe AIPilot. Dès que le format est correct, le portail vérifie la licence côté serveur avant de vous laisser continuer."
+                />
 
               <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
@@ -608,17 +632,35 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                         />
                       </label>
 
-                      <label className="block">
+      <label className="block">
                         <span className="mb-2 block text-sm font-medium text-slate-900">
                           Numéro WhatsApp
                         </span>
                         <input
                           type="text"
                           value={requestWhatsapp}
-                          onChange={(event) => setRequestWhatsapp(event.target.value)}
-                          placeholder="Ex: +21612345678"
+                          onChange={(event) =>
+                            setRequestWhatsapp(normalizeWhatsappInput(event.target.value))
+                          }
+                          placeholder="Ex: +216 29 293 038"
                           className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                         />
+                        <span className="mt-2 block text-xs leading-6 text-slate-500">
+                          Entrez votre numéro WhatsApp tunisien. Si vous saisissez
+                          seulement 8 chiffres, AIPilot le convertira automatiquement
+                          en format +216.
+                        </span>
+                        {requestWhatsapp.trim() ? (
+                          normalizedRequestWhatsapp ? (
+                            <span className="mt-2 block text-xs font-medium text-emerald-700">
+                              Numéro détecté: {normalizedRequestWhatsapp.display}
+                            </span>
+                          ) : (
+                            <span className="mt-2 block text-xs font-medium text-rose-700">
+                              Format non reconnu. Corrigez le numéro avant d’envoyer la demande.
+                            </span>
+                          )
+                        ) : null}
                       </label>
                     </div>
 
@@ -626,7 +668,10 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                       <button
                         type="button"
                         onClick={submitAccessRequest}
-                        disabled={accessRequest.status === "submitting"}
+                        disabled={
+                          accessRequest.status === "submitting" ||
+                          Boolean(requestWhatsapp.trim() && !normalizedRequestWhatsapp)
+                        }
                         className="inline-flex items-center justify-center rounded-xl border border-sky-200 bg-sky-100 px-4 py-2.5 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {accessRequest.status === "submitting"
@@ -754,19 +799,19 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                   {currentEnvironment.status === "available" ? (
                     <>
                       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                        <DownloadButton
-                          href={currentDownloadHref}
-                          label={`Télécharger ${currentOs.downloadLabel}`}
-                        />
-                        <a
-                          href="/tuto"
-                          className="inline-flex w-full items-center justify-center rounded-[1rem] border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto"
-                        >
-                          Ouvrir le guide manuel
-                        </a>
-                        <SecondaryButton onClick={() => selectEnvironment("opencode")}>
-                          Revenir sur OpenCode
-                        </SecondaryButton>
+                          <DownloadButton
+                            href={currentDownloadHref}
+                            label={`Télécharger ${currentOs.downloadLabel}`}
+                          />
+                          <a
+                            href={currentManualGuideHref}
+                            className="inline-flex w-full items-center justify-center rounded-[1rem] border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto"
+                          >
+                            {currentManualGuideLabel}
+                          </a>
+                          <SecondaryButton onClick={() => selectEnvironment("opencode")}>
+                            Revenir sur OpenCode
+                          </SecondaryButton>
                       </div>
 
                       <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
@@ -793,25 +838,26 @@ export default function HomeClient({ config }: { config: HomeConfig }) {
                     <ul className="space-y-2 text-sm leading-7 text-slate-700">
                       <li>- Il télécharge AIPilot Manager dans le format adapté à votre système</li>
                       <li>- Sous Windows, l’installateur place AIPilot Manager comme une vraie app visible sur le bureau et dans le menu Démarrer</li>
-                      <li>- Il ouvre ensuite l’application, préremplie avec votre licence et l’outil sélectionné</li>
-                      <li>
-                        -{" "}
-                        {config.includeApiKeyInInstaller
-                          ? "Le manager peut utiliser la clé Azure globale ou la clé spécifique de la licence côté serveur"
-                          : "Le manager s’appuie sur la licence pour récupérer la bonne configuration côté serveur"}
-                      </li>
-                      <li>- Il sait installer, configurer et réparer OpenCode, Codex, et T3 Code via Codex CLI</li>
-                    </ul>
-                  </InfoPanel>
+                        <li>- Il ouvre ensuite l’application, préremplie avec votre licence et l’outil sélectionné</li>
+                        <li>
+                          -{" "}
+                          {config.includeApiKeyInInstaller
+                            ? "Le manager peut utiliser la clé Azure globale ou la clé spécifique de la licence côté serveur"
+                            : "Le manager s’appuie sur la licence pour récupérer la bonne configuration côté serveur"}
+                        </li>
+                        <li>- Si vous choisissez la configuration manuelle, la clé API à coller dans les fichiers vous sera communiquée sur WhatsApp par l’équipe AIPilot</li>
+                        <li>- Il sait installer, configurer et réparer OpenCode, Codex, et T3 Code via Codex CLI</li>
+                      </ul>
+                    </InfoPanel>
 
                   <InfoPanel title="Points importants" tone="blue">
                     <ul className="space-y-2 text-sm leading-7 text-slate-700">
-                      <li>- Windows télécharge un fichier <InlineCode>.cmd</InlineCode> qui installe la vraie app desktop puis l’ouvre automatiquement</li>
-                      <li>- Linux et macOS utilisent un script shell qui installe puis ouvre AIPilot Manager</li>
-                      <li>- T3 Code est configuré à partir de Codex CLI, donc le manager traite Codex comme prérequis quand vous choisissez T3 Code</li>
-                      <li>- Le guide manuel complet est disponible à tout moment sur <InlineCode>/tuto</InlineCode> si vous voulez revoir chaque étape manuellement</li>
-                    </ul>
-                  </InfoPanel>
+                        <li>- Windows télécharge un fichier <InlineCode>.cmd</InlineCode> qui installe la vraie app desktop puis l’ouvre automatiquement</li>
+                        <li>- Linux et macOS utilisent un script shell qui installe puis ouvre AIPilot Manager</li>
+                        <li>- T3 Code est configuré à partir de Codex CLI, donc le manager traite Codex comme prérequis quand vous choisissez T3 Code</li>
+                        <li>- Le guide manuel adapté à votre système est disponible à tout moment ici: <InlineCode>{currentManualGuideHref}</InlineCode></li>
+                      </ul>
+                    </InfoPanel>
                 </div>
               </div>
             </>
@@ -1126,6 +1172,18 @@ function buildManagerDownloadCommand(
   }
 
   return `curl -fsSL ${downloadUrl} | bash`;
+}
+
+function getManualGuideHref(selectedOs: OsKey) {
+  if (selectedOs === "macos") return "/tuto-mac";
+  if (selectedOs === "linux") return "/tuto-linux";
+  return "/tuto";
+}
+
+function getManualGuideLabel(selectedOs: OsKey) {
+  if (selectedOs === "macos") return "Ouvrir le guide manuel macOS";
+  if (selectedOs === "linux") return "Ouvrir le guide manuel Linux";
+  return "Ouvrir le guide manuel Windows";
 }
 
 function getEnvironmentOptions() {

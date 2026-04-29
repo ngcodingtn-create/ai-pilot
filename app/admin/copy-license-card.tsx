@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { buildWhatsAppUrl, normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 
 export default function CopyLicenseCard({
   customer,
@@ -14,6 +15,15 @@ export default function CopyLicenseCard({
   whatsapp?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const normalizedWhatsapp = whatsapp
+    ? normalizeTunisiaWhatsappNumber(whatsapp)
+    : null;
+  const whatsappUrl = whatsapp
+    ? buildWhatsAppUrl(
+        whatsapp,
+        `Bonjour ${customer}, voici votre clé de licence AIPilot : ${licenseKey}`,
+      )
+    : null;
 
   async function copyLicense() {
     await navigator.clipboard.writeText(licenseKey);
@@ -35,23 +45,26 @@ export default function CopyLicenseCard({
               </p>
               {whatsapp ? (
                 <p className="break-all">
-                  <span className="font-semibold">WhatsApp:</span> {whatsapp}
+                  <span className="font-semibold">WhatsApp:</span>{" "}
+                  {normalizedWhatsapp?.display ?? whatsapp}
                 </p>
               ) : null}
             </div>
           </div>
 
-          {whatsapp ? (
+          {whatsappUrl ? (
             <a
-              href={`https://wa.me/${whatsapp.replace(/[^\d]/g, "")}?text=${encodeURIComponent(
-                `Bonjour ${customer}, voici votre clé de licence AIPilot : ${licenseKey}`,
-              )}`}
+              href={whatsappUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
             >
               Ouvrir WhatsApp
             </a>
+          ) : whatsapp ? (
+            <p className="text-sm font-medium text-rose-700">
+              Numéro WhatsApp à corriger avant l’envoi.
+            </p>
           ) : null}
         </div>
 

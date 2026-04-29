@@ -79,20 +79,49 @@ model_reasoning_effort = "xhigh"
 
 function buildOpenCodeConfig(
   resourceName: string,
+  apiKey: string,
   deployment: string,
   availableDeployments: AvailableDeployment[],
 ) {
+  const models = Object.fromEntries(
+    [
+      ...availableDeployments.map((item) => ({
+        deployment: item.deployment,
+        label: item.label,
+      })),
+      {
+        deployment: "gpt-5.3-codex",
+        label: "GPT-5.3 Codex",
+      },
+    ]
+      .filter(
+        (item, index, list) =>
+          list.findIndex((entry) => entry.deployment === item.deployment) === index,
+      )
+      .map((item) => [
+        item.deployment,
+        {
+          id: item.deployment,
+          name: `${item.label} (AIPilot)`,
+          options: {
+            reasoningEffort: "high",
+          },
+        },
+      ]),
+  );
+
   return {
     $schema: "https://opencode.ai/config.json",
+    model: `azure/${deployment}`,
     provider: {
       azure: {
         npm: "@ai-sdk/azure",
         options: {
-          baseURL: `https://${resourceName}.openai.azure.com/openai/deployments`,
+          resourceName,
+          apiKey,
         },
-        models: Object.fromEntries(
-          availableDeployments.map((item) => [item.deployment, {}]),
-        ),
+        models,
+        env: ["AZURE_RESOURCE_NAME", "AZURE_OPENAI_API_KEY"],
       },
     },
   };
@@ -361,7 +390,12 @@ export async function POST(request: Request) {
         configToml: buildCodexConfig(resourceName, deployment),
       },
       opencode: {
-        config: buildOpenCodeConfig(resourceName, deployment, availableDeployments),
+        config: buildOpenCodeConfig(
+          resourceName,
+          effectiveApiKey,
+          deployment,
+          availableDeployments,
+        ),
         auth: buildOpenCodeAuth(effectiveApiKey),
       },
     },

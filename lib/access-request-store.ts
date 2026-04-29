@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { getSql } from "./db";
+import { normalizeTunisiaWhatsappNumber } from "./whatsapp";
 
 export type AccessRequestEnvironment = "codex" | "vscode-codex" | "t3code" | "opencode";
 export type AccessRequestOs = "windows" | "linux" | "macos";
@@ -47,10 +48,6 @@ const LOCAL_ACCESS_REQUEST_PATH = path.resolve(
 
 function buildId() {
   return randomBytes(12).toString("hex");
-}
-
-function normalizeWhatsappNumber(value: string) {
-  return value.replace(/[^\d+]/g, "").slice(0, 24);
 }
 
 function mapRowToAccessRequest(row: AccessRequestRow): AccessRequestRecord {
@@ -121,20 +118,24 @@ export async function createAccessRequest(input: {
   requestedOs: AccessRequestOs;
 }) {
   const customerName = String(input.customerName ?? "").trim();
-  const whatsappNumber = normalizeWhatsappNumber(String(input.whatsappNumber ?? ""));
+  const normalizedWhatsapp = normalizeTunisiaWhatsappNumber(
+    String(input.whatsappNumber ?? ""),
+  );
 
   if (!customerName) {
     throw new Error("Le nom est requis.");
   }
 
-  if (whatsappNumber.length < 8) {
-    throw new Error("Le numéro WhatsApp est invalide.");
+  if (!normalizedWhatsapp) {
+    throw new Error(
+      "Le numéro WhatsApp est invalide. Entrez un numéro tunisien valide, par exemple +216 29 293 038.",
+    );
   }
 
   const record: AccessRequestRecord = {
     id: buildId(),
     customerName,
-    whatsappNumber,
+    whatsappNumber: normalizedWhatsapp.e164,
     preferredEnvironment: input.preferredEnvironment,
     requestedOs: input.requestedOs,
     status: "pending",

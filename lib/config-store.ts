@@ -29,6 +29,15 @@ type LocalConfigFile = {
 };
 
 type LocalOpenCodeRuntimeConfig = {
+  model?: string;
+  provider?: {
+    azure?: {
+      options?: {
+        apiKey?: string;
+        resourceName?: string;
+      };
+    };
+  };
   providers?: {
     azure?: {
       apiKey?: string;
@@ -196,21 +205,29 @@ export async function getStoredConfig(): Promise<StoredConfig> {
       readLocalConfigFile(),
       readLocalOpenCodeConfigFile(),
     ]);
-    const runtimeAzure = opencodeRuntime.providers?.azure;
+    const runtimeAzureLegacy = opencodeRuntime.providers?.azure;
+    const runtimeAzureProvider = opencodeRuntime.provider?.azure;
+    const runtimeModel = String(opencodeRuntime.model ?? "").trim();
+    const runtimeDeployment =
+      runtimeModel.startsWith("azure/") ? runtimeModel.slice("azure/".length) : "";
 
     return {
       azureResourceName:
         local.azureResourceName ??
-        runtimeAzure?.resourceName ??
+        runtimeAzureProvider?.options?.resourceName ??
+        runtimeAzureLegacy?.resourceName ??
         DEFAULTS.azureResourceName,
       azureDefaultDeployment:
         local.azureDefaultDeployment ??
-        runtimeAzure?.deployment ??
+        runtimeDeployment ??
+        runtimeAzureLegacy?.deployment ??
         DEFAULTS.azureDefaultDeployment,
       azureGpt55Deployment:
         local.azureGpt55Deployment ?? DEFAULTS.azureGpt55Deployment,
       azureApiKey: readStoredSecret(
-        local.azureApiKey ?? runtimeAzure?.apiKey,
+        local.azureApiKey ??
+          runtimeAzureProvider?.options?.apiKey ??
+          runtimeAzureLegacy?.apiKey,
         local.azureApiKeyEncrypted ?? false,
       ),
       includeApiKeyInInstaller:
@@ -229,7 +246,11 @@ export async function getStoredConfig(): Promise<StoredConfig> {
     FROM app_config
   `;
   const opencodeRuntime = await readLocalOpenCodeConfigFile();
-  const runtimeAzure = opencodeRuntime.providers?.azure;
+  const runtimeAzureLegacy = opencodeRuntime.providers?.azure;
+  const runtimeAzureProvider = opencodeRuntime.provider?.azure;
+  const runtimeModel = String(opencodeRuntime.model ?? "").trim();
+  const runtimeDeployment =
+    runtimeModel.startsWith("azure/") ? runtimeModel.slice("azure/".length) : "";
 
   const config: StoredConfig = { ...DEFAULTS };
 
@@ -254,12 +275,19 @@ export async function getStoredConfig(): Promise<StoredConfig> {
   }
 
   config.azureResourceName =
-    config.azureResourceName || runtimeAzure?.resourceName || DEFAULTS.azureResourceName;
+    config.azureResourceName ||
+    runtimeAzureProvider?.options?.resourceName ||
+    runtimeAzureLegacy?.resourceName ||
+    DEFAULTS.azureResourceName;
   config.azureDefaultDeployment =
     config.azureDefaultDeployment ||
-    runtimeAzure?.deployment ||
+    runtimeDeployment ||
+    runtimeAzureLegacy?.deployment ||
     DEFAULTS.azureDefaultDeployment;
-  config.azureApiKey = config.azureApiKey || runtimeAzure?.apiKey;
+  config.azureApiKey =
+    config.azureApiKey ||
+    runtimeAzureProvider?.options?.apiKey ||
+    runtimeAzureLegacy?.apiKey;
 
   return config;
 }

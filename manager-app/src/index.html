@@ -15,7 +15,12 @@
             <strong class="app-title">AIPilot Manager</strong>
             <span id="version-chip" class="version-badge">v0.0.0</span>
           </div>
-          <button id="sidebar-toggle" class="titlebar-icon-button sidebar-toggle-button" type="button" aria-label="Réduire ou afficher la barre latérale">
+          <button
+            id="sidebar-toggle"
+            class="titlebar-icon-button sidebar-toggle-button"
+            type="button"
+            aria-label="Réduire ou afficher la barre latérale"
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
               <path d="M4 5h16" />
               <path d="M4 12h16" />
@@ -39,7 +44,6 @@
               <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .738-1.674C19.41 13.966 18 12 18 8A6 6 0 0 0 6 8c0 4-1.411 5.966-2.738 7.326" />
             </svg>
           </button>
-
           <button id="help-button" class="titlebar-icon-button" type="button" aria-label="Aide">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
               <circle cx="12" cy="12" r="9" />
@@ -71,17 +75,7 @@
       <div class="app-body">
         <aside class="sidebar">
           <nav class="sidebar-nav">
-            <button id="nav-home" class="nav-item is-active" type="button">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M3 10.5 12 3l9 7.5" />
-                  <path d="M5 9.75V20h14V9.75" />
-                  <path d="M9 20v-6h6v6" />
-                </svg>
-              </span>
-              <span>Accueil</span>
-            </button>
-            <button id="nav-configuration" class="nav-item" type="button">
+            <button id="nav-configuration" class="nav-item is-active" type="button">
               <span class="nav-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                   <path d="M12 2v4" />
@@ -96,26 +90,6 @@
                 </svg>
               </span>
               <span>Configuration</span>
-            </button>
-            <button id="nav-preparation" class="nav-item" type="button">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M14.7 6.3a1 1 0 0 0 1.4 1.4l2.9-2.9a1 1 0 0 0-1.4-1.4z" />
-                  <path d="m4 20 6-6" />
-                  <path d="m2 22 2-2" />
-                  <path d="m7 11 6 6" />
-                  <path d="m14 4 6 6" />
-                </svg>
-              </span>
-              <span>Préparation</span>
-            </button>
-            <button id="nav-diagnostics" class="nav-item" type="button">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M3 12h4l3-8 4 16 3-8h4" />
-                </svg>
-              </span>
-              <span>Diagnostics</span>
             </button>
             <button id="nav-tutorials" class="nav-item" type="button">
               <span class="nav-icon">
@@ -168,7 +142,7 @@
           <div class="sidebar-bottom">
             <section class="help-card">
               <div class="help-card-copy">
-                <h3>Besoin d'aide ?</h3>
+                <h3>Besoin d’aide ?</h3>
                 <p>Consultez nos guides et tutoriels</p>
               </div>
               <button id="sidebar-open-tutorials" class="help-card-button" type="button">
@@ -198,334 +172,122 @@
         </aside>
 
         <section class="main-content">
-          <section id="view-home" class="view is-active">
-            <header class="page-header">
-              <h1>Bienvenue dans AIPilot Manager 👋</h1>
-              <p>Suivez les étapes ci-dessous pour préparer et lancer votre outil IA.</p>
-            </header>
+          <section id="view-configuration" class="view is-active">
+            <div class="config-page-head">
+              <div class="page-header">
+                <h1>Configuration &amp; Environnement</h1>
+                <p>Connectez votre licence, préparez votre outil IA et laissez AIPilot vérifier tout le reste automatiquement.</p>
+              </div>
+              <div class="page-header-actions">
+                <button id="config-refresh" class="small-secondary-button" type="button">Actualiser</button>
+                <button id="config-repair-all" class="small-primary-button" type="button">Réparer tout</button>
+              </div>
+            </div>
 
-            <section class="guided-home">
-              <div id="home-stepper" class="guided-stepper"></div>
-
-              <article class="content-card guided-card">
-                <div class="guided-card-heading">
-                  <span id="home-step-eyebrow" class="guided-eyebrow">Étape 1 sur 6</span>
-                  <h2 id="home-step-title">Connexion de licence</h2>
-                  <p id="home-step-subtitle">Connectez votre licence AIPilot pour récupérer votre configuration.</p>
-                </div>
-
-                <div class="guided-card-grid">
-                  <section class="guided-main">
-                    <div id="home-panel-license" class="guided-panel is-visible">
-                      <div class="info-banner">
-                        <div class="info-banner-icon">i</div>
-                        <div class="info-banner-copy">
-                          <strong>Votre licence est fournie sur le portail AIPilot.</strong>
-                          <span>Elle permet d’accéder à la configuration et aux ressources Azure associées.</span>
-                        </div>
-                      </div>
-
-                      <div id="config-form-wrap" class="config-form-wrap guided-form">
-                        <label class="field">
-                          <span>Clé de licence</span>
-                          <input id="license-key" type="text" placeholder="Entrez votre clé de licence" />
-                        </label>
-                        <label class="field">
-                          <span>Outil</span>
-                          <select id="environment">
-                            <option value="codex">Codex app</option>
-                            <option value="vscode-codex">VS Code Codex</option>
-                            <option value="t3code">T3 Code</option>
-                            <option value="opencode">OpenCode</option>
-                          </select>
-                        </label>
-                        <div class="field">
-                          <span>Dossier projet</span>
-                          <div class="inline-field">
-                            <input id="project-root" type="text" readonly placeholder="Optionnel" />
-                            <button id="choose-folder" class="small-secondary-button" type="button">Choisir</button>
-                          </div>
-                        </div>
-                        <button id="connect" class="step-primary-button" type="button">Connecter la licence</button>
-                      </div>
-                    </div>
-
-                    <div id="home-panel-azure" class="guided-panel">
-                      <div id="config-list" class="config-list"></div>
-                      <div class="guided-panel-actions">
-                        <button id="home-open-configuration" class="small-secondary-button" type="button">Voir la configuration détaillée</button>
-                      </div>
-                    </div>
-
-                    <div id="home-panel-preparation" class="guided-panel">
-                      <div id="prep-operation-banner" class="operation-banner">
-                        <div class="operation-banner-head">
-                          <span id="prep-operation-status" class="verification-status">En attente</span>
-                          <strong id="prep-operation-title">Aucune action en cours</strong>
-                        </div>
-                        <p id="prep-operation-detail">AIPilot attend votre prochaine action.</p>
-                      </div>
-                      <div id="prep-list" class="prep-summary-list"></div>
-                      <div class="guided-panel-actions two-actions">
-                        <button id="home-run-preparation" class="small-primary-button" type="button">Installer et configurer</button>
-                        <button id="home-prep-repair" class="small-secondary-button" type="button">Réparer</button>
-                      </div>
-                    </div>
-
-                    <div id="home-panel-diagnostics" class="guided-panel">
-                      <div id="machine-list" class="machine-list"></div>
-                      <div id="issues-list" class="issues-list guided-issues"></div>
-                      <div class="guided-panel-actions two-actions">
-                        <button id="home-open-diagnostics" class="small-secondary-button" type="button">Voir tous les diagnostics</button>
-                        <button id="home-open-problems" class="small-secondary-button" type="button">Voir les problèmes</button>
-                      </div>
-                    </div>
-
-                    <div id="home-panel-ready" class="guided-panel">
-                      <div class="success-banner">
-                        <div class="success-banner-dot">✓</div>
-                        <div class="success-banner-copy">
-                          <strong>Votre environnement est prêt</strong>
-                          <span>Vous pouvez relancer un outil, vérifier la configuration ou réparer à tout moment.</span>
-                        </div>
-                      </div>
-                      <div class="guided-ready-grid">
-                        <div class="ready-mini-card">
-                          <span>Outil prêt</span>
-                          <strong id="home-ready-tool">-</strong>
-                        </div>
-                        <div class="ready-mini-card">
-                          <span>Modèle actif</span>
-                          <strong id="home-ready-model">-</strong>
-                        </div>
-                        <div class="ready-mini-card">
-                          <span>Diagnostics</span>
-                          <strong id="home-ready-diagnostics">-</strong>
-                        </div>
-                      </div>
-                      <div class="guided-panel-actions two-actions">
-                        <button id="home-open-tutorials" class="small-secondary-button" type="button">Ouvrir les tutoriels</button>
-                        <button id="home-open-updates" class="small-secondary-button" type="button">Voir les mises à jour</button>
-                      </div>
-                    </div>
-
-                    <div id="home-panel-launch" class="guided-panel">
-                      <button id="home-launch-tool" class="step-primary-button launch-home-button" type="button">Lancer l’outil</button>
-                      <p class="launch-home-note">Le lancement reste disponible à tout moment depuis le panneau de droite.</p>
-                    </div>
-                  </section>
-
-                  <aside class="guided-side">
-                    <div class="mini-section-head">
-                      <h3>Que fait cette étape ?</h3>
-                    </div>
-                    <div id="home-step-explainer" class="guided-explainer"></div>
-                <div class="guided-help-box">
-                  <strong>Besoin d’aide ?</strong>
-                  <p>Consultez notre guide de connexion de licence.</p>
-                  <button id="sidebar-open-tutorials-home" class="small-link" type="button">Ouvrir le tutoriel</button>
-                </div>
-                  </aside>
-                </div>
-              </article>
-
-              <article class="content-card guided-progress-card">
-                <div class="mini-section-head">
-                  <h3>Votre progression</h3>
-                </div>
-                <div id="home-progress-strip" class="guided-progress-strip"></div>
-              </article>
+            <section class="tool-selection-strip">
+              <div class="section-title-wrap">
+                <h2>Outil sélectionné</h2>
+                <p>La configuration et les vérifications ci-dessous sont spécifiques à l’outil choisi.</p>
+              </div>
+              <div id="tool-card-grid" class="tool-card-grid"></div>
             </section>
 
-            <section class="update-banner">
-              <div class="update-banner-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <path d="m7 10 5 5 5-5" />
-                  <path d="M12 15V3" />
-                </svg>
-              </div>
-              <div class="update-banner-copy">
-                <div class="update-banner-title-row">
-                  <strong id="update-banner-title">Mises à jour disponibles</strong>
-                  <span class="new-badge">Nouveau</span>
+            <section class="content-card readiness-banner">
+              <div class="readiness-banner-main">
+                <div id="environment-ready-icon" class="readiness-icon">✓</div>
+                <div>
+                  <h3 id="environment-ready-title">Votre environnement est prêt</h3>
+                  <p id="environment-ready-subtitle">Tous les composants sont installés et configurés correctement.</p>
                 </div>
-                <p id="update-message">Une nouvelle version d'AIPilot Manager est disponible.</p>
               </div>
-              <div class="update-banner-actions">
-                <button id="home-open-release-notes" class="update-link-button" type="button">Voir les nouveautés</button>
-                <button id="install-update" class="install-update-button" type="button" disabled>
-                  <span class="icon-wrap icon-15">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <path d="m7 10 5 5 5-5" />
-                      <path d="M12 15V3" />
-                    </svg>
-                  </span>
-                  <span>Installer maintenant</span>
-                </button>
-              </div>
+              <div id="banner-stats" class="readiness-stats"></div>
             </section>
-          </section>
 
-          <section id="view-configuration" class="view">
-            <article class="content-card single-view-card">
-              <div class="card-header">
-                <h2>Configuration AIPilot</h2>
-                <p>Connectez votre licence, choisissez l’outil, puis laissez AIPilot charger la bonne configuration Azure.</p>
-              </div>
-
-              <div class="split-view-grid">
-                <section class="stack-card">
-                  <div class="mini-section-head">
-                    <h3>Connexion</h3>
-                    <p>Étape 1: associez cette machine à votre licence AIPilot.</p>
+            <section class="content-card config-section-card">
+              <div class="section-row-head">
+                <div class="section-row-title">
+                  <span class="section-index">1</span>
+                  <div>
+                    <h2>Licence AIPilot</h2>
+                    <p>Votre licence est connectée et active.</p>
                   </div>
-                  <div class="config-form-wrap config-form-wrap-always">
-                    <label class="field">
-                      <span>Clé de licence</span>
-                      <input id="config-license-key" type="text" placeholder="ABCD-1234-EFGH-5678" />
-                    </label>
-                    <label class="field">
-                      <span>Outil</span>
-                      <select id="config-environment">
-                        <option value="codex">Codex app</option>
-                        <option value="vscode-codex">VS Code Codex</option>
-                        <option value="t3code">T3 Code</option>
-                        <option value="opencode">OpenCode</option>
-                      </select>
-                    </label>
-                    <div class="field">
-                      <span>Dossier projet</span>
-                      <div class="inline-field">
-                        <input id="config-project-root" type="text" readonly placeholder="Optionnel" />
-                        <button id="config-choose-folder" class="small-secondary-button" type="button">Choisir</button>
-                      </div>
-                    </div>
-                    <button id="config-connect" class="small-primary-button" type="button">Connecter la licence</button>
-                  </div>
-                </section>
-
-                <section class="stack-card">
-                  <div class="mini-section-head">
-                    <h3>Configuration chargée</h3>
-                    <p>Résumé du client, de la ressource Azure et du déploiement actif.</p>
-                  </div>
-                  <div id="config-detail-list" class="summary-block"></div>
-                </section>
-              </div>
-
-              <section id="codex-launcher-card" class="stack-card codex-launcher-card">
-                <div class="mini-section-head">
-                  <h3>Lanceur Codex app Azure</h3>
-                  <p>Ne passez pas par le sélecteur visuel de modèles de Codex app. Choisissez ici le bon déploiement Azure, AIPilot réécrit le config.toml puis relance Codex app proprement.</p>
                 </div>
-                <div class="codex-launcher-grid">
-                  <label class="field">
-                    <span>Modèle Azure</span>
-                    <select id="codex-model-select"></select>
-                  </label>
+                <div class="section-row-actions">
+                  <button id="license-view-detail" class="small-secondary-button" type="button">Voir le détail</button>
+                  <button id="license-reconnect" class="small-secondary-button" type="button">Reconnecter</button>
                 </div>
-                <div class="launcher-note">
-                  <strong>Ce que fait AIPilot</strong>
-                  <p>Le manager met à jour <code>~/.codex/config.toml</code>, garde Azure comme provider, ferme Codex app si besoin, puis la relance avec le bon déploiement.</p>
-                </div>
-                <div class="view-actions">
-                  <button id="codex-apply-launch" class="small-primary-button" type="button" disabled>Appliquer et lancer Codex app</button>
-                  <button id="codex-open-config" class="small-secondary-button" type="button" disabled>Ouvrir config.toml</button>
-                </div>
-              </section>
-            </article>
-          </section>
-
-          <section id="view-preparation" class="view">
-            <article class="content-card single-view-card">
-              <div class="card-header">
-                <h2>Préparation de l’outil</h2>
-                <p>AIPilot installe, configure, vérifie et relance l’outil sans demander de manipulations techniques inutiles.</p>
               </div>
 
-              <div class="split-view-grid preparation-layout">
-                <section class="stack-card">
-                  <div class="mini-section-head">
-                    <h3>Progression actuelle</h3>
-                    <p>Vous voyez ici ce que le manager est en train de faire en ce moment.</p>
+              <div class="license-form-grid">
+                <label class="field">
+                  <span>Clé de licence</span>
+                  <input id="config-license-key" type="text" placeholder="ABCD-1234-EFGH-5678" />
+                </label>
+                <label class="field field-project">
+                  <span>Dossier projet</span>
+                  <div class="inline-field">
+                    <input id="config-project-root" type="text" readonly placeholder="Optionnel" />
+                    <button id="config-choose-folder" class="small-secondary-button" type="button">Choisir</button>
                   </div>
-                  <div id="prep-operation-banner" class="operation-banner">
-                    <div class="operation-banner-head">
-                      <span id="prep-operation-status" class="verification-status">En attente</span>
-                      <strong id="prep-operation-title">Aucune action en cours</strong>
-                    </div>
-                    <p id="prep-operation-detail">AIPilot attend votre prochaine action.</p>
-                  </div>
-                  <div id="prep-detail-list" class="prep-summary-list"></div>
-                </section>
+                </label>
+                <button id="config-connect" class="license-connect-button" type="button">Connecter la licence</button>
+              </div>
 
-                <section class="stack-card">
-                  <div class="mini-section-head">
-                    <h3>Actions rapides</h3>
-                    <p>Lancez l’installation, la réparation ou une vérification complète depuis cette zone.</p>
-                  </div>
-                  <div class="view-actions prep-actions-grid">
-                    <button id="prep-install" class="small-primary-button" type="button" disabled>Installer et configurer</button>
-                    <button id="prep-repair" class="small-primary-button alt-green" type="button" disabled>Réparer automatiquement</button>
-                    <button id="prep-diagnose" class="small-secondary-button" type="button" disabled>Vérifier maintenant</button>
-                    <button id="prep-launch" class="small-secondary-button" type="button" disabled>Lancer l’outil</button>
-                  </div>
-                  <div id="prep-guidance" class="prep-guidance-grid"></div>
-                  <div class="mini-section-head activity-head">
-                    <h3>Activité récente</h3>
-                    <p>Les dernières actions exécutées par le manager apparaissent ici.</p>
-                  </div>
-                  <div id="prep-activity-feed" class="activity-feed"></div>
-                </section>
-              </div>
-            </article>
-          </section>
+              <div id="license-summary-grid" class="license-summary-grid"></div>
+            </section>
 
-          <section id="view-diagnostics" class="view">
-            <article class="content-card single-view-card">
-              <div class="card-header">
-                <h2>Diagnostics système</h2>
-                <p>AIPilot repère les problèmes, explique la cause et propose la correction la plus simple.</p>
-              </div>
-              <div class="view-actions">
-                <button id="diagnose" class="small-secondary-button" type="button" disabled>Vérifier mon installation</button>
-                <button id="repair" class="small-primary-button alt-green" type="button" disabled>Réparer automatiquement</button>
-              </div>
-              <div id="diagnostics-operation-banner" class="operation-banner">
-                <div class="operation-banner-head">
-                  <span id="diagnostics-operation-status" class="verification-status">En attente</span>
-                  <strong id="diagnostics-operation-title">Aucune vérification en cours</strong>
+            <section class="content-card config-section-card">
+              <div class="section-row-head">
+                <div class="section-row-title">
+                  <span class="section-index">2</span>
+                  <div>
+                    <h2>Préparation de l’environnement</h2>
+                    <p>Installation et configuration des composants nécessaires.</p>
+                  </div>
                 </div>
-                <p id="diagnostics-operation-detail">Lancez une vérification pour voir l’état de votre machine et les points à corriger.</p>
+                <div id="prep-status-pill" class="section-status-pill">En attente</div>
               </div>
-              <div id="system-health" class="diagnostic-health-grid"></div>
-              <div id="system-issues" class="issues-list"></div>
-              <div class="mini-section-head verification-head">
-                <h3>Vérification détaillée</h3>
-                <p>Chaque ligne explique ce qui est contrôlé, son état actuel et ce que le manager doit corriger si besoin.</p>
+              <div id="prep-list" class="prep-rows"></div>
+            </section>
+
+            <section class="content-card config-section-card">
+              <div class="section-row-head">
+                <div class="section-row-title">
+                  <span class="section-index">3</span>
+                  <div>
+                    <h2>Diagnostics système</h2>
+                    <p>Vérifications de l’état de votre système et de la configuration appliquée.</p>
+                  </div>
+                </div>
+                <div id="diagnostics-status-pill" class="section-status-pill">En attente</div>
               </div>
-              <div id="verification-checklist" class="verification-checklist"></div>
-              <div class="mini-section-head activity-head">
-                <h3>Activité récente</h3>
-                <p>Les dernières vérifications, réparations et messages importants sont visibles ici.</p>
+              <div id="diagnostics-list" class="diagnostic-rows"></div>
+            </section>
+
+            <section class="content-card config-section-card">
+              <div class="section-row-head">
+                <div class="section-row-title">
+                  <h2>Activité récente</h2>
+                  <p>Les dernières actions AIPilot apparaissent ici.</p>
+                </div>
+                <button id="view-all-logs" class="small-secondary-button" type="button">Voir tous les logs</button>
               </div>
-              <div id="diagnostics-activity-feed" class="activity-feed"></div>
-              <div id="diagnostics" class="summary-block"></div>
-            </article>
+              <div id="activity-timeline" class="activity-timeline"></div>
+            </section>
+
+            <section id="update-banner" class="content-card update-banner-card"></section>
           </section>
 
           <section id="view-tutorials" class="view">
             <article class="content-card single-view-card">
               <div class="card-header">
-                <h2>Tutoriels et aide</h2>
+                <h2>Tutoriels</h2>
                 <p>Guides, vidéos et procédures utiles pour terminer l’installation.</p>
               </div>
               <div id="tutorials-library" class="tutorials-library"></div>
               <div class="view-actions">
-                <button id="watch-video" class="small-secondary-button" type="button" disabled>Ouvrir la vidéo</button>
-                <button id="download-official-app" class="small-secondary-button" type="button" disabled>Ouvrir le lien officiel</button>
+                <button id="watch-video" class="small-secondary-button" type="button">Ouvrir la vidéo</button>
+                <button id="download-official-app" class="small-secondary-button" type="button">Ouvrir le lien officiel</button>
               </div>
             </article>
           </section>
@@ -533,7 +295,7 @@
           <section id="view-updates" class="view">
             <article class="content-card single-view-card">
               <div class="card-header">
-                <h2>Mises à jour automatiques</h2>
+                <h2>Mises à jour</h2>
                 <p>Le manager peut vérifier, télécharger puis installer automatiquement les nouvelles versions.</p>
               </div>
               <div id="update-summary" class="summary-block"></div>
@@ -548,30 +310,29 @@
             <article class="content-card single-view-card">
               <div class="card-header">
                 <h2>Paramètres</h2>
-                <p>Choisissez ici l’outil IA préféré qui sera repris par l’accueil, la préparation et le panneau de lancement.</p>
+                <p>Choisissez ici l’outil IA préféré repris par toute l’interface AIPilot Manager.</p>
               </div>
               <div class="split-view-grid">
                 <section class="stack-card">
                   <div class="mini-section-head">
                     <h3>Préférence d’outil</h3>
-                    <p>Le choix par défaut sera synchronisé dans toute l’interface AIPilot Manager.</p>
+                    <p>Le choix par défaut sera synchronisé dans le panneau de droite et la configuration.</p>
                   </div>
                   <label class="field">
                     <span>Outil IA préféré</span>
                     <select id="settings-preferred-tool">
-                      <option value="codex">Codex app</option>
-                      <option value="vscode-codex">VS Code Codex</option>
                       <option value="t3code">T3 Code</option>
+                      <option value="codex">Codex App</option>
+                      <option value="vscode-codex">VS Code + Codex</option>
                       <option value="opencode">OpenCode</option>
                     </select>
                   </label>
-                  <p class="settings-note">Vous pourrez toujours changer d’outil plus tard depuis la configuration ou le panneau de droite.</p>
                 </section>
 
                 <section class="stack-card">
                   <div class="mini-section-head">
                     <h3>Référence rapide</h3>
-                    <p>Résumé du portail lié, de votre plateforme et de la version du manager.</p>
+                    <p>Résumé du portail, de votre plateforme et de la version du manager.</p>
                   </div>
                   <div id="settings-summary" class="summary-block"></div>
                 </section>
@@ -591,78 +352,77 @@
         </section>
 
         <aside class="right-panel">
-          <div class="right-panel-header">
-            <span>Outil sélectionné</span>
-            <span class="icon-wrap icon-14 right-panel-info">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 8h.01" />
-                <path d="M11 12h1v4h1" />
-              </svg>
-            </span>
-          </div>
+          <div class="right-panel-block">
+            <div class="right-panel-header">
+              <span>Outil sélectionné</span>
+              <span class="icon-wrap icon-14 right-panel-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8h.01" />
+                  <path d="M11 12h1v4h1" />
+                </svg>
+              </span>
+            </div>
 
-          <div class="tool-selector-card">
-            <div class="tool-selector-left">
+            <div class="tool-selector-card">
               <span class="tool-selector-icon">
-                <img id="tool-icon" src="./assets/tool-codex.png" alt="Icône Codex app" />
+                <img id="tool-icon" src="./assets/tool-t3code.png" alt="Icône T3 Code" />
               </span>
               <div class="tool-selector-copy">
-                <strong id="tool-label">Codex app</strong>
-                <span>Sélectionnez l’outil à préparer et lancer</span>
+                <div class="tool-selector-topline">
+                  <strong id="tool-label">T3 Code</strong>
+                  <span id="tool-status" class="tool-ready-badge">Prêt</span>
+                </div>
+                <span id="tool-helper">Prêt à être lancé avec la configuration AIPilot.</span>
               </div>
             </div>
-            <div class="tool-selector-right">
-              <span id="tool-status" class="tool-ready-badge">Prêt</span>
-            </div>
-          </div>
-          <label class="tool-select-block">
-            <span>Choisir l’outil</span>
-            <select id="dock-tool-select" class="tool-select-input">
-              <option value="codex">Codex app</option>
-              <option value="vscode-codex">VS Code Codex</option>
-              <option value="t3code">T3 Code</option>
-              <option value="opencode">OpenCode</option>
-            </select>
-          </label>
 
-          <div id="dock-codex-controls" class="dock-codex-controls">
+            <label class="tool-select-block">
+              <span>Choisir l’outil</span>
+              <select id="dock-tool-select" class="tool-select-input">
+                <option value="t3code">T3 Code</option>
+                <option value="codex">Codex App</option>
+                <option value="vscode-codex">VS Code + Codex</option>
+                <option value="opencode">OpenCode</option>
+              </select>
+            </label>
+
             <label class="tool-select-block">
               <span>Modèle Azure</span>
               <select id="dock-model-select" class="tool-select-input"></select>
             </label>
+
+            <button id="dock-launch" class="launch-primary-button" type="button">
+              <span class="icon-wrap icon-17">
+                <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <path d="m8 5 11 7-11 7z" />
+                </svg>
+              </span>
+              <span id="launch-label">Lancer T3 Code</span>
+            </button>
+
+            <button id="open-config-folder" class="right-link-button" type="button">Ouvrir le dossier de config</button>
           </div>
 
-          <button id="dock-launch" class="launch-primary-button" type="button" disabled>
-            <span class="icon-wrap icon-17">
-              <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <path d="m8 5 11 7-11 7z" />
-              </svg>
-            </span>
-            <span id="launch-label">Lancer Codex app</span>
-          </button>
+          <div class="right-panel-block">
+            <div class="right-panel-header">
+              <span>Actions rapides</span>
+            </div>
+            <div class="quick-action-stack">
+              <button id="quick-reinstall" class="right-link-button" type="button">Réinstaller un composant</button>
+              <button id="quick-repair-config" class="right-link-button" type="button">Réparer les fichiers de config</button>
+              <button id="quick-reset-config" class="right-link-button" type="button">Réinitialiser la configuration</button>
+              <button id="quick-clear-cache" class="right-link-button" type="button">Vider le cache</button>
+              <button id="quick-export-diagnostic" class="right-link-button" type="button">Exporter le diagnostic</button>
+            </div>
+          </div>
 
-          <button id="dock-install" class="right-link-button" type="button" disabled>
-            Installer et configurer
-          </button>
-          <button id="dock-repair" class="right-link-button" type="button" disabled>
-            Réparer
-          </button>
-
-          <button id="dock-change-tool" class="change-tool-link" type="button">
-            <span class="icon-wrap icon-13">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M16 3h5v5" />
-                <path d="M4 20 21 3" />
-                <path d="M21 16v5h-5" />
-                <path d="M15 21 4 10" />
-              </svg>
-            </span>
-            <span>Changer d'outil</span>
-          </button>
+          <div class="right-panel-block tip-card">
+            <div class="tip-card-head">Astuce</div>
+            <p>Si vous rencontrez un problème, cliquez sur “Réparer tout” pour corriger automatiquement les composants et la configuration.</p>
+          </div>
         </aside>
       </div>
-
     </main>
 
     <script src="./renderer.js"></script>
