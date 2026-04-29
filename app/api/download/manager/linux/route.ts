@@ -2,8 +2,9 @@ import { resolveSiteUrlFromRequest } from "@/lib/site-url";
 import {
   downloadBinaryArtifact,
   downloadTextFile,
-  findManagerArtifact,
-  findManagerReleaseAsset,
+  findManagerArtifactForVersion,
+  findManagerReleaseAssetForVersion,
+  getManagerAppVersion,
   redirectToArtifact,
 } from "../../lib";
 
@@ -12,9 +13,13 @@ const FILES = [
   "package-lock.json",
   "main.js",
   "preload.js",
+  "build/icon.png",
   "src/index.html",
   "src/styles.css",
   "src/renderer.js",
+  "src/assets/tool-codex.png",
+  "src/assets/tool-t3code.png",
+  "src/assets/tool-opencode.png",
 ];
 
 function readEnvironment(value: string | null) {
@@ -31,18 +36,28 @@ function readLicenseKey(value: string | null) {
 }
 
 export async function GET(request: Request) {
+  const managerVersion = await getManagerAppVersion();
   const packagedArtifact =
-    (await findManagerArtifact([".appimage"], ["appimage"])) ??
-    (await findManagerArtifact([".deb"], ["deb"])) ??
-    (await findManagerArtifact([".zip"], ["linux"], { requirePreferredMatch: true }));
+    (await findManagerArtifactForVersion(managerVersion, [".appimage"], ["appimage"])) ??
+    (await findManagerArtifactForVersion(managerVersion, [".deb"], ["deb"])) ??
+    (await findManagerArtifactForVersion(managerVersion, [".zip"], ["linux"]));
   if (packagedArtifact) {
     return downloadBinaryArtifact(packagedArtifact);
   }
 
   const releaseArtifact =
-    (await findManagerReleaseAsset((asset) => /\.AppImage$/i.test(asset.name))) ??
-    (await findManagerReleaseAsset((asset) => /\.deb$/i.test(asset.name))) ??
-    (await findManagerReleaseAsset((asset) => /linux/i.test(asset.name) && /\.zip$/i.test(asset.name)));
+    (await findManagerReleaseAssetForVersion(
+      managerVersion,
+      (asset) => /\.AppImage$/i.test(asset.name),
+    )) ??
+    (await findManagerReleaseAssetForVersion(
+      managerVersion,
+      (asset) => /\.deb$/i.test(asset.name),
+    )) ??
+    (await findManagerReleaseAssetForVersion(
+      managerVersion,
+      (asset) => /linux/i.test(asset.name) && /\.zip$/i.test(asset.name),
+    ));
   if (releaseArtifact) {
     return redirectToArtifact(releaseArtifact.browser_download_url);
   }

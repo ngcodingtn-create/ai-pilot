@@ -2,8 +2,9 @@ import { resolveSiteUrlFromRequest } from "@/lib/site-url";
 import {
   downloadBinaryArtifact,
   downloadTextFile,
-  findManagerArtifact,
-  findManagerReleaseAsset,
+  findManagerArtifactForVersion,
+  findManagerReleaseAssetForVersion,
+  getManagerAppVersion,
   redirectToArtifact,
 } from "../../lib";
 
@@ -12,9 +13,13 @@ const FILES = [
   "package-lock.json",
   "main.js",
   "preload.js",
+  "build/icon.png",
   "src/index.html",
   "src/styles.css",
   "src/renderer.js",
+  "src/assets/tool-codex.png",
+  "src/assets/tool-t3code.png",
+  "src/assets/tool-opencode.png",
 ];
 
 function readEnvironment(value: string | null) {
@@ -31,17 +36,27 @@ function readLicenseKey(value: string | null) {
 }
 
 export async function GET(request: Request) {
+  const managerVersion = await getManagerAppVersion();
   const packagedArtifact =
-    (await findManagerArtifact([".dmg"], ["dmg"])) ??
-    (await findManagerArtifact([".zip"], ["mac"], { requirePreferredMatch: true }));
+    (await findManagerArtifactForVersion(managerVersion, [".dmg"], ["dmg"])) ??
+    (await findManagerArtifactForVersion(managerVersion, [".zip"], ["mac"]));
   if (packagedArtifact) {
     return downloadBinaryArtifact(packagedArtifact);
   }
 
   const releaseArtifact =
-    (await findManagerReleaseAsset((asset) => /\.dmg$/i.test(asset.name))) ??
-    (await findManagerReleaseAsset((asset) => /mac/i.test(asset.name) && /\.zip$/i.test(asset.name))) ??
-    (await findManagerReleaseAsset((asset) => /\.zip$/i.test(asset.name)));
+    (await findManagerReleaseAssetForVersion(
+      managerVersion,
+      (asset) => /\.dmg$/i.test(asset.name),
+    )) ??
+    (await findManagerReleaseAssetForVersion(
+      managerVersion,
+      (asset) => /mac/i.test(asset.name) && /\.zip$/i.test(asset.name),
+    )) ??
+    (await findManagerReleaseAssetForVersion(
+      managerVersion,
+      (asset) => /\.zip$/i.test(asset.name),
+    ));
   if (releaseArtifact) {
     return redirectToArtifact(releaseArtifact.browser_download_url);
   }

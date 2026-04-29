@@ -73,6 +73,20 @@ export async function findManagerArtifact(
   }
 }
 
+export async function findManagerArtifactForVersion(
+  version: string,
+  extensions: string[],
+  preferredNameParts: string[] = [],
+) {
+  const normalizedVersion = String(version ?? "").trim();
+  if (!normalizedVersion) {
+    return null;
+  }
+
+  const versionParts = [normalizedVersion, ...preferredNameParts];
+  return findManagerArtifact(extensions, versionParts, { requirePreferredMatch: true });
+}
+
 export async function downloadBinaryArtifact(filePath: string) {
   const content = await readFile(filePath);
   const filename = path.basename(filePath);
@@ -118,6 +132,41 @@ export async function findManagerReleaseAsset(
   try {
     const response = await fetch(
       "https://api.github.com/repos/ngcodingtn-create/ai-pilot/releases/latest",
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "User-Agent": "AIPilot-Portal",
+        },
+        next: { revalidate: 300 },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as {
+      assets?: GitHubReleaseAsset[];
+    };
+    const assets = Array.isArray(payload.assets) ? payload.assets : [];
+    return assets.find(matcher) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function findManagerReleaseAssetForVersion(
+  version: string,
+  matcher: (asset: GitHubReleaseAsset) => boolean,
+) {
+  const normalizedVersion = String(version ?? "").trim();
+  if (!normalizedVersion) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/ngcodingtn-create/ai-pilot/releases/tags/v${normalizedVersion}`,
       {
         headers: {
           Accept: "application/vnd.github+json",
