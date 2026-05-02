@@ -42,6 +42,21 @@ const quickProof = [
   ["DT", "Paiement tunisien"],
 ];
 
+const toolFreedom = [
+  [
+    "Codex App",
+    "Le vrai agent OpenAI, prêt pour les gros projets, le refactor et le debugging profond.",
+  ],
+  [
+    "T3 Code",
+    "Une interface plus légère pour coder vite, rester concentré et enchaîner sans friction.",
+  ],
+  [
+    "OpenCode",
+    "Parfait si tu veux terminal + vitesse + contrôle, sans limite de sessions ni blocage.",
+  ],
+];
+
 const faqs = [
   {
     q: "C’est quoi exactement AIPilot ?",
@@ -143,7 +158,7 @@ export default function FunnelClient() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [spotsLeft, setSpotsLeft] = useState(2);
+  const [spotsLeft] = useState(4);
   const normalizedPhone = normalizeTunisiaWhatsappNumber(phone);
 
   const statValue0 = useCountUp(stats[0].value, Boolean(visible.comparison));
@@ -169,13 +184,6 @@ export default function FunnelClient() {
     if (utmMedium) {
       window.localStorage.setItem("aipilot-utm_medium", utmMedium);
     }
-  }, []);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setSpotsLeft((current) => (current > 2 ? current - 1 : 2));
-    }, 5000);
-    return () => window.clearInterval(interval);
   }, []);
 
   async function submitTrial() {
@@ -271,34 +279,34 @@ export default function FunnelClient() {
       </Script>
 
       <div className="relative min-h-screen overflow-x-hidden bg-[#050607] text-white">
-        <div className="sticky top-0 z-50 border-b border-white/10 bg-[#FF3D3D] px-3 py-2 text-center text-xs font-semibold text-white shadow-[0_0_24px_rgba(255,61,61,0.32)] sm:px-4 sm:text-sm">
-          <span className="inline-flex items-center gap-2">
+        <div className="sticky top-0 z-50 border-b border-white/10 bg-[#FF3D3D] px-2 py-2 text-center text-[11px] font-semibold text-white shadow-[0_0_24px_rgba(255,61,61,0.32)] sm:px-4 sm:text-sm">
+          <span className="inline-flex max-w-full items-center justify-center gap-2 whitespace-nowrap">
             <span className="animate-pulse">⚡</span>
-            Plus que <span className="font-black">{spotsLeft}</span> places disponibles — Essai gratuit 1 jour • Offre limitée
+            <span className="sm:hidden">
+              Plus que <span className="font-black">{spotsLeft}</span> places — essai gratuit
+            </span>
+            <span className="hidden sm:inline">
+              Plus que <span className="font-black">{spotsLeft}</span> places disponibles — Essai gratuit 1 jour • Offre limitée
+            </span>
           </span>
         </div>
 
         <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,225,255,0.22)_0%,_rgba(5,6,7,0)_42%)]" />
-        <div className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="relative mx-auto max-w-7xl px-4 pb-6 pt-0 sm:px-6 sm:py-6 lg:px-8">
           <section
             id="hero"
-            className={`section-reveal min-h-[calc(100vh-5rem)] py-8 sm:py-10 ${visible.hero ? "visible" : ""}`}
+            className={`section-reveal relative min-h-[calc(100vh-5rem)] pb-4 pt-3 sm:py-10 ${visible.hero ? "visible" : ""}`}
           >
-            <div className="mx-auto max-w-6xl">
+            <div className="pointer-events-none absolute inset-x-[-1rem] top-0 z-0 h-[34rem] bg-[radial-gradient(ellipse_at_top,rgba(23,232,255,0.24)_0%,rgba(5,6,7,0.96)_58%,rgba(5,6,7,1)_84%)] sm:hidden" />
+            <div className="relative z-10 mx-auto max-w-6xl">
               <div className="mx-auto max-w-5xl text-center">
-              <span className="inline-flex items-center rounded-full border border-[#17E8FF]/30 bg-[#17E8FF]/8 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#B7F7FF] sm:text-sm">
-                🇹🇳 Disponible en Tunisie • Paiement DT
-              </span>
-
               <h1
-                className="mt-8 text-[2.7rem] font-extrabold leading-[0.92] tracking-[-0.05em] text-white sm:text-[4.4rem] lg:text-[5.9rem]"
+                className="mx-auto mt-4 max-w-[11ch] text-[2.45rem] font-extrabold leading-[0.9] tracking-[-0.055em] text-white sm:mt-5 sm:max-w-none sm:text-[4.4rem] lg:text-[5.9rem]"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                Le vrai Codex OpenAI
-                <br />
-                avec GPT-5.5,
-                <br />
-                <span className="text-[#17E8FF] drop-shadow-[0_0_24px_rgba(23,232,255,0.4)]">
+                <span className="block whitespace-nowrap">Codex OpenAI</span>
+                <span className="block whitespace-nowrap">avec GPT-5.5,</span>
+                <span className="block whitespace-nowrap text-[#17E8FF] drop-shadow-[0_0_24px_rgba(23,232,255,0.4)]">
                   Pour 60 DT/mois
                 </span>
               </h1>
@@ -328,9 +336,10 @@ export default function FunnelClient() {
               <div className="mt-8 flex flex-col items-center gap-3">
                 <a
                   href="#form"
-                  className="cta-pulse cta-yellow inline-flex min-h-[56px] w-full max-w-xl items-center justify-center rounded-full px-6 py-4 text-base font-black shadow-[0_14px_34px_rgba(255,240,106,0.18)] transition hover:scale-[1.01] hover:brightness-[0.98] sm:text-lg"
+                  className="cta-pulse cta-yellow inline-flex min-h-[56px] w-full max-w-xl items-center justify-center rounded-full px-5 py-4 text-[0.98rem] font-black leading-none shadow-[0_14px_34px_rgba(255,240,106,0.18)] transition hover:scale-[1.01] hover:brightness-[0.98] sm:px-6 sm:text-lg"
                 >
-                  🎁 Obtenir mon essai gratuit — 1 jour
+                  <span className="sm:hidden">🎁 Obtenir mon essai gratuit</span>
+                  <span className="hidden sm:inline">🎁 Obtenir mon essai gratuit — 1 jour</span>
                 </a>
                 <p className="text-sm font-semibold text-[#FF6B6B]">
                   ⚠️ Seulement {spotsLeft} places disponibles
@@ -361,7 +370,7 @@ export default function FunnelClient() {
                 ))}
               </div>
 
-              <div className="hero-stage mt-10 overflow-hidden rounded-[32px] border border-[#17E8FF]/14 bg-[#05090D] shadow-[0_35px_100px_rgba(0,0,0,0.55)]">
+              <div className="hero-stage relative left-1/2 mt-8 w-screen -translate-x-1/2 overflow-hidden bg-transparent sm:left-auto sm:mt-10 sm:w-auto sm:translate-x-0 sm:overflow-hidden sm:rounded-[32px] sm:border sm:border-[#17E8FF]/14 sm:bg-[#05090D] sm:shadow-[0_35px_100px_rgba(0,0,0,0.55)]">
                 <div className="relative aspect-[16/9]">
                   <div className="hero-grid absolute inset-0 z-0" />
                   <Image
@@ -379,7 +388,7 @@ export default function FunnelClient() {
                       className="object-cover object-top"
                     />
                   </div>
-                  <div className="absolute bottom-4 right-4 max-w-[72%] rounded-full border border-[#17E8FF]/30 bg-black/55 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#B7F7FF] backdrop-blur-sm sm:bottom-8 sm:right-8 sm:text-sm">
+                  <div className="absolute bottom-4 right-4 max-w-[78%] rounded-full border border-[#17E8FF]/30 bg-black/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#B7F7FF] backdrop-blur-sm sm:bottom-8 sm:right-8 sm:max-w-[72%] sm:px-4 sm:text-sm">
                     GPT-5.5 • Codex officiel • Paiement tunisien
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -481,6 +490,35 @@ export default function FunnelClient() {
                   ]}
                   tone="green"
                 />
+              </div>
+
+              <div className="mt-8 rounded-[24px] border border-[#17E8FF]/14 bg-[linear-gradient(180deg,#0B1116,#080C10)] p-6 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+                <div className="max-w-3xl">
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#17E8FF]">
+                    Un seul abonnement, plusieurs façons de coder
+                  </p>
+                  <h3
+                    className="mt-3 text-2xl font-bold tracking-[-0.03em] text-white sm:text-3xl"
+                    style={{ fontFamily: "var(--font-outfit)" }}
+                  >
+                    Utilise Codex, T3 Code ou OpenCode sans limite et gagne du temps sans payer 310 DT/mois.
+                  </h3>
+                  <p className="mt-3 text-sm leading-7 text-[#AFC0CE] sm:text-base">
+                    Tu choisis l’outil qui te convient le mieux, AIPilot s’occupe du setup, de la configuration Azure, et tu gardes le même niveau de productivité pour beaucoup moins cher.
+                  </p>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  {toolFreedom.map(([title, text]) => (
+                    <div
+                      key={title}
+                      className="rounded-[20px] border border-white/8 bg-white/[0.03] p-5"
+                    >
+                      <p className="text-lg font-bold text-white">{title}</p>
+                      <p className="mt-2 text-sm leading-7 text-[#B3C0CB]">{text}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
@@ -613,9 +651,10 @@ export default function FunnelClient() {
               </p>
               <a
                 href="#form"
-                className="cta-pulse cta-yellow mt-8 inline-flex min-h-12 w-full max-w-2xl items-center justify-center rounded-full px-6 py-4 text-lg font-black shadow-[0_14px_34px_rgba(255,240,106,0.18)] transition hover:scale-[1.01]"
+                className="cta-pulse cta-yellow mt-8 inline-flex min-h-12 w-full max-w-2xl items-center justify-center rounded-full px-5 py-4 text-base font-black leading-none shadow-[0_14px_34px_rgba(255,240,106,0.18)] transition hover:scale-[1.01] sm:px-6 sm:text-lg"
               >
-                🚀 Je veux ma place — Essai gratuit
+                <span className="sm:hidden whitespace-nowrap">🚀 Je veux ma place</span>
+                <span className="hidden whitespace-nowrap sm:inline">🚀 Je veux ma place — Essai gratuit</span>
               </a>
               <div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-sm text-[#D0D0D0]">
                 <span>✓ Aucun paiement maintenant</span>
@@ -680,11 +719,16 @@ export default function FunnelClient() {
                     type="button"
                     onClick={submitTrial}
                     disabled={formState.status === "submitting"}
-                    className="cta-pulse cta-yellow min-h-14 w-full rounded-full px-5 py-4 text-lg font-black shadow-[0_14px_34px_rgba(255,240,106,0.18)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="cta-pulse cta-yellow min-h-14 w-full rounded-full px-5 py-4 text-base font-black leading-none shadow-[0_14px_34px_rgba(255,240,106,0.18)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70 sm:text-lg"
                   >
                     {formState.status === "submitting"
                       ? "Activation en cours..."
-                      : "→ Obtenir mon essai gratuit 1 jour"}
+                      : (
+                        <>
+                          <span className="sm:hidden whitespace-nowrap">→ Obtenir mon essai</span>
+                          <span className="hidden whitespace-nowrap sm:inline">→ Obtenir mon essai gratuit 1 jour</span>
+                        </>
+                      )}
                   </button>
 
                   {formState.status === "success" ? (
