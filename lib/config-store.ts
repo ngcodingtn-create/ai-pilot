@@ -55,7 +55,7 @@ const DEFAULTS: StoredConfig = {
   azureGpt55Deployment: process.env.NEXT_PUBLIC_GPT55_DEPLOYMENT ?? "gpt-5.5-1",
   includeApiKeyInInstaller: false,
   supportWhatsappNumber:
-    process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER ?? "",
+    process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER ?? "+216 29 293 037",
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "",
   supportVideoUrl:
     process.env.NEXT_PUBLIC_SUPPORT_VIDEO_URL ?? "https://youtu.be/WwDvzdM9YWw",
