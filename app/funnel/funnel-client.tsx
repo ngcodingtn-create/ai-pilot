@@ -24,7 +24,7 @@ const features = [
   ["🤖", "Codex Officiel OpenAI", "L’app desktop officielle d’OpenAI, pas une copie."],
   ["⚡", "GPT-5.5 & GPT-5.4", "Choisis ton modèle selon ta mission de coding."],
   ["♾️", "Aucune limite de sessions", "Code autant que tu veux, 24h/24."],
-  ["💳", "Paiement 100% Tunisien", "D17, virement, Wafa Cash ou IWI Payment."],
+  ["💳", "Paiement 100% Tunisien", "D17, virement, Wafa Cash ou IZI Payment."],
   ["⚙️", "Installation en 5 minutes", "Un installateur configure tout automatiquement."],
   ["🎁", "Essai gratuit 1 jour", "Teste d’abord, puis décide en toute tranquillité."],
 ];
@@ -57,6 +57,24 @@ const toolFreedom = [
   ],
 ];
 
+const toolGallery = [
+  {
+    title: "Codex App",
+    image: "/api/manager/files/src/assets/tool-codex.png",
+    text: "Le vrai agent OpenAI avec GPT-5.5 ou GPT-5.4, prêt pour le multi-fichiers et les gros chantiers.",
+  },
+  {
+    title: "T3 Code",
+    image: "/api/manager/files/src/assets/tool-t3code.png",
+    text: "Une interface rapide, plus légère, idéale pour les devs qui veulent une UX clean et immédiate.",
+  },
+  {
+    title: "OpenCode",
+    image: "/api/manager/files/src/assets/tool-opencode.png",
+    text: "Mode terminal puissant, parfait pour automatiser, itérer vite et rester sans limite toute la journée.",
+  },
+];
+
 const faqs = [
   {
     q: "C’est quoi exactement AIPilot ?",
@@ -72,7 +90,7 @@ const faqs = [
   },
   {
     q: "Comment je paie après l’essai ?",
-    a: "Après l’essai gratuit d’une journée, on te contacte sur WhatsApp pour finaliser la suite via D17, virement, Wafa Cash ou IWI Payment.",
+    a: "Après l’essai gratuit d’une journée, on te contacte sur WhatsApp pour finaliser la suite via D17, virement, Wafa Cash ou IZI Payment.",
   },
   {
     q: "Qu’est-ce qui se passe après le formulaire ?",
@@ -301,7 +319,7 @@ export default function FunnelClient() {
             <div className="relative z-10 mx-auto max-w-6xl">
               <div className="mx-auto max-w-5xl text-center">
               <h1
-                className="mx-auto mt-4 max-w-[11ch] text-[2.45rem] font-extrabold leading-[0.9] tracking-[-0.055em] text-white sm:mt-5 sm:max-w-none sm:text-[4.4rem] lg:text-[5.9rem]"
+                className="mx-auto mt-4 max-w-[11ch] text-[2.45rem] font-extrabold leading-[0.94] tracking-[-0.055em] text-white sm:mt-5 sm:max-w-none sm:text-[4.4rem] sm:leading-[0.9] lg:text-[5.9rem]"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
                 <span className="block whitespace-nowrap">Codex OpenAI</span>
@@ -315,6 +333,20 @@ export default function FunnelClient() {
                 <span className="line-through opacity-80">310 DT/mois</span>
                 <span className="mx-2 text-white/40">→</span>
                 <span className="text-[#FFF06A]">60 DT/mois avec AIPilot</span>
+              </div>
+
+              <div className="hero-stage relative left-1/2 mt-6 w-screen -translate-x-1/2 overflow-hidden bg-transparent sm:left-auto sm:mt-10 sm:w-auto sm:translate-x-0 sm:rounded-[32px] sm:border sm:border-[#17E8FF]/14 sm:bg-[#05090D] sm:shadow-[0_35px_100px_rgba(0,0,0,0.55)]">
+                <div className="relative aspect-[16/10.8] sm:aspect-[16/9]">
+                  <div className="hero-grid absolute inset-0 z-0" />
+                  <Image
+                    src="/funnel/aipilot-hero-desk.png"
+                    alt="AIPilot Manager, Codex et support WhatsApp"
+                    fill
+                    className="object-cover object-center opacity-92"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,7,11,0.06),rgba(4,7,11,0.12)_42%,rgba(4,7,11,0.32)_100%)]" />
+                </div>
               </div>
 
               <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-[#C6C6C6] sm:text-lg">
@@ -369,36 +401,6 @@ export default function FunnelClient() {
                   </span>
                 ))}
               </div>
-
-              <div className="hero-stage relative left-1/2 mt-8 w-screen -translate-x-1/2 overflow-hidden bg-transparent sm:left-auto sm:mt-10 sm:w-auto sm:translate-x-0 sm:overflow-hidden sm:rounded-[32px] sm:border sm:border-[#17E8FF]/14 sm:bg-[#05090D] sm:shadow-[0_35px_100px_rgba(0,0,0,0.55)]">
-                <div className="relative aspect-[16/9]">
-                  <div className="hero-grid absolute inset-0 z-0" />
-                  <Image
-                    src="/tutorials/aipilot-manager-connect-install.png"
-                    alt="Démo AIPilot"
-                    fill
-                    className="object-cover object-top opacity-78"
-                  />
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(0,0,0,0.68))]" />
-                  <div className="absolute left-4 top-4 h-24 w-32 overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-[0_10px_30px_rgba(0,0,0,0.25)] sm:left-8 sm:top-8 sm:h-36 sm:w-48">
-                    <Image
-                      src="/tutorials/codex-enter-api-key.png"
-                      alt="Codex setup"
-                      fill
-                      className="object-cover object-top"
-                    />
-                  </div>
-                  <div className="absolute bottom-4 right-4 max-w-[78%] rounded-full border border-[#17E8FF]/30 bg-black/55 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#B7F7FF] backdrop-blur-sm sm:bottom-8 sm:right-8 sm:max-w-[72%] sm:px-4 sm:text-sm">
-                    GPT-5.5 • Codex officiel • Paiement tunisien
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-black/55 text-3xl text-white shadow-[0_0_40px_rgba(23,232,255,0.12)]">
-                      ▶
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {quickProof.map(([value, label]) => (
                   <div
@@ -483,7 +485,7 @@ export default function FunnelClient() {
                   title="Avec AIPilot"
                   items={[
                     "60 DT/mois",
-                    "D17 / Virement / Wafa Cash / IWI",
+                    "D17 / Virement / Wafa Cash / IZI",
                     "Aucune limite de sessions",
                     "Code à 3h du matin si tu veux",
                     "100% disponible en Tunisie",
@@ -519,6 +521,28 @@ export default function FunnelClient() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                {toolGallery.map((item) => (
+                  <div
+                    key={item.title}
+                    className="overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#10161C,#0A0E12)] shadow-[0_16px_40px_rgba(0,0,0,0.18)]"
+                  >
+                    <div className="relative h-40 border-b border-white/8 bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.16),transparent_60%)]">
+                      <Image
+                        src={item.image}
+                        alt={item.title}
+                        fill
+                        className="object-contain p-8"
+                      />
+                    </div>
+                    <div className="p-5">
+                      <p className="text-lg font-bold text-white">{item.title}</p>
+                      <p className="mt-2 text-sm leading-7 text-[#B7C3CD]">{item.text}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
@@ -635,13 +659,53 @@ export default function FunnelClient() {
                   </div>
                 ))}
               </div>
+
+              <div className="mt-10 grid gap-4 md:grid-cols-2">
+                <div className="overflow-hidden rounded-[24px] border border-[#17E8FF]/14 bg-[#0D1014] shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
+                  <div className="relative aspect-[16/10]">
+                    <Image
+                      src="/tutorials/aipilot-manager-connect-install.png"
+                      alt="AIPilot Manager"
+                      fill
+                      className="object-cover object-top"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#17E8FF]">
+                      AIPilot Manager
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-[#CCD6DE]">
+                      Le manager installe, configure et vérifie tout automatiquement pour éviter les manipulations compliquées.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-[24px] border border-[#17E8FF]/14 bg-[#0D1014] shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
+                  <div className="relative aspect-[16/10]">
+                    <Image
+                      src="/tutorials/codex-enter-api-key.png"
+                      alt="Codex OpenAI"
+                      fill
+                      className="object-cover object-top"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#17E8FF]">
+                      Codex OpenAI
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-[#CCD6DE]">
+                      Tu ouvres l’outil, AIPilot a déjà préparé la configuration, et tu peux coder immédiatement avec le bon modèle.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
           <section id="scarcity" className={`section-reveal py-16 ${visible.scarcity ? "visible" : ""}`}>
             <div className="mx-auto max-w-5xl rounded-[28px] border border-white/10 bg-[#111111] p-8 text-center shadow-[0_30px_90px_rgba(0,0,0,0.35)]">
               <p className="text-4xl font-black text-[#FF4B4B] sm:text-6xl" style={{ fontFamily: "var(--font-outfit)" }}>
-                ⚠️ Seulement {spotsLeft} Places Disponibles
+                ⚠️ Seulement
               </p>
               <div className="mt-6 inline-flex items-center justify-center rounded-full border border-[#FF4B4B]/40 bg-[#FF3D3D]/10 px-6 py-3 text-xl font-black text-[#FF5E5E]">
                 {spotsLeft} places restantes
@@ -649,6 +713,25 @@ export default function FunnelClient() {
               <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-[#CFCFCF]">
                 L’essai gratuit 1 jour est disponible uniquement pour les prochains développeurs qui s’inscrivent. Après ? Liste d’attente. Mouch wa9t el taswif.
               </p>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                {[
+                  ["Codex App", "GPT-5.5 / GPT-5.4, installation guidée"],
+                  ["T3 Code", "Même puissance, interface plus simple"],
+                  ["OpenCode", "Terminal moderne, sans limite de sessions"],
+                ].map(([title, text]) => (
+                  <div
+                    key={title}
+                    className="rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-4 text-left"
+                  >
+                    <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#FFF06A]">
+                      {title}
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-[#D5DCE4]">{text}</p>
+                  </div>
+                ))}
+              </div>
+
               <a
                 href="#form"
                 className="cta-pulse cta-yellow mt-8 inline-flex min-h-12 w-full max-w-2xl items-center justify-center rounded-full px-5 py-4 text-base font-black leading-none shadow-[0_14px_34px_rgba(255,240,106,0.18)] transition hover:scale-[1.01] sm:px-6 sm:text-lg"
