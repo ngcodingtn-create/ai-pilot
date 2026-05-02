@@ -60,6 +60,8 @@ export async function saveAdminConfig(formData: FormData) {
       String(formData.get("azureGpt55Deployment") ?? "").trim() || undefined,
     azureApiKey: String(formData.get("azureApiKey") ?? "").trim() || undefined,
     includeApiKeyInInstaller: formData.get("includeApiKeyInInstaller") === "on",
+    supportWhatsappNumber:
+      String(formData.get("supportWhatsappNumber") ?? "").trim() || undefined,
     supportEmail: String(formData.get("supportEmail") ?? "").trim() || undefined,
     supportVideoUrl:
       String(formData.get("supportVideoUrl") ?? "").trim() || undefined,

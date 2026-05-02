@@ -9,6 +9,7 @@ export type StoredConfig = {
   azureGpt55Deployment?: string;
   azureApiKey?: string;
   includeApiKeyInInstaller: boolean;
+  supportWhatsappNumber?: string;
   supportEmail?: string;
   supportVideoUrl?: string;
   managerUpdateUrl?: string;
@@ -22,6 +23,7 @@ type LocalConfigFile = {
   azureApiKey?: string;
   azureApiKeyEncrypted?: boolean;
   includeApiKeyInInstaller?: boolean;
+  supportWhatsappNumber?: string;
   supportEmail?: string;
   supportVideoUrl?: string;
   managerUpdateUrl?: string;
@@ -52,6 +54,8 @@ const DEFAULTS: StoredConfig = {
   azureDefaultDeployment: process.env.NEXT_PUBLIC_DEFAULT_DEPLOYMENT ?? "gpt-5.4-1",
   azureGpt55Deployment: process.env.NEXT_PUBLIC_GPT55_DEPLOYMENT ?? "gpt-5.5-1",
   includeApiKeyInInstaller: false,
+  supportWhatsappNumber:
+    process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER ?? "",
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "",
   supportVideoUrl:
     process.env.NEXT_PUBLIC_SUPPORT_VIDEO_URL ?? "https://youtu.be/WwDvzdM9YWw",
@@ -122,6 +126,7 @@ async function saveLocalConfig(config: StoredConfig) {
     azureDefaultDeployment: config.azureDefaultDeployment,
     azureGpt55Deployment: config.azureGpt55Deployment,
     includeApiKeyInInstaller: config.includeApiKeyInInstaller,
+    supportWhatsappNumber: config.supportWhatsappNumber,
     supportEmail: config.supportEmail,
     supportVideoUrl: config.supportVideoUrl,
     managerUpdateUrl: config.managerUpdateUrl,
@@ -187,6 +192,7 @@ export async function saveStoredConfig(config: StoredConfig) {
     "includeApiKeyInInstaller",
     String(config.includeApiKeyInInstaller),
   );
+  await setValue("supportWhatsappNumber", config.supportWhatsappNumber ?? "");
   await setValue("supportEmail", config.supportEmail ?? "");
   await setValue("supportVideoUrl", config.supportVideoUrl ?? "");
   await setValue("managerUpdateUrl", config.managerUpdateUrl ?? "");
@@ -232,6 +238,8 @@ export async function getStoredConfig(): Promise<StoredConfig> {
       ),
       includeApiKeyInInstaller:
         local.includeApiKeyInInstaller ?? DEFAULTS.includeApiKeyInInstaller,
+      supportWhatsappNumber:
+        local.supportWhatsappNumber ?? DEFAULTS.supportWhatsappNumber,
       supportEmail: local.supportEmail ?? DEFAULTS.supportEmail,
       supportVideoUrl: local.supportVideoUrl ?? DEFAULTS.supportVideoUrl,
       managerUpdateUrl: local.managerUpdateUrl ?? DEFAULTS.managerUpdateUrl,
@@ -268,6 +276,7 @@ export async function getStoredConfig(): Promise<StoredConfig> {
     if (row.key === "includeApiKeyInInstaller") {
       config.includeApiKeyInInstaller = value === "true";
     }
+    if (row.key === "supportWhatsappNumber") config.supportWhatsappNumber = value;
     if (row.key === "supportEmail") config.supportEmail = value;
     if (row.key === "supportVideoUrl") config.supportVideoUrl = value;
     if (row.key === "managerUpdateUrl") config.managerUpdateUrl = value;

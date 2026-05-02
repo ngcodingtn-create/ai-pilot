@@ -235,6 +235,13 @@ export default async function AdminPage({
                             type="email"
                           />
                           <Field
+                            label="Numéro WhatsApp AIPilot"
+                            name="supportWhatsappNumber"
+                            defaultValue={config.supportWhatsappNumber ?? ""}
+                            placeholder="Ex: +216 29 293 038"
+                            helperText="Ce numéro est utilisé par le funnel /funnel pour rediriger le prospect vers WhatsApp après l’envoi du formulaire."
+                          />
+                          <Field
                             label="URL de la vidéo YouTube"
                             name="supportVideoUrl"
                             defaultValue={config.supportVideoUrl ?? ""}
