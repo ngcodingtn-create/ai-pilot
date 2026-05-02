@@ -108,17 +108,18 @@ type ProofStoredState = {
   slideIndex: number;
   currentTime: number;
   pausedByUser: boolean;
+  muted: boolean;
 };
 
 function readStoredProofState(): ProofStoredState {
   if (typeof window === "undefined") {
-    return { slideIndex: 0, currentTime: 0, pausedByUser: false };
+    return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: true };
   }
 
   try {
     const raw = window.sessionStorage.getItem(PROOF_VIDEO_STORAGE_KEY);
     if (!raw) {
-      return { slideIndex: 0, currentTime: 0, pausedByUser: false };
+      return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: true };
     }
 
     const parsed = JSON.parse(raw) as Partial<ProofStoredState>;
@@ -135,9 +136,10 @@ function readStoredProofState(): ProofStoredState {
       slideIndex,
       currentTime,
       pausedByUser: Boolean(parsed.pausedByUser),
+      muted: typeof parsed.muted === "boolean" ? parsed.muted : true,
     };
   } catch {
-    return { slideIndex: 0, currentTime: 0, pausedByUser: false };
+    return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: true };
   }
 }
 
@@ -223,6 +225,7 @@ export default function FunnelClient() {
   const [proofVideoPausedByUser, setProofVideoPausedByUser] = useState(
     () => initialProofState.pausedByUser,
   );
+  const [proofVideoMuted, setProofVideoMuted] = useState(() => initialProofState.muted);
   const [isProofVideoPlaying, setIsProofVideoPlaying] = useState(
     () => !initialProofState.pausedByUser && proofSlides[initialProofState.slideIndex]?.type === "video",
   );
@@ -236,6 +239,7 @@ export default function FunnelClient() {
     slideIndex?: number;
     currentTime?: number;
     pausedByUser?: boolean;
+    muted?: boolean;
   }) => {
     if (typeof window === "undefined") return;
 
@@ -243,6 +247,7 @@ export default function FunnelClient() {
       slideIndex: activeProofSlide,
       currentTime: proofVideoProgressRef.current,
       pausedByUser: proofVideoPausedByUser,
+      muted: proofVideoMuted,
     };
 
     const payload = {
@@ -251,7 +256,7 @@ export default function FunnelClient() {
     };
 
     window.sessionStorage.setItem(PROOF_VIDEO_STORAGE_KEY, JSON.stringify(payload));
-  }, [activeProofSlide, proofVideoPausedByUser]);
+  }, [activeProofSlide, proofVideoMuted, proofVideoPausedByUser]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -284,7 +289,7 @@ export default function FunnelClient() {
       if (Math.abs(video.currentTime - proofVideoProgressRef.current) > 0.35) {
         video.currentTime = proofVideoProgressRef.current;
       }
-      video.muted = !hasProofInteraction;
+      video.muted = !hasProofInteraction || proofVideoMuted;
       void video
         .play()
         .catch(() => {
@@ -296,7 +301,7 @@ export default function FunnelClient() {
     } else {
       video.pause();
     }
-  }, [activeProofSlide, hasProofInteraction, isProofMediaVisible, proofVideoPausedByUser]);
+  }, [activeProofSlide, hasProofInteraction, isProofMediaVisible, proofVideoMuted, proofVideoPausedByUser]);
 
   useEffect(() => {
     const markInteraction = () => setHasProofInteraction(true);
@@ -474,15 +479,42 @@ export default function FunnelClient() {
 
     if (video.paused) {
       setProofVideoPausedByUser(false);
-      persistProofState({ pausedByUser: false, currentTime: video.currentTime });
-      video.muted = false;
+      persistProofState({ pausedByUser: false, currentTime: video.currentTime, muted: proofVideoMuted });
+      video.muted = proofVideoMuted;
       void video.play().then(() => setIsProofVideoPlaying(true)).catch(() => setIsProofVideoPlaying(false));
     } else {
       setProofVideoPausedByUser(true);
       proofVideoProgressRef.current = video.currentTime;
-      persistProofState({ pausedByUser: true, currentTime: video.currentTime });
+      persistProofState({ pausedByUser: true, currentTime: video.currentTime, muted: proofVideoMuted });
       video.pause();
       setIsProofVideoPlaying(false);
+    }
+  }
+
+  function toggleProofVideoMute() {
+    const video = proofVideoRef.current;
+    const nextMuted = !proofVideoMuted;
+
+    setHasProofInteraction(true);
+    setProofVideoMuted(nextMuted);
+    persistProofState({
+      muted: nextMuted,
+      currentTime: video?.currentTime ?? proofVideoProgressRef.current,
+    });
+
+    if (!video) return;
+
+    video.muted = nextMuted;
+
+    if (!nextMuted && video.paused && !proofVideoPausedByUser) {
+      void video.play().then(() => setIsProofVideoPlaying(true)).catch(() => {
+        video.muted = true;
+        setProofVideoMuted(true);
+        persistProofState({
+          muted: true,
+          currentTime: video.currentTime,
+        });
+      });
     }
   }
 
@@ -789,12 +821,7 @@ export default function FunnelClient() {
                         }`}
                       >
                         {slide.type === "video" ? (
-                          <button
-                            type="button"
-                            onClick={toggleProofVideoPlayback}
-                            className="absolute inset-0 block"
-                            aria-label={isProofVideoPlaying ? "Mettre la vidéo en pause" : "Lire la vidéo"}
-                          >
+                          <div className="absolute inset-0">
                             <video
                               ref={proofVideoRef}
                               src={slide.src}
@@ -824,12 +851,39 @@ export default function FunnelClient() {
                               className="h-full w-full object-contain p-3 sm:p-5"
                             />
                             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,9,11,0.02),rgba(7,9,11,0.04)_42%,rgba(7,9,11,0.16)_100%)]" />
-                            <span className={`absolute inset-x-0 bottom-5 flex justify-center transition-opacity ${isProofVideoPlaying ? "opacity-0" : "opacity-100"}`}>
-                              <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-black/60 text-2xl text-white shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur">
-                                ▶
+                            <button
+                              type="button"
+                              onClick={toggleProofVideoPlayback}
+                              className="absolute inset-0 block"
+                              aria-label={isProofVideoPlaying ? "Mettre la vidéo en pause" : "Lire la vidéo"}
+                            >
+                              <span className={`absolute inset-x-0 bottom-6 flex justify-center transition-opacity ${isProofVideoPlaying ? "opacity-0" : "opacity-100"}`}>
+                                <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-black/60 text-2xl text-white shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur">
+                                  ▶
+                                </span>
                               </span>
-                            </span>
-                          </button>
+                            </button>
+                            <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+                              <div className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/55 px-2.5 py-2 shadow-[0_14px_32px_rgba(0,0,0,0.28)] backdrop-blur">
+                                <button
+                                  type="button"
+                                  onClick={toggleProofVideoPlayback}
+                                  className="inline-flex min-w-[5.75rem] items-center justify-center rounded-full bg-white/8 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/14"
+                                  aria-label={isProofVideoPlaying ? "Mettre en pause" : "Lire la vidéo"}
+                                >
+                                  {isProofVideoPlaying ? "❚❚ Pause" : "▶ Lecture"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={toggleProofVideoMute}
+                                  className="inline-flex min-w-[4.5rem] items-center justify-center rounded-full bg-white/8 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/14"
+                                  aria-label={proofVideoMuted ? "Activer le son" : "Couper le son"}
+                                >
+                                  {proofVideoMuted ? "🔇 Son" : "🔊 Son"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         ) : (
                           <>
                             <Image
