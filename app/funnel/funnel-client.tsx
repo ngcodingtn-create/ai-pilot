@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Script from "next/script";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 
 type RevealMap = Record<string, boolean>;
@@ -13,12 +13,6 @@ type TrialFormState =
   | { status: "success" | "error"; message: string };
 
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "TON_PIXEL_ID";
-
-const stats = [
-  { label: "Plus rapide qu’un dev humain", value: 10, suffix: "x" },
-  { label: "Limite de sessions", value: 0, suffix: "" },
-  { label: "Disponible par jour", value: 24, suffix: "h" },
-];
 
 const features = [
   ["🤖", "Codex Officiel OpenAI", "L’app desktop officielle d’OpenAI, pas une copie."],
@@ -36,42 +30,75 @@ const trustSignals = [
   "Installation guidée pas à pas",
 ];
 
-const quickProof = [
-  ["5 min", "Activation moyenne"],
-  ["1 jour", "Essai gratuit complet"],
-  ["DT", "Paiement tunisien"],
-];
-
-const toolFreedom = [
-  [
-    "Codex App",
-    "Le vrai agent OpenAI, prêt pour les gros projets, le refactor et le debugging profond.",
-  ],
-  [
-    "T3 Code",
-    "Une interface plus légère pour coder vite, rester concentré et enchaîner sans friction.",
-  ],
-  [
-    "OpenCode",
-    "Parfait si tu veux terminal + vitesse + contrôle, sans limite de sessions ni blocage.",
-  ],
-];
-
 const toolGallery = [
   {
     title: "Codex App",
-    image: "/api/manager/files/src/assets/tool-codex.png",
+    image: "/funnel/tools/tool-codex-app.webp",
     text: "Le vrai agent OpenAI avec GPT-5.5 ou GPT-5.4, prêt pour le multi-fichiers et les gros chantiers.",
   },
   {
     title: "T3 Code",
-    image: "/api/manager/files/src/assets/tool-t3code.png",
+    image: "/funnel/tools/tool-t3code.jpg",
     text: "Une interface rapide, plus légère, idéale pour les devs qui veulent une UX clean et immédiate.",
   },
   {
     title: "OpenCode",
-    image: "/api/manager/files/src/assets/tool-opencode.png",
+    image: "/funnel/tools/tool-opencode.webp",
     text: "Mode terminal puissant, parfait pour automatiser, itérer vite et rester sans limite toute la journée.",
+  },
+];
+
+const proofSlides = [
+  {
+    type: "video" as const,
+    title: "Vidéo WhatsApp AIPilot",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-video.mp4",
+    poster: "/funnel/whatsapp-proof/whatsapp-proof-1.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 1",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-1.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 2",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-2.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 3",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-3.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 4",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-4.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 5",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-5.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 6",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-6.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 7",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-7.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 8",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-8.jpg",
+  },
+  {
+    type: "image" as const,
+    title: "Preuve WhatsApp 9",
+    src: "/funnel/whatsapp-proof/whatsapp-proof-9.jpg",
   },
 ];
 
@@ -131,34 +158,6 @@ function useReveal(ids: string[]) {
   return visible;
 }
 
-function useCountUp(target: number, isVisible: boolean) {
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    if (!isVisible) {
-      return;
-    }
-
-    const duration = 900;
-    const start = performance.now();
-    let frame = 0;
-
-    const tick = (time: number) => {
-      const progress = Math.min((time - start) / duration, 1);
-      const next = Math.round(target * (1 - Math.pow(1 - progress, 3)));
-      setValue(next);
-      if (progress < 1) {
-        frame = window.requestAnimationFrame(tick);
-      }
-    };
-
-    frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
-  }, [isVisible, target]);
-
-  return value;
-}
-
 export default function FunnelClient() {
   const sectionIds = [
     "hero",
@@ -177,11 +176,12 @@ export default function FunnelClient() {
   const [phone, setPhone] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [spotsLeft] = useState(4);
+  const [showFloatingCta, setShowFloatingCta] = useState(false);
+  const [activeProofSlide, setActiveProofSlide] = useState(0);
+  const [proofTouchStart, setProofTouchStart] = useState<number | null>(null);
+  const [isProofVideoPlaying, setIsProofVideoPlaying] = useState(true);
+  const proofVideoRef = useRef<HTMLVideoElement | null>(null);
   const normalizedPhone = normalizeTunisiaWhatsappNumber(phone);
-
-  const statValue0 = useCountUp(stats[0].value, Boolean(visible.comparison));
-  const statValue1 = useCountUp(stats[1].value, Boolean(visible.comparison));
-  const statValue2 = useCountUp(stats[2].value, Boolean(visible.comparison));
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -202,6 +202,50 @@ export default function FunnelClient() {
     if (utmMedium) {
       window.localStorage.setItem("aipilot-utm_medium", utmMedium);
     }
+  }, []);
+
+  useEffect(() => {
+    const currentSlide = proofSlides[activeProofSlide];
+    const video = proofVideoRef.current;
+
+    if (!video) return;
+
+    if (currentSlide?.type === "video") {
+      video.currentTime = 0;
+      void video.play().then(() => {
+        setIsProofVideoPlaying(true);
+      }).catch(() => {
+        setIsProofVideoPlaying(false);
+      });
+    } else {
+      video.pause();
+    }
+  }, [activeProofSlide]);
+
+  useEffect(() => {
+    const updateFloatingCta = () => {
+      const problemSection = document.getElementById("problem");
+      const formSection = document.getElementById("form");
+      if (!problemSection || !formSection) {
+        setShowFloatingCta(false);
+        return;
+      }
+
+      const scrollAnchor = window.scrollY + window.innerHeight * 0.28;
+      const problemTop = problemSection.offsetTop;
+      const formTop = formSection.offsetTop;
+
+      setShowFloatingCta(scrollAnchor >= problemTop && scrollAnchor < formTop);
+    };
+
+    updateFloatingCta();
+    window.addEventListener("scroll", updateFloatingCta, { passive: true });
+    window.addEventListener("resize", updateFloatingCta);
+
+    return () => {
+      window.removeEventListener("scroll", updateFloatingCta);
+      window.removeEventListener("resize", updateFloatingCta);
+    };
   }, []);
 
   async function submitTrial() {
@@ -282,6 +326,32 @@ export default function FunnelClient() {
     }
   }
 
+  function setProofSlideIndex(nextIndex: number) {
+    const normalizedIndex = (nextIndex + proofSlides.length) % proofSlides.length;
+    setIsProofVideoPlaying(proofSlides[normalizedIndex]?.type === "video");
+    setActiveProofSlide(normalizedIndex);
+  }
+
+  function goToPreviousProofSlide() {
+    setProofSlideIndex(activeProofSlide - 1);
+  }
+
+  function goToNextProofSlide() {
+    setProofSlideIndex(activeProofSlide + 1);
+  }
+
+  function toggleProofVideoPlayback() {
+    const video = proofVideoRef.current;
+    if (!video || proofSlides[activeProofSlide]?.type !== "video") return;
+
+    if (video.paused) {
+      void video.play().then(() => setIsProofVideoPlaying(true)).catch(() => setIsProofVideoPlaying(false));
+    } else {
+      video.pause();
+      setIsProofVideoPlaying(false);
+    }
+  }
+
   return (
     <>
       <Script id="meta-pixel-base" strategy="afterInteractive">
@@ -296,7 +366,7 @@ export default function FunnelClient() {
         `}
       </Script>
 
-      <div className="relative min-h-screen overflow-x-hidden bg-[#050607] text-white">
+      <div className="relative min-h-screen overflow-x-hidden bg-[#050607] pb-28 text-white sm:pb-32">
         <div className="sticky top-0 z-50 border-b border-white/10 bg-[#FF3D3D] px-2 py-2 text-center text-[11px] font-semibold text-white shadow-[0_0_24px_rgba(255,61,61,0.32)] sm:px-4 sm:text-sm">
           <span className="inline-flex max-w-full items-center justify-center gap-2 whitespace-nowrap">
             <span className="animate-pulse">⚡</span>
@@ -310,6 +380,33 @@ export default function FunnelClient() {
         </div>
 
         <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,225,255,0.22)_0%,_rgba(5,6,7,0)_42%)]" />
+        <div
+          className={`pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-all duration-300 sm:px-6 ${
+            showFloatingCta
+              ? "translate-y-0 opacity-100"
+              : "translate-y-6 opacity-0"
+          }`}
+        >
+          <a
+            href="#form"
+            className="pointer-events-auto inline-flex w-full max-w-xl items-center gap-3 rounded-full border border-[#FFF06A]/40 bg-[#0C1014]/92 px-4 py-3 shadow-[0_18px_45px_rgba(0,0,0,0.45)] backdrop-blur-xl transition hover:-translate-y-0.5"
+          >
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFF06A] text-xl shadow-[0_8px_24px_rgba(255,240,106,0.28)]">
+              🎁
+            </span>
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block truncate text-sm font-black text-white sm:text-base">
+                Obtenir mon essai gratuit
+              </span>
+              <span className="block truncate text-[11px] font-medium text-[#C7D1DA] sm:text-xs">
+                Aller directement au formulaire
+              </span>
+            </span>
+            <span className="cta-yellow inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-black text-[#1A1600] shadow-[0_12px_24px_rgba(255,240,106,0.22)]">
+              C’est gratuit
+            </span>
+          </a>
+        </div>
         <div className="relative mx-auto max-w-7xl px-4 pb-6 pt-0 sm:px-6 sm:py-6 lg:px-8">
           <section
             id="hero"
@@ -390,35 +487,6 @@ export default function FunnelClient() {
                 ))}
               </div>
 
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-sm text-[#B5B5B5]">
-                <span>Basé sur des outils utilisés par des devs orientés</span>
-                {["Azure", "OpenAI", "GitHub"].map((logo) => (
-                  <span
-                    key={logo}
-                    className="rounded-full border border-white/10 bg-white/5 px-4 py-2 font-semibold text-white"
-                  >
-                    {logo}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                {quickProof.map(([value, label]) => (
-                  <div
-                    key={label}
-                    className="rounded-2xl border border-white/8 bg-white/[0.035] px-4 py-4 text-center"
-                  >
-                    <div
-                      className="text-3xl font-extrabold text-[#FFF06A]"
-                      style={{ fontFamily: "var(--font-outfit)" }}
-                    >
-                      {value}
-                    </div>
-                    <div className="mt-1 text-xs uppercase tracking-[0.18em] text-[#9FB0BF]">
-                      {label}
-                    </div>
-                  </div>
-                ))}
-              </div>
               </div>
             </div>
           </section>
@@ -486,7 +554,7 @@ export default function FunnelClient() {
                   items={[
                     "60 DT/mois",
                     "D17 / Virement / Wafa Cash / IZI",
-                    "Aucune limite de sessions",
+                    "Aucune limite de sessions (VIA API)",
                     "Code à 3h du matin si tu veux",
                     "100% disponible en Tunisie",
                   ]}
@@ -503,46 +571,155 @@ export default function FunnelClient() {
                     className="mt-3 text-2xl font-bold tracking-[-0.03em] text-white sm:text-3xl"
                     style={{ fontFamily: "var(--font-outfit)" }}
                   >
-                    Utilise Codex, T3 Code ou OpenCode sans limite et gagne du temps sans payer 310 DT/mois.
+                    Utilise Codex, T3 Code ou OpenCode sans limite, avec le même niveau de puissance pour beaucoup moins cher.
                   </h3>
-                  <p className="mt-3 text-sm leading-7 text-[#AFC0CE] sm:text-base">
-                    Tu choisis l’outil qui te convient le mieux, AIPilot s’occupe du setup, de la configuration Azure, et tu gardes le même niveau de productivité pour beaucoup moins cher.
-                  </p>
                 </div>
 
                 <div className="mt-6 grid gap-4 md:grid-cols-3">
-                  {toolFreedom.map(([title, text]) => (
+                  {toolGallery.map((item) => (
                     <div
-                      key={title}
-                      className="rounded-[20px] border border-white/8 bg-white/[0.03] p-5"
+                      key={item.title}
+                      className="overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#10161C,#0A0E12)] shadow-[0_16px_40px_rgba(0,0,0,0.18)]"
                     >
-                      <p className="text-lg font-bold text-white">{title}</p>
-                      <p className="mt-2 text-sm leading-7 text-[#B3C0CB]">{text}</p>
+                      <div className="relative h-40 border-b border-white/8 bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.16),transparent_60%)]">
+                        <Image
+                          src={item.image}
+                          alt={item.title}
+                          fill
+                          className="object-cover object-top"
+                        />
+                      </div>
+                      <div className="p-5">
+                        <p className="text-lg font-bold text-white">{item.title}</p>
+                        <p className="mt-2 text-sm leading-7 text-[#B7C3CD]">{item.text}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
+            </div>
+          </section>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-3">
-                {toolGallery.map((item) => (
-                  <div
-                    key={item.title}
-                    className="overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#10161C,#0A0E12)] shadow-[0_16px_40px_rgba(0,0,0,0.18)]"
+          <section className="section-reveal py-16 visible">
+            <div className="mx-auto max-w-6xl">
+              <div className="flex items-end justify-between gap-4">
+                <div className="max-w-3xl">
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#17E8FF]">
+                    Preuves clients
+                  </p>
+                  <h2
+                    className="mt-3 text-3xl font-bold tracking-[-0.03em] text-white sm:text-5xl"
+                    style={{ fontFamily: "var(--font-outfit)" }}
                   >
-                    <div className="relative h-40 border-b border-white/8 bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.16),transparent_60%)]">
-                      <Image
-                        src={item.image}
-                        alt={item.title}
-                        fill
-                        className="object-contain p-8"
-                      />
-                    </div>
-                    <div className="p-5">
-                      <p className="text-lg font-bold text-white">{item.title}</p>
-                      <p className="mt-2 text-sm leading-7 text-[#B7C3CD]">{item.text}</p>
-                    </div>
+                    Captures réelles + retours WhatsApp
+                  </h2>
+                  <p className="mt-4 text-base leading-8 text-[#AEB8C2]">
+                    Des échanges, des captures et une vidéo courte pour voir concrètement comment AIPilot est reçu, installé et utilisé.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8 overflow-hidden rounded-[28px] border border-[#17E8FF]/12 bg-[linear-gradient(180deg,#10161C,#0A0E12)] shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
+                <div
+                  className="relative bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.18),transparent_58%)]"
+                  onTouchStart={(event) => setProofTouchStart(event.touches[0]?.clientX ?? null)}
+                  onTouchEnd={(event) => {
+                    if (proofTouchStart === null) return;
+                    const touchEnd = event.changedTouches[0]?.clientX ?? proofTouchStart;
+                    const delta = touchEnd - proofTouchStart;
+                    if (Math.abs(delta) > 45) {
+                      if (delta > 0) {
+                        goToPreviousProofSlide();
+                      } else {
+                        goToNextProofSlide();
+                      }
+                    }
+                    setProofTouchStart(null);
+                  }}
+                >
+                  <div className="relative aspect-[9/16] w-full min-h-[34rem] overflow-hidden bg-[#070B0F] sm:aspect-[4/3] sm:min-h-[28rem] lg:min-h-[36rem] xl:min-h-[42rem]">
+                    {proofSlides.map((slide, index) => (
+                      <div
+                        key={slide.title}
+                        className={`absolute inset-0 transition-all duration-500 ${
+                          index === activeProofSlide
+                            ? "pointer-events-auto translate-x-0 opacity-100"
+                            : "pointer-events-none translate-x-4 opacity-0"
+                        }`}
+                      >
+                        {slide.type === "video" ? (
+                          <button
+                            type="button"
+                            onClick={toggleProofVideoPlayback}
+                            className="absolute inset-0 block"
+                            aria-label={isProofVideoPlaying ? "Mettre la vidéo en pause" : "Lire la vidéo"}
+                          >
+                            <video
+                              ref={proofVideoRef}
+                              src={slide.src}
+                              poster={slide.poster}
+                              muted
+                              loop
+                              playsInline
+                              preload="metadata"
+                              controls={false}
+                              className="h-full w-full object-contain p-3 sm:p-5"
+                            />
+                            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,9,11,0.02),rgba(7,9,11,0.04)_42%,rgba(7,9,11,0.16)_100%)]" />
+                            <span className={`absolute inset-x-0 bottom-5 flex justify-center transition-opacity ${isProofVideoPlaying ? "opacity-0" : "opacity-100"}`}>
+                              <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-black/60 text-2xl text-white shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur">
+                                ▶
+                              </span>
+                            </span>
+                          </button>
+                        ) : (
+                          <>
+                            <Image
+                              src={slide.src}
+                              alt={slide.title}
+                              fill
+                              className="object-contain p-3 sm:p-5"
+                            />
+                            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,9,11,0.04),rgba(7,9,11,0.08)_42%,rgba(7,9,11,0.18)_100%)]" />
+                          </>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <div className="flex items-center justify-center gap-3 border-t border-white/8 bg-[#0B0F13]/98 px-4 py-4 backdrop-blur sm:gap-4 sm:px-6">
+                    <button
+                      type="button"
+                      onClick={goToPreviousProofSlide}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg text-white shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:bg-white/16"
+                      aria-label="Slide précédent"
+                    >
+                      ←
+                    </button>
+                    <div className="flex min-w-0 items-center justify-center gap-2">
+                      {proofSlides.map((slide, index) => (
+                        <button
+                          key={slide.title}
+                          type="button"
+                          onClick={() => setProofSlideIndex(index)}
+                          className={`h-2.5 rounded-full transition ${
+                            index === activeProofSlide
+                              ? "w-9 bg-[#17E8FF] shadow-[0_0_18px_rgba(23,232,255,0.36)]"
+                              : "w-2.5 bg-white/35 hover:bg-white/55"
+                          }`}
+                          aria-label={`Aller au slide ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={goToNextProofSlide}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg text-white shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:bg-white/16"
+                      aria-label="Slide suivant"
+                    >
+                      →
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -591,23 +768,18 @@ export default function FunnelClient() {
                 </table>
               </div>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-3">
-                {stats.map((item, index) => (
-                  <div
-                    key={item.label}
-                    className="rounded-[24px] border border-white/10 bg-[#111111] p-6 text-center"
-                  >
-                    <div
-                      className="text-5xl font-black text-[#17E8FF] sm:text-6xl"
-                      style={{ fontFamily: "var(--font-outfit)" }}
-                    >
-                      {index === 0 ? statValue0 : index === 1 ? statValue1 : statValue2}
-                      {item.suffix}
-                    </div>
-                    <p className="mt-3 text-sm leading-7 text-[#A3A3A3]">{item.label}</p>
-                  </div>
-                ))}
+              <div className="mt-8 overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,#10161C,#0A0E12)] shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+                <div className="relative bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.14),transparent_60%)]">
+                  <Image
+                    src="/funnel/gpt55-benchmark.png"
+                    alt="Benchmark GPT-5.5 versus autres modèles"
+                    width={1390}
+                    height={900}
+                    className="h-auto w-full object-cover"
+                  />
+                </div>
               </div>
+
             </div>
           </section>
 
@@ -644,60 +816,51 @@ export default function FunnelClient() {
               </h2>
               <div className="relative mt-10 space-y-10 before:absolute before:left-5 before:top-0 before:h-full before:w-px before:bg-gradient-to-b before:from-[#00FF88] before:to-transparent md:before:left-8">
                 {[
-                  ["①", "Remplis le formulaire", "Ton prénom + ton WhatsApp → reçois ton essai gratuit immédiatement"],
-                  ["②", "Télécharge l’installateur", "Un seul fichier, installe et configure tout en 5 min"],
-                  ["③", "Code avec GPT-5.5", "Ouvre Codex — ton IA numéro 1 mondiale t’attend"],
-                ].map(([number, title, text]) => (
-                  <div key={title} className="relative flex gap-5 pl-14 md:pl-20">
+                  {
+                    number: "①",
+                    title: "Remplis le formulaire",
+                    text: "Ton prénom + ton WhatsApp → reçois ton essai gratuit immédiatement",
+                    image: "/funnel/step-form.png",
+                    imageClass: "object-cover object-[center_44%] scale-[1.18] sm:scale-[1.12]",
+                    imageWrapperClass: "bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.1),transparent_60%)]",
+                  },
+                  {
+                    number: "②",
+                    title: "Télécharge l’installateur",
+                    text: "Un seul fichier, installe et configure tout en 5 min",
+                    image: "/funnel/step-manager.png",
+                    imageClass: "object-cover object-top",
+                    imageWrapperClass: "bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.16),transparent_60%)]",
+                  },
+                  {
+                    number: "③",
+                    title: "Code avec GPT-5.5",
+                    text: "Ouvre Codex — ton IA numéro 1 mondiale t’attend",
+                    image: "/funnel/step-codex-vscode.webp",
+                    imageClass: "object-cover object-top",
+                    imageWrapperClass: "bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.16),transparent_60%)]",
+                  },
+                ].map((step) => (
+                  <div key={step.title} className="relative flex gap-5 pl-14 md:pl-20">
                     <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-full border border-[#17E8FF]/50 bg-[#17E8FF]/10 text-sm font-black text-[#17E8FF] md:h-16 md:w-16 md:text-lg">
-                      {number}
+                      {step.number}
                     </div>
-                    <div className="rounded-[24px] border border-[#17E8FF]/12 bg-[#0D1014] p-6">
-                      <p className="text-2xl font-bold text-white">{title}</p>
-                      <p className="mt-3 text-sm leading-7 text-[#A5A5A5]">{text}</p>
+                    <div className="overflow-hidden rounded-[24px] border border-[#17E8FF]/12 bg-[#0D1014]">
+                      <div className={`relative aspect-[16/9] overflow-hidden border-b border-white/8 ${step.imageWrapperClass}`}>
+                        <Image
+                          src={step.image}
+                          alt={step.title}
+                          fill
+                          className={step.imageClass}
+                        />
+                      </div>
+                      <div className="p-6">
+                        <p className="text-2xl font-bold text-white">{step.title}</p>
+                        <p className="mt-3 text-sm leading-7 text-[#A5A5A5]">{step.text}</p>
+                      </div>
                     </div>
                   </div>
                 ))}
-              </div>
-
-              <div className="mt-10 grid gap-4 md:grid-cols-2">
-                <div className="overflow-hidden rounded-[24px] border border-[#17E8FF]/14 bg-[#0D1014] shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
-                  <div className="relative aspect-[16/10]">
-                    <Image
-                      src="/tutorials/aipilot-manager-connect-install.png"
-                      alt="AIPilot Manager"
-                      fill
-                      className="object-cover object-top"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#17E8FF]">
-                      AIPilot Manager
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-[#CCD6DE]">
-                      Le manager installe, configure et vérifie tout automatiquement pour éviter les manipulations compliquées.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-[24px] border border-[#17E8FF]/14 bg-[#0D1014] shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
-                  <div className="relative aspect-[16/10]">
-                    <Image
-                      src="/tutorials/codex-enter-api-key.png"
-                      alt="Codex OpenAI"
-                      fill
-                      className="object-cover object-top"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#17E8FF]">
-                      Codex OpenAI
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-[#CCD6DE]">
-                      Tu ouvres l’outil, AIPilot a déjà préparé la configuration, et tu peux coder immédiatement avec le bon modèle.
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
           </section>
@@ -713,24 +876,6 @@ export default function FunnelClient() {
               <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-[#CFCFCF]">
                 L’essai gratuit 1 jour est disponible uniquement pour les prochains développeurs qui s’inscrivent. Après ? Liste d’attente. Mouch wa9t el taswif.
               </p>
-
-              <div className="mt-8 grid gap-4 md:grid-cols-3">
-                {[
-                  ["Codex App", "GPT-5.5 / GPT-5.4, installation guidée"],
-                  ["T3 Code", "Même puissance, interface plus simple"],
-                  ["OpenCode", "Terminal moderne, sans limite de sessions"],
-                ].map(([title, text]) => (
-                  <div
-                    key={title}
-                    className="rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-4 text-left"
-                  >
-                    <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#FFF06A]">
-                      {title}
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-[#D5DCE4]">{text}</p>
-                  </div>
-                ))}
-              </div>
 
               <a
                 href="#form"
