@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 
 type RevealMap = Record<string, boolean>;
@@ -102,6 +102,45 @@ const proofSlides = [
   },
 ];
 
+const PROOF_VIDEO_STORAGE_KEY = "aipilot-funnel-proof-video-state";
+
+type ProofStoredState = {
+  slideIndex: number;
+  currentTime: number;
+  pausedByUser: boolean;
+};
+
+function readStoredProofState(): ProofStoredState {
+  if (typeof window === "undefined") {
+    return { slideIndex: 0, currentTime: 0, pausedByUser: false };
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(PROOF_VIDEO_STORAGE_KEY);
+    if (!raw) {
+      return { slideIndex: 0, currentTime: 0, pausedByUser: false };
+    }
+
+    const parsed = JSON.parse(raw) as Partial<ProofStoredState>;
+    const slideIndex =
+      typeof parsed.slideIndex === "number" && parsed.slideIndex >= 0 && parsed.slideIndex < proofSlides.length
+        ? parsed.slideIndex
+        : 0;
+    const currentTime =
+      typeof parsed.currentTime === "number" && Number.isFinite(parsed.currentTime) && parsed.currentTime >= 0
+        ? parsed.currentTime
+        : 0;
+
+    return {
+      slideIndex,
+      currentTime,
+      pausedByUser: Boolean(parsed.pausedByUser),
+    };
+  } catch {
+    return { slideIndex: 0, currentTime: 0, pausedByUser: false };
+  }
+}
+
 const faqs = [
   {
     q: "C’est quoi exactement AIPilot ?",
@@ -159,6 +198,7 @@ function useReveal(ids: string[]) {
 }
 
 export default function FunnelClient() {
+  const initialProofState = readStoredProofState();
   const sectionIds = [
     "hero",
     "problem",
@@ -177,11 +217,41 @@ export default function FunnelClient() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [spotsLeft] = useState(4);
   const [showFloatingCta, setShowFloatingCta] = useState(false);
-  const [activeProofSlide, setActiveProofSlide] = useState(0);
+  const [activeProofSlide, setActiveProofSlide] = useState(() => initialProofState.slideIndex);
   const [proofTouchStart, setProofTouchStart] = useState<number | null>(null);
-  const [isProofVideoPlaying, setIsProofVideoPlaying] = useState(true);
+  const [hasProofInteraction, setHasProofInteraction] = useState(false);
+  const [proofVideoPausedByUser, setProofVideoPausedByUser] = useState(
+    () => initialProofState.pausedByUser,
+  );
+  const [isProofVideoPlaying, setIsProofVideoPlaying] = useState(
+    () => !initialProofState.pausedByUser && proofSlides[initialProofState.slideIndex]?.type === "video",
+  );
   const proofVideoRef = useRef<HTMLVideoElement | null>(null);
+  const proofMediaRef = useRef<HTMLDivElement | null>(null);
+  const [isProofMediaVisible, setIsProofMediaVisible] = useState(false);
+  const proofVideoProgressRef = useRef(initialProofState.currentTime);
   const normalizedPhone = normalizeTunisiaWhatsappNumber(phone);
+
+  const persistProofState = useCallback((next: {
+    slideIndex?: number;
+    currentTime?: number;
+    pausedByUser?: boolean;
+  }) => {
+    if (typeof window === "undefined") return;
+
+    const current = {
+      slideIndex: activeProofSlide,
+      currentTime: proofVideoProgressRef.current,
+      pausedByUser: proofVideoPausedByUser,
+    };
+
+    const payload = {
+      ...current,
+      ...next,
+    };
+
+    window.sessionStorage.setItem(PROOF_VIDEO_STORAGE_KEY, JSON.stringify(payload));
+  }, [activeProofSlide, proofVideoPausedByUser]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -210,17 +280,67 @@ export default function FunnelClient() {
 
     if (!video) return;
 
-    if (currentSlide?.type === "video") {
-      video.currentTime = 0;
-      void video.play().then(() => {
-        setIsProofVideoPlaying(true);
-      }).catch(() => {
-        setIsProofVideoPlaying(false);
-      });
+    if (currentSlide?.type === "video" && isProofMediaVisible && !proofVideoPausedByUser) {
+      if (Math.abs(video.currentTime - proofVideoProgressRef.current) > 0.35) {
+        video.currentTime = proofVideoProgressRef.current;
+      }
+      video.muted = !hasProofInteraction;
+      void video
+        .play()
+        .catch(() => {
+          video.muted = true;
+          void video.play().catch(() => {
+            setIsProofVideoPlaying(false);
+          });
+        });
     } else {
       video.pause();
     }
-  }, [activeProofSlide]);
+  }, [activeProofSlide, hasProofInteraction, isProofMediaVisible, proofVideoPausedByUser]);
+
+  useEffect(() => {
+    const markInteraction = () => setHasProofInteraction(true);
+
+    window.addEventListener("pointerdown", markInteraction, { passive: true, once: true });
+    window.addEventListener("keydown", markInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", markInteraction);
+      window.removeEventListener("keydown", markInteraction);
+    };
+  }, []);
+
+  useEffect(() => {
+    const element = proofMediaRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        setIsProofMediaVisible(Boolean(entry?.isIntersecting && entry.intersectionRatio > 0.4));
+      },
+      { threshold: [0, 0.4, 0.7] },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const handleScrollPause = () => {
+      if (proofSlides[activeProofSlide]?.type !== "video") return;
+      const video = proofVideoRef.current;
+      if (!video || video.paused) return;
+      if (!isProofMediaVisible) {
+        proofVideoProgressRef.current = video.currentTime;
+        persistProofState({ currentTime: video.currentTime });
+        video.pause();
+      }
+    };
+
+    window.addEventListener("scroll", handleScrollPause, { passive: true });
+    return () => window.removeEventListener("scroll", handleScrollPause);
+  }, [activeProofSlide, isProofMediaVisible, persistProofState]);
 
   useEffect(() => {
     const updateFloatingCta = () => {
@@ -328,8 +448,14 @@ export default function FunnelClient() {
 
   function setProofSlideIndex(nextIndex: number) {
     const normalizedIndex = (nextIndex + proofSlides.length) % proofSlides.length;
-    setIsProofVideoPlaying(proofSlides[normalizedIndex]?.type === "video");
+    const currentVideo = proofVideoRef.current;
+    if (currentVideo) {
+      proofVideoProgressRef.current = currentVideo.currentTime;
+    }
+    const nextIsVideo = proofSlides[normalizedIndex]?.type === "video";
+    setIsProofVideoPlaying(nextIsVideo && !proofVideoPausedByUser);
     setActiveProofSlide(normalizedIndex);
+    persistProofState({ slideIndex: normalizedIndex, currentTime: proofVideoProgressRef.current });
   }
 
   function goToPreviousProofSlide() {
@@ -344,9 +470,17 @@ export default function FunnelClient() {
     const video = proofVideoRef.current;
     if (!video || proofSlides[activeProofSlide]?.type !== "video") return;
 
+    setHasProofInteraction(true);
+
     if (video.paused) {
+      setProofVideoPausedByUser(false);
+      persistProofState({ pausedByUser: false, currentTime: video.currentTime });
+      video.muted = false;
       void video.play().then(() => setIsProofVideoPlaying(true)).catch(() => setIsProofVideoPlaying(false));
     } else {
+      setProofVideoPausedByUser(true);
+      proofVideoProgressRef.current = video.currentTime;
+      persistProofState({ pausedByUser: true, currentTime: video.currentTime });
       video.pause();
       setIsProofVideoPlaying(false);
     }
@@ -416,7 +550,7 @@ export default function FunnelClient() {
             <div className="relative z-10 mx-auto max-w-6xl">
               <div className="mx-auto max-w-5xl text-center">
               <h1
-                className="mx-auto mt-4 max-w-[11ch] text-[2.45rem] font-extrabold leading-[0.94] tracking-[-0.055em] text-white sm:mt-5 sm:max-w-none sm:text-[4.4rem] sm:leading-[0.9] lg:text-[5.9rem]"
+                className="mx-auto mt-4 max-w-[11ch] text-[2.45rem] font-extrabold leading-[1.01] tracking-[-0.055em] text-white sm:mt-5 sm:max-w-none sm:text-[4.4rem] sm:leading-[0.96] lg:text-[5.9rem]"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
                 <span className="block whitespace-nowrap">Codex OpenAI</span>
@@ -425,6 +559,10 @@ export default function FunnelClient() {
                   Pour 60 DT/mois
                 </span>
               </h1>
+
+              <p className="mt-3 text-sm font-bold uppercase tracking-[0.18em] text-[#FFF06A] sm:text-base">
+                Offre Codex 100 dollar
+              </p>
 
               <div className="mt-4 text-sm font-semibold text-[#FF7070]">
                 <span className="line-through opacity-80">310 DT/mois</span>
@@ -637,7 +775,10 @@ export default function FunnelClient() {
                     setProofTouchStart(null);
                   }}
                 >
-                  <div className="relative aspect-[9/16] w-full min-h-[34rem] overflow-hidden bg-[#070B0F] sm:aspect-[4/3] sm:min-h-[28rem] lg:min-h-[36rem] xl:min-h-[42rem]">
+                  <div
+                    ref={proofMediaRef}
+                    className="relative aspect-[9/16] w-full min-h-[34rem] overflow-hidden bg-[#070B0F] sm:aspect-[4/3] sm:min-h-[28rem] lg:min-h-[36rem] xl:min-h-[42rem]"
+                  >
                     {proofSlides.map((slide, index) => (
                       <div
                         key={slide.title}
@@ -663,6 +804,23 @@ export default function FunnelClient() {
                               playsInline
                               preload="metadata"
                               controls={false}
+                              onLoadedMetadata={(event) => {
+                                const target = event.currentTarget;
+                                if (proofVideoProgressRef.current > 0 && proofVideoProgressRef.current < target.duration) {
+                                  target.currentTime = proofVideoProgressRef.current;
+                                }
+                              }}
+                              onTimeUpdate={(event) => {
+                                const target = event.currentTarget;
+                                proofVideoProgressRef.current = target.currentTime;
+                                persistProofState({ currentTime: target.currentTime });
+                              }}
+                              onPlay={() => setIsProofVideoPlaying(true)}
+                              onPause={(event) => {
+                                proofVideoProgressRef.current = event.currentTarget.currentTime;
+                                persistProofState({ currentTime: event.currentTarget.currentTime });
+                                setIsProofVideoPlaying(false);
+                              }}
                               className="h-full w-full object-contain p-3 sm:p-5"
                             />
                             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,9,11,0.02),rgba(7,9,11,0.04)_42%,rgba(7,9,11,0.16)_100%)]" />
