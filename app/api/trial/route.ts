@@ -21,6 +21,9 @@ export async function POST(request: Request) {
 
   try {
     const normalizedName = String(payload?.nom ?? "").trim();
+    const normalizedLeadWhatsapp = normalizeTunisiaWhatsappNumber(
+      String(payload?.telephone ?? ""),
+    );
     const lead = await createTrialLead({
       name: normalizedName,
       whatsappNumber: String(payload?.telephone ?? ""),
@@ -35,7 +38,9 @@ export async function POST(request: Request) {
       config.supportWhatsappNumber ?? "",
     );
 
-    const whatsappMessage = `Aahla, je suis ${normalizedName} et je suis intéressé par l'offre Codex 100 dollar. Code: TRIAL-${lead.id}`;
+    const whatsappMessage = normalizedLeadWhatsapp
+      ? `Aahla, je suis ${normalizedName} et je suis intéressé par l'offre Codex 100 dollar. Mon WhatsApp: ${normalizedLeadWhatsapp.display}`
+      : `Aahla, je suis ${normalizedName} et je suis intéressé par l'offre Codex 100 dollar.`;
 
     const redirectUrl = supportWhatsapp
       ? buildWhatsAppUrl(
