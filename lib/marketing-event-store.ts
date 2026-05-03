@@ -47,6 +47,29 @@ function buildId() {
   return randomBytes(12).toString("hex");
 }
 
+function normalizePhoneKey(phone: string) {
+  return String(phone ?? "").replace(/[^\d]/g, "");
+}
+
+function normalizePhoneSuffix(phone: string) {
+  const normalized = normalizePhoneKey(phone);
+  return normalized.length >= 8 ? normalized.slice(-8) : normalized;
+}
+
+function samePhoneIdentity(left: string, right: string) {
+  const leftNormalized = normalizePhoneKey(left);
+  const rightNormalized = normalizePhoneKey(right);
+
+  if (!leftNormalized || !rightNormalized) {
+    return false;
+  }
+
+  return (
+    leftNormalized === rightNormalized ||
+    normalizePhoneSuffix(leftNormalized) === normalizePhoneSuffix(rightNormalized)
+  );
+}
+
 async function readLocalMarketingEvents(): Promise<LocalMarketingEventsFile> {
   try {
     const raw = await readFile(LOCAL_MARKETING_EVENTS_PATH, "utf8");
@@ -205,4 +228,56 @@ export async function listRecentMarketingEvents(limit = 25) {
   `;
 
   return (rows as Array<MarketingEventRow>).map(mapMarketingEventRow);
+}
+
+export async function deleteMarketingEventsForIdentity(input: {
+  clientId?: string;
+  phone?: string;
+}) {
+  const clientId = String(input.clientId ?? "").trim();
+  const normalized = normalizePhoneKey(input.phone ?? "");
+  const suffix = normalizePhoneSuffix(input.phone ?? "");
+
+  if (!clientId && !normalized) {
+    return;
+  }
+
+  const sql = getSql();
+  if (!sql) {
+    const local = await readLocalMarketingEvents();
+    local.events = local.events.filter((event) => {
+      const sameClient = clientId && event.clientId === clientId;
+      const samePhone = normalized && event.phone && samePhoneIdentity(event.phone, normalized);
+      return !sameClient && !samePhone;
+    });
+    await writeLocalMarketingEvents(local);
+    return;
+  }
+
+  await ensureMarketingEventsTable();
+  if (clientId && normalized) {
+    await sql`
+      DELETE FROM marketing_events
+      WHERE
+        client_id = ${clientId}
+        OR regexp_replace(phone, '[^0-9]', '', 'g') = ${normalized}
+        OR right(regexp_replace(phone, '[^0-9]', '', 'g'), 8) = ${suffix}
+    `;
+    return;
+  }
+
+  if (clientId) {
+    await sql`
+      DELETE FROM marketing_events
+      WHERE client_id = ${clientId}
+    `;
+    return;
+  }
+
+  await sql`
+    DELETE FROM marketing_events
+    WHERE
+      regexp_replace(phone, '[^0-9]', '', 'g') = ${normalized}
+      OR right(regexp_replace(phone, '[^0-9]', '', 'g'), 8) = ${suffix}
+  `;
 }

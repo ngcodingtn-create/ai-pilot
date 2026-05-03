@@ -411,6 +411,32 @@ export async function deleteAccessRequestById(id: string) {
   `;
 }
 
+export async function deleteAccessRequestsByPhone(phone: string) {
+  const normalized = normalizePhoneKey(phone);
+  const suffix = normalizePhoneSuffix(phone);
+  if (!normalized) {
+    return;
+  }
+
+  const sql = getSql();
+  if (!sql) {
+    const local = await readLocalAccessRequestFile();
+    local.requests = local.requests.filter(
+      (request) => !samePhoneIdentity(request.whatsappNumber, normalized),
+    );
+    await writeLocalAccessRequestFile(local);
+    return;
+  }
+
+  await ensureAccessRequestTable();
+  await sql`
+    DELETE FROM access_requests
+    WHERE
+      regexp_replace(whatsapp_number, '[^0-9]', '', 'g') = ${normalized}
+      OR right(regexp_replace(whatsapp_number, '[^0-9]', '', 'g'), 8) = ${suffix}
+  `;
+}
+
 export async function acceptAccessRequest(input: {
   requestId: string;
   generatedLicenseKey: string;

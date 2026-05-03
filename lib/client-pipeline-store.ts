@@ -530,6 +530,74 @@ export async function getPipelineClientById(id: string) {
   return row ? mapClientRow(row) : null;
 }
 
+export async function getPipelineClientByLicenseKey(licenseKey: string) {
+  const normalized = String(licenseKey ?? "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const sql = getSql();
+  if (!sql) {
+    const local = await readLocalPipelineFile();
+    return local.clients.find((client) => client.licenseKey === normalized) ?? null;
+  }
+
+  await syncLegacyTrialLeadsIntoPipeline();
+  await ensurePipelineTables();
+  const rows = await sql`
+    SELECT
+      id,
+      name,
+      phone,
+      email,
+      fbp,
+      fbc,
+      ip,
+      user_agent,
+      ad_source,
+      fbclid,
+      utm_source,
+      utm_campaign,
+      utm_medium,
+      utm_content,
+      utm_term,
+      landing_url,
+      referrer,
+      status,
+      lead_at,
+      trial_at,
+      trial_ends_at,
+      paid_at,
+      license_key,
+      license_type,
+      license_expires_at,
+      created_at,
+      updated_at
+    FROM clients
+    WHERE license_key = ${normalized}
+    LIMIT 1
+  `;
+
+  const row = (rows as Array<ClientRow>)[0];
+  return row ? mapClientRow(row) : null;
+}
+
+export async function getPipelineClientByPhone(phone: string) {
+  const normalized = normalizePhoneKey(phone);
+  if (!normalized) {
+    return null;
+  }
+
+  const sql = getSql();
+  if (!sql) {
+    const local = await readLocalPipelineFile();
+    return local.clients.find((client) => samePhoneIdentity(client.phone, normalized)) ?? null;
+  }
+
+  await syncLegacyTrialLeadsIntoPipeline();
+  return findMatchingSqlClientByPhone(normalized);
+}
+
 export async function upsertLeadClient(input: UpsertLeadInput) {
   const phone = normalizePhoneKey(input.phone);
   if (!phone) {
@@ -1238,6 +1306,30 @@ export async function deletePipelineClientById(clientId: string) {
     DELETE FROM clients
     WHERE id = ${client.id}
   `;
+}
+
+export async function deletePipelineClientByLicenseKey(licenseKey: string) {
+  const client = await getPipelineClientByLicenseKey(licenseKey);
+  if (client) {
+    await deletePipelineClientById(client.id);
+    return client;
+  }
+
+  const license = await findLicenseByKey(licenseKey);
+  if (license) {
+    await deleteLicenseById(license.id);
+  }
+  return null;
+}
+
+export async function deletePipelineClientByPhone(phone: string) {
+  const client = await getPipelineClientByPhone(phone);
+  if (!client) {
+    return null;
+  }
+
+  await deletePipelineClientById(client.id);
+  return client;
 }
 
 export async function convertClientToPaid(input: {

@@ -12,6 +12,7 @@ import { sendCapiEvent } from "@/lib/capi";
 import {
   acceptAccessRequest,
   deleteAccessRequestById,
+  deleteAccessRequestsByPhone,
   findAccessRequestById,
 } from "@/lib/access-request-store";
 import {
@@ -27,14 +28,17 @@ import {
 import {
   activateTrialForClient,
   convertClientToPaid,
+  deletePipelineClientByLicenseKey,
   deletePipelineClientById,
+  deletePipelineClientByPhone,
   getPipelineClientById,
   markClientLostById,
-  markClientLostByLicenseKey,
   markClientPaid,
   recordFacebookEvent,
   upsertLeadClient,
 } from "@/lib/client-pipeline-store";
+import { deleteMarketingEventsForIdentity } from "@/lib/marketing-event-store";
+import { deleteTrialLeadsByPhone } from "@/lib/trial-leads-store";
 import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 
 function readTier(value: FormDataEntryValue | null): LicenseTier {
@@ -218,7 +222,15 @@ export async function deleteSubscriptionAction(formData: FormData) {
 
   const license = await findLicenseById(licenseId);
   if (license?.licenseKey) {
-    await markClientLostByLicenseKey(license.licenseKey);
+    const deletedClient = await deletePipelineClientByLicenseKey(license.licenseKey);
+    if (deletedClient?.phone) {
+      await deleteAccessRequestsByPhone(deletedClient.phone);
+      await deleteTrialLeadsByPhone(deletedClient.phone);
+      await deleteMarketingEventsForIdentity({
+        clientId: deletedClient.id,
+        phone: deletedClient.phone,
+      });
+    }
   }
 
   await deleteLicenseById(licenseId);
@@ -233,7 +245,24 @@ export async function deleteAccessRequestAction(formData: FormData) {
     throw new Error("Missing access request id");
   }
 
+  const request = await findAccessRequestById(requestId);
   await deleteAccessRequestById(requestId);
+  if (request) {
+    if (request.generatedLicenseKey) {
+      const deletedClient = await deletePipelineClientByLicenseKey(request.generatedLicenseKey);
+      await deleteMarketingEventsForIdentity({
+        clientId: deletedClient?.id,
+        phone: deletedClient?.phone ?? request.whatsappNumber,
+      });
+    } else {
+      const deletedClient = await deletePipelineClientByPhone(request.whatsappNumber);
+      await deleteMarketingEventsForIdentity({
+        clientId: deletedClient?.id,
+        phone: request.whatsappNumber,
+      });
+    }
+    await deleteTrialLeadsByPhone(request.whatsappNumber);
+  }
   redirect("/admin?section=requests&deleted=1");
 }
 
@@ -361,6 +390,15 @@ export async function deletePipelineClientAction(formData: FormData) {
     throw new Error("Missing client id");
   }
 
+  const client = await getPipelineClientById(clientId);
   await deletePipelineClientById(clientId);
+  if (client?.phone) {
+    await deleteAccessRequestsByPhone(client.phone);
+    await deleteTrialLeadsByPhone(client.phone);
+  }
+  await deleteMarketingEventsForIdentity({
+    clientId,
+    phone: client?.phone,
+  });
   redirect("/admin?section=pipeline&deleted=1");
 }

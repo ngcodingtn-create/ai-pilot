@@ -53,6 +53,29 @@ function buildId() {
   return randomBytes(4).toString("hex").toUpperCase();
 }
 
+function normalizePhoneKey(phone: string) {
+  return String(phone ?? "").replace(/[^\d]/g, "");
+}
+
+function normalizePhoneSuffix(phone: string) {
+  const normalized = normalizePhoneKey(phone);
+  return normalized.length >= 8 ? normalized.slice(-8) : normalized;
+}
+
+function samePhoneIdentity(left: string, right: string) {
+  const leftNormalized = normalizePhoneKey(left);
+  const rightNormalized = normalizePhoneKey(right);
+
+  if (!leftNormalized || !rightNormalized) {
+    return false;
+  }
+
+  return (
+    leftNormalized === rightNormalized ||
+    normalizePhoneSuffix(leftNormalized) === normalizePhoneSuffix(rightNormalized)
+  );
+}
+
 async function readLocalTrialLeads(): Promise<LocalTrialLeadsFile> {
   try {
     const raw = await readFile(LOCAL_TRIAL_LEADS_PATH, "utf8");
@@ -221,4 +244,30 @@ export function mapTrialLeadRow(row: TrialLeadRow): TrialLeadRecord {
     eventId: row.event_id ?? undefined,
     createdAt: new Date(row.created_at).toISOString(),
   };
+}
+
+export async function deleteTrialLeadsByPhone(phone: string) {
+  const normalized = normalizePhoneKey(phone);
+  const suffix = normalizePhoneSuffix(phone);
+  if (!normalized) {
+    return;
+  }
+
+  const sql = getSql();
+  if (!sql) {
+    const local = await readLocalTrialLeads();
+    local.leads = local.leads.filter(
+      (lead) => !samePhoneIdentity(lead.whatsappNumber, normalized),
+    );
+    await writeLocalTrialLeads(local);
+    return;
+  }
+
+  await ensureTrialLeadsTable();
+  await sql`
+    DELETE FROM trial_leads
+    WHERE
+      regexp_replace(whatsapp_number, '[^0-9]', '', 'g') = ${normalized}
+      OR right(regexp_replace(whatsapp_number, '[^0-9]', '', 'g'), 8) = ${suffix}
+  `;
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 import {
   Activity,
   BriefcaseBusiness,
@@ -711,9 +712,12 @@ function RequestCard({ request }: { request: AccessRequestRecord }) {
                   <option value="pro">Pro</option>
                   <option value="max">Max</option>
                 </select>
-                <button className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white">
+                <PendingButton
+                  className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white"
+                  pendingLabel="Création..."
+                >
                   Créer trial
-                </button>
+                </PendingButton>
               </form>
             ) : (
               <div className="rounded-2xl border border-white/10 bg-[#06141f] px-3 py-3">
@@ -733,9 +737,12 @@ function RequestCard({ request }: { request: AccessRequestRecord }) {
             </a>
             <form action={deleteAccessRequestAction}>
               <input type="hidden" name="requestId" value={request.id} />
-              <button className="h-full min-h-12 rounded-2xl border border-rose-400/35 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100">
+              <PendingButton
+                className="h-full min-h-12 rounded-2xl border border-rose-400/35 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100"
+                pendingLabel="Suppression..."
+              >
                 Supprimer
-              </button>
+              </PendingButton>
             </form>
           </div>
         </div>
@@ -804,9 +811,12 @@ function AddSubscriptionSheet({ open, onClose }: { open: boolean; onClose: () =>
           </p>
         </FormSection>
         <div className="fixed inset-x-4 bottom-6 z-50 mx-auto max-w-xl">
-          <button className="h-14 w-full rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white shadow-[0_18px_50px_rgba(10,132,255,0.34)]">
+          <PendingButton
+            className="h-14 w-full rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white shadow-[0_18px_50px_rgba(10,132,255,0.34)]"
+            pendingLabel="Création..."
+          >
             Créer et préparer l’envoi
-          </button>
+          </PendingButton>
         </div>
       </form>
     </Sheet>
@@ -915,15 +925,19 @@ function SubscriptionDetailSheet({
           </FormSection>
         ) : null}
         <div className="fixed inset-x-4 bottom-6 z-50 mx-auto grid max-w-xl grid-cols-[0.8fr_1.2fr] gap-2">
-          <button
+          <PendingButton
             formAction={deleteSubscriptionAction}
             className="h-14 rounded-2xl border border-rose-400/35 bg-rose-500/10 text-sm font-semibold text-rose-100"
+            pendingLabel="Suppression..."
           >
             Supprimer
-          </button>
-          <button className="h-14 rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white shadow-[0_18px_50px_rgba(10,132,255,0.34)]">
+          </PendingButton>
+          <PendingButton
+            className="h-14 rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white shadow-[0_18px_50px_rgba(10,132,255,0.34)]"
+            pendingLabel="Enregistrement..."
+          >
             Enregistrer
-          </button>
+          </PendingButton>
         </div>
       </form>
     </Sheet>
@@ -958,9 +972,12 @@ function ClientDetailSheet({
               <input type="hidden" name="clientId" value={client.id} />
               <input type="hidden" name="preferredEnvironment" value="opencode" />
               <input type="hidden" name="tier" value="pro" />
-              <button className="h-12 w-full rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white">
+              <PendingButton
+                className="h-12 w-full rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white"
+                pendingLabel="Création..."
+              >
                 Créer free trial
-              </button>
+              </PendingButton>
             </form>
           ) : null}
           {client.status === "trial" ? (
@@ -968,17 +985,23 @@ function ClientDetailSheet({
               <input type="hidden" name="clientId" value={client.id} />
               <input type="hidden" name="preferredEnvironment" value="opencode" />
               <input type="hidden" name="tier" value="pro" />
-              <button className="h-12 w-full rounded-2xl bg-emerald-500 text-sm font-semibold text-white">
+              <PendingButton
+                className="h-12 w-full rounded-2xl bg-emerald-500 text-sm font-semibold text-white"
+                pendingLabel="Conversion..."
+              >
                 Passer en paid
-              </button>
+              </PendingButton>
             </form>
           ) : null}
           {client.status === "trial" ? (
             <form action={markPipelineClientLostAction}>
               <input type="hidden" name="clientId" value={client.id} />
-              <button className="h-12 w-full rounded-2xl border border-rose-400/35 bg-rose-500/10 text-sm font-semibold text-rose-100">
+              <PendingButton
+                className="h-12 w-full rounded-2xl border border-rose-400/35 bg-rose-500/10 text-sm font-semibold text-rose-100"
+                pendingLabel="Mise à jour..."
+              >
                 Lost
-              </button>
+              </PendingButton>
             </form>
           ) : null}
           {client.status === "paid" ? (
@@ -994,9 +1017,12 @@ function ClientDetailSheet({
         </div>
         <form action={deletePipelineClientAction}>
           <input type="hidden" name="clientId" value={client.id} />
-          <button className="h-12 w-full rounded-2xl border border-rose-400/35 bg-rose-500/10 text-sm font-semibold text-rose-100">
+          <PendingButton
+            className="h-12 w-full rounded-2xl border border-rose-400/35 bg-rose-500/10 text-sm font-semibold text-rose-100"
+            pendingLabel="Suppression..."
+          >
             Supprimer du pipeline
-          </button>
+          </PendingButton>
         </form>
       </div>
     </Sheet>
@@ -1538,6 +1564,37 @@ function FlashRail({ flash }: { flash?: AdminConsoleProps["flash"] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function PendingButton({
+  children,
+  className,
+  pendingLabel = "Chargement...",
+  ...props
+}: {
+  children: ReactNode;
+  className?: string;
+  pendingLabel?: string;
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      {...props}
+      disabled={pending || props.disabled}
+      aria-busy={pending}
+      className={`${className ?? ""} inline-flex items-center justify-center gap-2 transition disabled:cursor-wait disabled:opacity-70`}
+    >
+      {pending ? (
+        <>
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          {pendingLabel}
+        </>
+      ) : (
+        children
+      )}
+    </button>
   );
 }
 
