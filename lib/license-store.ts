@@ -29,6 +29,7 @@ export type CreateLicenseInput = {
   azureApiKey?: string;
   tier: LicenseTier;
   preferredEnvironment: LicenseEnvironment;
+  status?: LicenseStatus;
   notes?: string;
   licenseKey?: string;
 };
@@ -235,7 +236,7 @@ export async function createLicense(input: CreateLicenseInput) {
     azureApiKey: input.azureApiKey?.trim() || undefined,
     tier: input.tier,
     preferredEnvironment: input.preferredEnvironment,
-    status: "active",
+    status: input.status ?? "active",
     notes: input.notes?.trim() || undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -333,6 +334,8 @@ export async function findLicenseByKey(licenseKey: string) {
       license_key,
       customer_name,
       customer_email,
+      azure_api_key,
+      azure_api_key_encrypted,
       tier,
       preferred_environment,
       status,
@@ -347,6 +350,16 @@ export async function findLicenseByKey(licenseKey: string) {
 
   const row = (rows as Array<LicenseRow>)[0];
   return row ? mapRowToLicenseRecord(row) : null;
+}
+
+export async function disableLicenseByKey(licenseKey: string) {
+  const existing = await findLicenseByKey(licenseKey);
+  if (!existing) {
+    return false;
+  }
+
+  await updateLicenseStatus(existing.id, "disabled");
+  return true;
 }
 
 export async function validateLicenseKey(licenseKey: string) {

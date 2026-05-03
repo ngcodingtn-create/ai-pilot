@@ -1,5 +1,10 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { listAccessRequests } from "@/lib/access-request-store";
+import {
+  listPipelineClients,
+  type ClientStatus,
+  type PipelineClientRecord,
+} from "@/lib/client-pipeline-store";
 import { getStoredConfig, LOCAL_CONFIG_RELATIVE_PATH } from "@/lib/config-store";
 import { listLicenseKeys } from "@/lib/license-store";
 import { buildWhatsAppUrl, normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
@@ -25,6 +30,8 @@ import {
 import CopyLicenseCard from "./copy-license-card";
 import {
   acceptAccessRequestAction,
+  activatePipelineTrialAction,
+  convertPipelineClientToPaidAction,
   createLicenseAction,
   loginAdmin,
   logoutAdmin,
@@ -32,7 +39,7 @@ import {
   updateLicenseStatusAction,
 } from "./actions";
 
-type AdminSection = "dashboard" | "subscriptions" | "requests";
+type AdminSection = "dashboard" | "subscriptions" | "pipeline" | "requests";
 
 type AdminSearchParams = Promise<{
   created?: string;
@@ -46,6 +53,9 @@ type AdminSearchParams = Promise<{
   saved?: string;
   section?: string;
   status?: string;
+  pipelineStatus?: string;
+  trialCreated?: string;
+  paidConverted?: string;
   updated?: string;
   whatsapp?: string;
 }>;
@@ -67,10 +77,11 @@ export default async function AdminPage({
     return <AdminLoginPage params={params} />;
   }
 
-  const [config, licenses, accessRequests] = await Promise.all([
+  const [config, licenses, accessRequests, pipelineClients] = await Promise.all([
     getStoredConfig(),
     listLicenseKeys(),
     listAccessRequests(),
+    listPipelineClients(),
   ]);
 
   const section = readSection(params.section);
@@ -79,6 +90,20 @@ export default async function AdminPage({
   const activeCount = uniqueLicenses.filter((license) => license.status === "active").length;
   const pendingRequests = accessRequests.filter((request) => request.status === "pending");
   const acceptedRequests = accessRequests.filter((request) => request.status === "accepted");
+  const pipelineFilters: {
+    query: string;
+    status: "all" | ClientStatus;
+  } = {
+    query: normalizeSearchQuery(params.q),
+    status: normalizePipelineStatusFilter(params.pipelineStatus),
+  };
+  const filteredPipelineClients = filterPipelineClients(pipelineClients, pipelineFilters);
+  const pipelineStats = {
+    leads: pipelineClients.filter((client) => client.status === "lead").length,
+    trials: pipelineClients.filter((client) => client.status === "trial").length,
+    paid: pipelineClients.filter((client) => client.status === "paid").length,
+    expired: pipelineClients.filter((client) => client.status === "expired").length,
+  };
   const licenseFilters: {
     query: string;
     status: "all" | "active" | "disabled";
@@ -133,6 +158,15 @@ export default async function AdminPage({
                       hint="Licences, statuts et clients"
                       badge={String(licenses.length)}
                       active={section === "subscriptions"}
+                    />
+                    <SidebarItem
+                      href="/admin?section=pipeline"
+                      title="Pipeline"
+                      hint="Leads, trials en attente et conversions paid"
+                      badge={String(
+                        pipelineStats.leads + pipelineStats.trials + pipelineStats.paid,
+                      )}
+                      active={section === "pipeline"}
                     />
                     <SidebarItem
                       href="/admin?section=requests"
@@ -697,6 +731,173 @@ export default async function AdminPage({
                   </Card>
                 </>
               ) : null}
+
+              {section === "pipeline" ? (
+                <>
+                  <SectionIntro
+                    eyebrow="Pipeline"
+                    title="Leads, essais gratuits et conversions paid"
+                    description="Cette vue relie le funnel marketing, la licence d’essai 24h et la conversion finale en licence payante. Tu peux passer un lead en trial, puis convertir le trial en paid sans quitter l’admin."
+                  />
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <MiniMetric label="Leads" value={String(pipelineStats.leads)} />
+                    <MiniMetric label="Trials créés" value={String(pipelineStats.trials)} />
+                    <MiniMetric label="Paid" value={String(pipelineStats.paid)} />
+                    <MiniMetric label="Expired" value={String(pipelineStats.expired)} />
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Suivi du funnel</CardTitle>
+                      <CardDescription>
+                        Tu peux rechercher un client, voir son statut actuel, lancer un essai 24h,
+                        puis le convertir en abonnement paid 60 DT quand le paiement est confirmé.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      <form method="GET" className="space-y-4">
+                        <input type="hidden" name="section" value="pipeline" />
+                        <div className="grid gap-4 lg:grid-cols-[1fr_220px_auto] lg:items-end">
+                          <Field
+                            label="Recherche"
+                            name="q"
+                            defaultValue={pipelineFilters.query}
+                            placeholder="Nom, téléphone, email ou clé..."
+                            helperText="Recherche rapide par lead, client, WhatsApp ou licence."
+                          />
+                          <SelectField
+                            label="Statut"
+                            name="pipelineStatus"
+                            defaultValue={pipelineFilters.status}
+                            options={[
+                              { label: "Tous", value: "all" },
+                              { label: "Lead", value: "lead" },
+                              { label: "Trial", value: "trial" },
+                              { label: "Paid", value: "paid" },
+                              { label: "Expired", value: "expired" },
+                              { label: "Cancelled", value: "cancelled" },
+                            ]}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="submit">Filtrer</Button>
+                            <a
+                              href="/admin?section=pipeline"
+                              className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+                            >
+                              Réinitialiser
+                            </a>
+                          </div>
+                        </div>
+                      </form>
+
+                      {filteredPipelineClients.length === 0 ? (
+                        <EmptyState
+                          title="Aucun client dans le pipeline"
+                          description="Les leads capturés depuis le funnel, les essais gratuits et les conversions paid apparaîtront ici."
+                        />
+                      ) : (
+                        <>
+                          <MobilePipelineClientCards clients={filteredPipelineClients} />
+                          <div className="hidden overflow-x-auto md:block">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Client</TableHead>
+                                  <TableHead>WhatsApp</TableHead>
+                                  <TableHead>Statut</TableHead>
+                                  <TableHead>Source pub</TableHead>
+                                  <TableHead>Licence</TableHead>
+                                  <TableHead>Dernière étape</TableHead>
+                                  <TableHead>Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredPipelineClients.map((client) => (
+                                  <TableRow key={client.id}>
+                                    <TableCell>
+                                      <div className="space-y-1">
+                                        <p className="font-semibold text-slate-950">
+                                          {client.name || "Lead sans prénom"}
+                                        </p>
+                                        <p className="break-all text-xs text-slate-500">
+                                          {client.email || "Email non renseigné"}
+                                        </p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <p className="font-mono text-[13px] text-slate-700">
+                                        {normalizeTunisiaWhatsappNumber(client.phone)?.display ??
+                                          client.phone}
+                                      </p>
+                                    </TableCell>
+                                    <TableCell>
+                                      <PipelineStatusBadge status={client.status} />
+                                    </TableCell>
+                                    <TableCell className="text-sm text-slate-600">
+                                      {client.adSource || "—"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="space-y-1">
+                                        <p className="font-mono text-[12px] text-slate-700">
+                                          {client.licenseKey ?? "—"}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                          {client.licenseType ? client.licenseType.toUpperCase() : "Aucune"}
+                                        </p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm text-slate-600">
+                                      {formatPipelineDate(client)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="space-y-3">
+                                        {client.status !== "paid" ? (
+                                          <form action={convertPipelineClientToPaidAction} className="space-y-2">
+                                            <input type="hidden" name="clientId" value={client.id} />
+                                            <input
+                                              type="hidden"
+                                              name="preferredEnvironment"
+                                              value="codex"
+                                            />
+                                            <input type="hidden" name="tier" value="pro" />
+                                            <Button type="submit" variant="success" size="sm">
+                                              Passer en paid
+                                            </Button>
+                                          </form>
+                                        ) : null}
+
+                                        {client.status === "lead" || client.status === "expired" ? (
+                                          <form action={activatePipelineTrialAction} className="space-y-2">
+                                            <input type="hidden" name="clientId" value={client.id} />
+                                            <select
+                                              name="preferredEnvironment"
+                                              defaultValue="codex"
+                                              className="w-full min-w-[9rem] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                                            >
+                                              <option value="codex">Codex app</option>
+                                              <option value="vscode-codex">VS Code Codex</option>
+                                              <option value="t3code">T3 Code</option>
+                                              <option value="opencode">OpenCode</option>
+                                            </select>
+                                            <Button type="submit" variant="outline" size="sm">
+                                              Créer le trial
+                                            </Button>
+                                          </form>
+                                        ) : null}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              ) : null}
             </SidebarInset>
           </SidebarLayout>
         </div>
@@ -811,6 +1012,16 @@ function FlashMessages({
       ) : null}
       {params.updated === "1" ? (
         <Notice tone="emerald">Statut de licence mis à jour.</Notice>
+      ) : null}
+      {params.trialCreated === "1" ? (
+        <Notice tone="emerald">
+          Trial créée et laissée inactive{params.customer ? ` pour ${params.customer}` : ""}.
+        </Notice>
+      ) : null}
+      {params.paidConverted === "1" ? (
+        <Notice tone="emerald">
+          Client converti en licence paid{params.customer ? ` pour ${params.customer}` : ""}.
+        </Notice>
       ) : null}
     </div>
   );
@@ -1155,8 +1366,76 @@ function MobileRequestCards({
   );
 }
 
+function MobilePipelineClientCards({
+  clients,
+}: {
+  clients: PipelineClientRecord[];
+}) {
+  return (
+    <div className="space-y-4 md:hidden">
+      {clients.map((client) => (
+        <article key={client.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-950">{client.name || "Lead sans prénom"}</p>
+              <p className="mt-1 break-all text-xs text-slate-500">
+                {client.email || "Email non renseigné"}
+              </p>
+            </div>
+            <PipelineStatusBadge status={client.status} />
+          </div>
+
+          <div className="mt-4 space-y-2 text-sm text-slate-600">
+            <p className="font-mono text-[13px] text-slate-700">
+              {normalizeTunisiaWhatsappNumber(client.phone)?.display ?? client.phone}
+            </p>
+            <p>Source pub: {client.adSource || "—"}</p>
+            <p>Licence: {client.licenseKey ?? "Aucune"}</p>
+            <p>{formatPipelineDate(client)}</p>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {client.status !== "paid" ? (
+              <form action={convertPipelineClientToPaidAction} className="space-y-2">
+                <input type="hidden" name="clientId" value={client.id} />
+                <input type="hidden" name="preferredEnvironment" value="codex" />
+                <input type="hidden" name="tier" value="pro" />
+                <Button type="submit" variant="success" className="w-full">
+                  Passer en paid
+                </Button>
+              </form>
+            ) : null}
+
+            {client.status === "lead" || client.status === "expired" ? (
+              <form action={activatePipelineTrialAction} className="space-y-3">
+                <input type="hidden" name="clientId" value={client.id} />
+                <SelectField
+                  label="Environnement du trial"
+                  name="preferredEnvironment"
+                  defaultValue="codex"
+                  options={[
+                    { label: "Codex app", value: "codex" },
+                    { label: "VS Code Codex", value: "vscode-codex" },
+                    { label: "T3 Code", value: "t3code" },
+                    { label: "OpenCode", value: "opencode" },
+                  ]}
+                />
+                <Button type="submit" variant="outline" className="w-full">
+                  Créer le trial
+                </Button>
+              </form>
+            ) : null}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function readSection(value: string | undefined): AdminSection {
-  return value === "subscriptions" || value === "requests" ? value : "dashboard";
+  return value === "subscriptions" || value === "requests" || value === "pipeline"
+    ? value
+    : "dashboard";
 }
 
 function dedupeLicenses(licenses: Awaited<ReturnType<typeof listLicenseKeys>>) {
@@ -1178,6 +1457,16 @@ function normalizeSearchQuery(value: string | undefined) {
 
 function normalizeLicenseStatusFilter(value: string | undefined) {
   return value === "active" || value === "disabled" ? value : "all";
+}
+
+function normalizePipelineStatusFilter(value: string | undefined) {
+  return value === "lead" ||
+    value === "trial" ||
+    value === "paid" ||
+    value === "expired" ||
+    value === "cancelled"
+    ? value
+    : "all";
 }
 
 function normalizeEnvironmentFilter(value: string | undefined) {
@@ -1220,11 +1509,63 @@ function filterLicenses(
   });
 }
 
+function filterPipelineClients(
+  clients: PipelineClientRecord[],
+  filters: {
+    query: string;
+    status: "all" | ClientStatus;
+  },
+) {
+  const query = filters.query.toLowerCase();
+
+  return clients.filter((client) => {
+    const matchesQuery =
+      !query ||
+      [
+        client.name ?? "",
+        client.phone,
+        client.email ?? "",
+        client.adSource ?? "",
+        client.licenseKey ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+
+    const matchesStatus = filters.status === "all" || client.status === filters.status;
+    return matchesQuery && matchesStatus;
+  });
+}
+
 function formatEnvironmentLabel(value: string) {
   if (value === "codex") return "Codex app";
   if (value === "vscode-codex") return "VS Code Codex";
   if (value === "t3code") return "T3 Code";
   return "OpenCode";
+}
+
+function PipelineStatusBadge({ status }: { status: ClientStatus }) {
+  if (status === "paid") return <Badge tone="emerald">Paid</Badge>;
+  if (status === "trial") return <Badge tone="amber">Trial</Badge>;
+  if (status === "expired") return <Badge tone="amber">Expired</Badge>;
+  if (status === "cancelled") return <Badge tone="slate">Cancelled</Badge>;
+  return <Badge tone="blue">Lead</Badge>;
+}
+
+function formatPipelineDate(client: PipelineClientRecord) {
+  if (client.status === "paid" && client.paidAt) {
+    return `Paid le ${formatDateTime(client.paidAt)}`;
+  }
+
+  if (client.status === "trial" && client.trialEndsAt) {
+    return `Trial jusqu’au ${formatDateTime(client.trialEndsAt)}`;
+  }
+
+  if (client.status === "expired" && client.trialEndsAt) {
+    return `Expiré le ${formatDateTime(client.trialEndsAt)}`;
+  }
+
+  return `Lead du ${formatDateTime(client.leadAt)}`;
 }
 
 function buildTutorialPreview(

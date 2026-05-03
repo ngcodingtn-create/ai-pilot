@@ -19,6 +19,11 @@ import {
   type LicenseTier,
   updateLicenseStatus,
 } from "@/lib/license-store";
+import {
+  activateTrialForClient,
+  convertClientToPaid,
+  getPipelineClientById,
+} from "@/lib/client-pipeline-store";
 
 function readTier(value: FormDataEntryValue | null): LicenseTier {
   return value === "starter" || value === "max" ? value : "pro";
@@ -136,5 +141,49 @@ export async function acceptAccessRequestAction(formData: FormData) {
 
   redirect(
     `/admin?requestAccepted=1&licenseKey=${encodeURIComponent(license.licenseKey)}&customer=${encodeURIComponent(request.customerName)}&whatsapp=${encodeURIComponent(request.whatsappNumber)}`,
+  );
+}
+
+export async function activatePipelineTrialAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const clientId = String(formData.get("clientId") ?? "").trim();
+  if (!clientId) {
+    throw new Error("Missing client id");
+  }
+
+  const activation = await activateTrialForClient({
+    clientId,
+    tier: readTier(formData.get("tier")),
+    preferredEnvironment: readEnvironment(formData.get("preferredEnvironment")),
+    isActive: false,
+    markStatus: "trial",
+  });
+  const client = await getPipelineClientById(clientId);
+  const customerName = client?.name?.trim() || client?.phone || clientId;
+
+  redirect(
+    `/admin?section=pipeline&trialCreated=1&licenseKey=${encodeURIComponent(activation.licenseKey)}&customer=${encodeURIComponent(customerName)}`,
+  );
+}
+
+export async function convertPipelineClientToPaidAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const clientId = String(formData.get("clientId") ?? "").trim();
+  if (!clientId) {
+    throw new Error("Missing client id");
+  }
+
+  const conversion = await convertClientToPaid({
+    clientId,
+    tier: readTier(formData.get("tier")),
+    preferredEnvironment: readEnvironment(formData.get("preferredEnvironment")),
+  });
+  const client = await getPipelineClientById(clientId);
+  const customerName = client?.name?.trim() || client?.phone || clientId;
+
+  redirect(
+    `/admin?section=pipeline&paidConverted=1&licenseKey=${encodeURIComponent(conversion.licenseKey)}&customer=${encodeURIComponent(customerName)}`,
   );
 }
