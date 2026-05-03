@@ -68,3 +68,12 @@ export function buildWhatsAppUrl(phone: string, message: string) {
 
   return `https://wa.me/${normalized.waId}?text=${encodeURIComponent(message)}`;
 }
+
+export function buildWhatsAppAppUrl(phone: string, message: string) {
+  const normalized = normalizeTunisiaWhatsappNumber(phone);
+  if (!normalized) {
+    return null;
+  }
+
+  return `whatsapp://send?phone=${normalized.waId}&text=${encodeURIComponent(message)}`;
+}

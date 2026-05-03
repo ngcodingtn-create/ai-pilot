@@ -113,13 +113,13 @@ type ProofStoredState = {
 
 function readStoredProofState(): ProofStoredState {
   if (typeof window === "undefined") {
-    return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: true };
+    return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: false };
   }
 
   try {
     const raw = window.sessionStorage.getItem(PROOF_VIDEO_STORAGE_KEY);
     if (!raw) {
-      return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: true };
+      return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: false };
     }
 
     const parsed = JSON.parse(raw) as Partial<ProofStoredState>;
@@ -136,11 +136,54 @@ function readStoredProofState(): ProofStoredState {
       slideIndex,
       currentTime,
       pausedByUser: Boolean(parsed.pausedByUser),
-      muted: typeof parsed.muted === "boolean" ? parsed.muted : true,
+      muted: typeof parsed.muted === "boolean" ? parsed.muted : false,
     };
   } catch {
-    return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: true };
+    return { slideIndex: 0, currentTime: 0, pausedByUser: false, muted: false };
   }
+}
+
+function attemptWhatsAppRedirect(appUrl: string | null | undefined, webUrl: string | null | undefined) {
+  if (typeof window === "undefined") return;
+
+  if (!appUrl && !webUrl) return;
+
+  const fallbackUrl = webUrl ?? null;
+
+  if (!appUrl) {
+    if (fallbackUrl) {
+      window.location.href = fallbackUrl;
+    }
+    return;
+  }
+
+  let pageHidden = false;
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      pageHidden = true;
+    }
+  };
+
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  const fallbackTimer = window.setTimeout(() => {
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    if (!pageHidden && document.visibilityState === "visible" && fallbackUrl) {
+      window.location.href = fallbackUrl;
+    }
+  }, 1400);
+
+  window.addEventListener(
+    "pagehide",
+    () => {
+      pageHidden = true;
+      window.clearTimeout(fallbackTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    },
+    { once: true },
+  );
+
+  window.location.href = appUrl;
 }
 
 const faqs = [
@@ -429,6 +472,7 @@ export default function FunnelClient() {
       const payload = (await response.json()) as {
         ok?: boolean;
         error?: string;
+        appRedirectUrl?: string | null;
         redirectUrl?: string | null;
       };
 
@@ -452,9 +496,7 @@ export default function FunnelClient() {
       });
 
       window.setTimeout(() => {
-        if (payload.redirectUrl) {
-          window.location.href = payload.redirectUrl;
-        }
+        attemptWhatsAppRedirect(payload.appRedirectUrl, payload.redirectUrl);
       }, 900);
     } catch {
       setFormState({
@@ -839,13 +881,13 @@ export default function FunnelClient() {
                       >
                         {slide.type === "video" ? (
                           <div className="absolute inset-0">
-                            <video
-                              ref={proofVideoRef}
-                              src={slide.src}
-                              poster={slide.poster}
-                              muted
-                              loop
-                              playsInline
+                              <video
+                                ref={proofVideoRef}
+                                src={slide.src}
+                                poster={slide.poster}
+                                muted={!hasProofInteraction || proofVideoMuted}
+                                loop
+                                playsInline
                               preload="metadata"
                               controls={false}
                               onLoadedMetadata={(event) => {

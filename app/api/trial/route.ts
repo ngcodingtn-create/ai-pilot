@@ -1,6 +1,10 @@
 import { createTrialLead } from "@/lib/trial-leads-store";
 import { getStoredConfig } from "@/lib/config-store";
-import { buildWhatsAppUrl, normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
+import {
+  buildWhatsAppAppUrl,
+  buildWhatsAppUrl,
+  normalizeTunisiaWhatsappNumber,
+} from "@/lib/whatsapp";
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as
@@ -36,10 +40,17 @@ export async function POST(request: Request) {
           `Salam AIPilot! Code: TRIAL-${lead.id}`,
         )
       : null;
+    const appRedirectUrl = supportWhatsapp
+      ? buildWhatsAppAppUrl(
+          supportWhatsapp.e164,
+          `Salam AIPilot! Code: TRIAL-${lead.id}`,
+        )
+      : null;
 
     return Response.json({
       ok: true,
       leadId: lead.id,
+      appRedirectUrl,
       redirectUrl,
       message:
         "Votre demande d’essai gratuit a été enregistrée. Nous vous redirigeons vers WhatsApp.",
