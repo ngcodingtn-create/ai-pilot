@@ -233,6 +233,7 @@ export default function FunnelClient() {
   const proofMediaRef = useRef<HTMLDivElement | null>(null);
   const [isProofMediaVisible, setIsProofMediaVisible] = useState(false);
   const proofVideoProgressRef = useRef(initialProofState.currentTime);
+  const proofVideoAutoPausedRef = useRef(false);
   const normalizedPhone = normalizeTunisiaWhatsappNumber(phone);
 
   const persistProofState = useCallback((next: {
@@ -285,23 +286,51 @@ export default function FunnelClient() {
 
     if (!video) return;
 
-    if (currentSlide?.type === "video" && isProofMediaVisible && !proofVideoPausedByUser) {
-      if (Math.abs(video.currentTime - proofVideoProgressRef.current) > 0.35) {
-        video.currentTime = proofVideoProgressRef.current;
+    if (currentSlide?.type !== "video") {
+      proofVideoAutoPausedRef.current = false;
+      proofVideoProgressRef.current = video.currentTime;
+      video.pause();
+      return;
+    }
+
+    if (!isProofMediaVisible) {
+      if (!video.paused && !proofVideoPausedByUser) {
+        proofVideoAutoPausedRef.current = true;
       }
-      video.muted = !hasProofInteraction || proofVideoMuted;
+      proofVideoProgressRef.current = video.currentTime;
+      persistProofState({ currentTime: video.currentTime });
+      video.pause();
+      return;
+    }
+
+    if (proofVideoPausedByUser) {
+      return;
+    }
+
+    if (Math.abs(video.currentTime - proofVideoProgressRef.current) > 0.35) {
+      video.currentTime = proofVideoProgressRef.current;
+    }
+
+    if (proofVideoAutoPausedRef.current || video.paused) {
+      proofVideoAutoPausedRef.current = false;
       void video
         .play()
+        .then(() => setIsProofVideoPlaying(true))
         .catch(() => {
           video.muted = true;
-          void video.play().catch(() => {
+          void video.play().then(() => setIsProofVideoPlaying(true)).catch(() => {
             setIsProofVideoPlaying(false);
           });
         });
-    } else {
-      video.pause();
     }
-  }, [activeProofSlide, hasProofInteraction, isProofMediaVisible, proofVideoMuted, proofVideoPausedByUser]);
+  }, [activeProofSlide, hasProofInteraction, isProofMediaVisible, persistProofState, proofVideoPausedByUser]);
+
+  useEffect(() => {
+    const video = proofVideoRef.current;
+    if (!video || proofSlides[activeProofSlide]?.type !== "video") return;
+
+    video.muted = !hasProofInteraction || proofVideoMuted;
+  }, [activeProofSlide, hasProofInteraction, proofVideoMuted]);
 
   useEffect(() => {
     const markInteraction = () => setHasProofInteraction(true);
@@ -322,30 +351,14 @@ export default function FunnelClient() {
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        setIsProofMediaVisible(Boolean(entry?.isIntersecting && entry.intersectionRatio > 0.4));
+        setIsProofMediaVisible(Boolean(entry?.isIntersecting && entry.intersectionRatio > 0.2));
       },
-      { threshold: [0, 0.4, 0.7] },
+      { threshold: [0, 0.2, 0.45, 0.7] },
     );
 
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-
-  useEffect(() => {
-    const handleScrollPause = () => {
-      if (proofSlides[activeProofSlide]?.type !== "video") return;
-      const video = proofVideoRef.current;
-      if (!video || video.paused) return;
-      if (!isProofMediaVisible) {
-        proofVideoProgressRef.current = video.currentTime;
-        persistProofState({ currentTime: video.currentTime });
-        video.pause();
-      }
-    };
-
-    window.addEventListener("scroll", handleScrollPause, { passive: true });
-    return () => window.removeEventListener("scroll", handleScrollPause);
-  }, [activeProofSlide, isProofMediaVisible, persistProofState]);
 
   useEffect(() => {
     const updateFloatingCta = () => {
@@ -457,6 +470,7 @@ export default function FunnelClient() {
     if (currentVideo) {
       proofVideoProgressRef.current = currentVideo.currentTime;
     }
+    proofVideoAutoPausedRef.current = false;
     const nextIsVideo = proofSlides[normalizedIndex]?.type === "video";
     setIsProofVideoPlaying(nextIsVideo && !proofVideoPausedByUser);
     setActiveProofSlide(normalizedIndex);
@@ -478,11 +492,13 @@ export default function FunnelClient() {
     setHasProofInteraction(true);
 
     if (video.paused) {
+      proofVideoAutoPausedRef.current = false;
       setProofVideoPausedByUser(false);
       persistProofState({ pausedByUser: false, currentTime: video.currentTime, muted: proofVideoMuted });
       video.muted = proofVideoMuted;
       void video.play().then(() => setIsProofVideoPlaying(true)).catch(() => setIsProofVideoPlaying(false));
     } else {
+      proofVideoAutoPausedRef.current = false;
       setProofVideoPausedByUser(true);
       proofVideoProgressRef.current = video.currentTime;
       persistProofState({ pausedByUser: true, currentTime: video.currentTime, muted: proofVideoMuted });
@@ -506,7 +522,8 @@ export default function FunnelClient() {
 
     video.muted = nextMuted;
 
-    if (!nextMuted && video.paused && !proofVideoPausedByUser) {
+    if (!nextMuted && video.paused && isProofMediaVisible && !proofVideoPausedByUser) {
+      proofVideoAutoPausedRef.current = false;
       void video.play().then(() => setIsProofVideoPlaying(true)).catch(() => {
         video.muted = true;
         setProofVideoMuted(true);
