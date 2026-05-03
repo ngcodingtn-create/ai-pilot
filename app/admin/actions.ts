@@ -119,6 +119,7 @@ export async function createQuickSubscriptionAction(formData: FormData) {
   await requireAdminAuth();
 
   const customerName = String(formData.get("customerName") ?? "").trim();
+  const customerEmail = String(formData.get("customerEmail") ?? "").trim() || undefined;
   const normalizedWhatsapp = normalizeTunisiaWhatsappNumber(
     String(formData.get("whatsappNumber") ?? ""),
   );
@@ -134,6 +135,7 @@ export async function createQuickSubscriptionAction(formData: FormData) {
 
   const client = await upsertLeadClient({
     name: customerName,
+    email: customerEmail,
     phone: normalizedWhatsapp.e164,
   });
 
@@ -166,6 +168,7 @@ export async function createQuickSubscriptionAction(formData: FormData) {
   const fbResponse = await sendCapiEvent({
     eventName: "Purchase",
     phone: normalizedWhatsapp.e164,
+    email: customerEmail,
     sourceUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://aipilot.tn",
     eventId: `aipilot-purchase-${client.id}-${Date.now()}`,
     subscriptionId: client.id,

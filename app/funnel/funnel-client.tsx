@@ -185,12 +185,42 @@ function readCookie(name: string) {
   );
 }
 
+function writeCookie(name: string, value: string, maxAge = 90 * 24 * 60 * 60) {
+  if (typeof document === "undefined" || !value) {
+    return;
+  }
+
+  document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+}
+
+function readClientMetaParams() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  const params = (window as Window & { __aipilotMetaParams?: unknown }).__aipilotMetaParams;
+  return params && typeof params === "object" && !Array.isArray(params)
+    ? (params as Record<string, unknown>)
+    : {};
+}
+
+function readMetaParam(params: Record<string, unknown>, names: string[]) {
+  for (const name of names) {
+    const value = params[name];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
 function buildFbcFromFbclid(fbclid: string) {
   if (!fbclid) {
     return "";
   }
 
-  return `fb.1.${Math.floor(Date.now() / 1000)}.${fbclid}`;
+  return `fb.1.${Date.now()}.${fbclid}`;
 }
 
 function buildMetaEventId(eventName: string) {
@@ -301,6 +331,9 @@ export default function FunnelClient() {
 
     if (fbclid) {
       window.localStorage.setItem("aipilot-fbclid", fbclid);
+      if (!readCookie("_fbc")) {
+        writeCookie("_fbc", buildFbcFromFbclid(fbclid));
+      }
     }
     if (utmSource) {
       window.localStorage.setItem("aipilot-utm_source", utmSource);
@@ -455,8 +488,14 @@ export default function FunnelClient() {
     const utmContent = window.localStorage.getItem("aipilot-utm_content") ?? "";
     const utmTerm = window.localStorage.getItem("aipilot-utm_term") ?? "";
     const testEventCode = window.localStorage.getItem("aipilot-test_event_code") ?? "";
-    const fbp = readCookie("_fbp");
-    const fbc = readCookie("_fbc") || buildFbcFromFbclid(fbclid);
+    const clientMetaParams = readClientMetaParams();
+    const fbp =
+      readCookie("_fbp") ||
+      readMetaParam(clientMetaParams, ["fbp", "_fbp", "browserId"]);
+    const fbc =
+      readCookie("_fbc") ||
+      readMetaParam(clientMetaParams, ["fbc", "_fbc", "clickId"]) ||
+      buildFbcFromFbclid(fbclid);
     const eventId = buildMetaEventId("Lead");
     const initiateCheckoutEventId = buildMetaEventId("InitiateCheckout");
 

@@ -34,6 +34,24 @@ function sha256(value: string) {
   return crypto.createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
 }
 
+function normalizeFbc(value?: string) {
+  const clean = String(value ?? "").trim();
+  if (!clean) {
+    return undefined;
+  }
+
+  if (/^fb\.\d+\.\d{13}\..+/.test(clean)) {
+    return clean;
+  }
+
+  const legacySecondsMatch = clean.match(/^fb\.(\d+)\.(\d{10})\.(.+)$/);
+  if (legacySecondsMatch) {
+    return `fb.${legacySecondsMatch[1]}.${Number(legacySecondsMatch[2]) * 1000}.${legacySecondsMatch[3]}`;
+  }
+
+  return undefined;
+}
+
 function buildUserData(payload: CapiEventPayload) {
   const userData: Record<string, unknown> = {};
 
@@ -56,8 +74,9 @@ function buildUserData(payload: CapiEventPayload) {
     userData.fbp = payload.fbp;
   }
 
-  if (payload.fbc) {
-    userData.fbc = payload.fbc;
+  const fbc = normalizeFbc(payload.fbc);
+  if (fbc) {
+    userData.fbc = fbc;
   }
 
   if (payload.ip) {

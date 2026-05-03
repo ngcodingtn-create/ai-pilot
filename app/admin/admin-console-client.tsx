@@ -786,6 +786,12 @@ function AddSubscriptionSheet({ open, onClose }: { open: boolean; onClose: () =>
         <FormSection title="Client">
           <DarkField label="Nom" name="customerName" required placeholder="Ex: Ahmed Slim" />
           <DarkField
+            label="Email"
+            name="customerEmail"
+            type="email"
+            placeholder="Optionnel"
+          />
+          <DarkField
             label="WhatsApp"
             name="whatsappNumber"
             required

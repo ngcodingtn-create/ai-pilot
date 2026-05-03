@@ -36,6 +36,33 @@ function queryParamsFromUrl(value: string) {
   return params;
 }
 
+function buildFbcFromFbclid(fbclid?: string) {
+  const clean = String(fbclid ?? "").trim();
+  if (!clean) {
+    return undefined;
+  }
+
+  return `fb.1.${Date.now()}.${clean}`;
+}
+
+function normalizeFbc(value?: string) {
+  const clean = String(value ?? "").trim();
+  if (!clean) {
+    return undefined;
+  }
+
+  if (/^fb\.\d+\.\d{13}\..+/.test(clean)) {
+    return clean;
+  }
+
+  const legacySecondsMatch = clean.match(/^fb\.(\d+)\.(\d{10})\.(.+)$/);
+  if (legacySecondsMatch) {
+    return `fb.${legacySecondsMatch[1]}.${Number(legacySecondsMatch[2]) * 1000}.${legacySecondsMatch[3]}`;
+  }
+
+  return undefined;
+}
+
 function hostFromRequest(request: Request, sourceUrl?: string) {
   try {
     if (sourceUrl) {
@@ -77,6 +104,10 @@ export function buildMetaParameterContext(input: {
     ...queryParamsFromUrl(input.request.url),
     ...queryParamsFromUrl(input.sourceUrl ?? ""),
   };
+  const fallbackFbc =
+    normalizeFbc(input.fbc) ||
+    normalizeFbc(cookies._fbc) ||
+    buildFbcFromFbclid(queryParams.fbclid);
 
   builder.processRequest(
     host,
@@ -88,7 +119,7 @@ export function buildMetaParameterContext(input: {
   );
 
   return {
-    fbc: builder.getFbc() ?? undefined,
+    fbc: normalizeFbc(builder.getFbc() ?? undefined) ?? fallbackFbc,
     fbp: builder.getFbp() ?? undefined,
     clientIpAddress: builder.getClientIpAddress() ?? undefined,
     hashedPhone: input.phone ? builder.getNormalizedAndHashedPII(input.phone, "phone") ?? undefined : undefined,
