@@ -1,131 +1,157 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { listRecentFacebookEvents } from "@/lib/client-pipeline-store";
+import {
+  listPipelineClients,
+  listRecentFacebookEvents,
+  type PipelineClientRecord,
+} from "@/lib/client-pipeline-store";
 import { listRecentMarketingEvents } from "@/lib/marketing-event-store";
+import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
+
+type TrackingFeedItem = {
+  id: string;
+  source: "capi" | "pixel";
+  eventName: string;
+  clientName: string;
+  phone?: string;
+  createdAt: string;
+};
 
 export default async function AdminTrackingPage() {
   if (!(await isAdminAuthenticated())) {
     redirect("/admin?error=auth-required");
   }
 
-  const [facebookEvents, marketingEvents] = await Promise.all([
-    listRecentFacebookEvents(75),
-    listRecentMarketingEvents(75),
+  const [clients, facebookEvents, marketingEvents] = await Promise.all([
+    listPipelineClients(),
+    listRecentFacebookEvents(40),
+    listRecentMarketingEvents(40),
   ]);
 
-  const pixelId =
-    process.env.FB_PIXEL_ID ||
-    process.env.NEXT_PUBLIC_META_PIXEL_ID ||
-    process.env.NEXT_PUBLIC_FB_PIXEL_ID ||
-    "";
-  const hasCapiToken = Boolean(process.env.FB_CAPI_TOKEN);
-  const graphApiVersion = process.env.FB_GRAPH_API_VERSION || "v19.0";
-  const leadEvents = facebookEvents.filter((event) => event.eventName === "Lead").length;
-  const purchaseEvents = facebookEvents.filter((event) => event.eventName === "Purchase").length;
-  const whatsappClicks = marketingEvents.filter((event) => event.eventName === "WhatsAppClick").length;
+  const clientById = new Map(clients.map((client) => [client.id, client]));
+  const clientByPhone = new Map<string, PipelineClientRecord>();
+  for (const client of clients) {
+    const key = phoneKey(client.phone);
+    if (key) {
+      clientByPhone.set(key, client);
+    }
+  }
+
+  const capiItems: TrackingFeedItem[] = facebookEvents.map((event) => {
+    const client = clientById.get(event.clientId);
+    return {
+      id: `capi-${event.id}`,
+      source: "capi",
+      eventName: eventLabel(event.eventName),
+      clientName: clientLabel(client, event.clientId),
+      phone: client?.phone,
+      createdAt: event.sentAt,
+    };
+  });
+
+  const pixelItems: TrackingFeedItem[] = marketingEvents.map((event) => {
+    const client =
+      (event.clientId ? clientById.get(event.clientId) : undefined) ||
+      (event.phone ? clientByPhone.get(phoneKey(event.phone)) : undefined);
+    return {
+      id: `pixel-${event.id}`,
+      source: "pixel",
+      eventName: eventLabel(event.eventName),
+      clientName: clientLabel(client, event.phone),
+      phone: client?.phone || event.phone,
+      createdAt: event.createdAt,
+    };
+  });
+
+  const feed = [...capiItems, ...pixelItems]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .slice(0, 50);
 
   return (
-    <main className="min-h-screen bg-[#020b12] px-4 py-6 text-slate-100 sm:px-6 lg:px-8">
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_12%,rgba(0,136,255,0.24),transparent_28%),radial-gradient(circle_at_92%_4%,rgba(15,185,129,0.16),transparent_24%),linear-gradient(180deg,#04131d_0%,#020910_42%,#010509_100%)]" />
-      <div className="fixed inset-0 pointer-events-none opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:28px_28px]" />
+    <main className="min-h-screen bg-[#020b12] px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_12%,rgba(0,136,255,0.2),transparent_28%),radial-gradient(circle_at_92%_4%,rgba(15,185,129,0.14),transparent_24%),linear-gradient(180deg,#04131d_0%,#020910_42%,#010509_100%)]" />
+      <div className="fixed inset-0 pointer-events-none opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:28px_28px]" />
 
-      <div className="relative mx-auto max-w-6xl space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#35a6ff]">
+      <div className="relative mx-auto w-full max-w-3xl space-y-5">
+        <header className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#35a6ff]">
               Meta Ads
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Pixel & CAPI Tracking</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              Real events stored from the funnel, admin conversions, and WhatsApp handoffs.
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              Tracking events
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+              Recent Pixel and CAPI activity from the funnel, confirmation page, and admin.
             </p>
           </div>
           <a
             href="/admin"
-            className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-4 text-sm font-semibold text-slate-200"
+            className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-slate-200"
           >
-            Retour admin
+            Admin
           </a>
-        </div>
+        </header>
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <Metric label="Pixel ID" value={pixelId || "Absent"} tone={pixelId ? "blue" : "amber"} />
-          <Metric label="CAPI token" value={hasCapiToken ? "Présent" : "Absent"} tone={hasCapiToken ? "emerald" : "amber"} />
-          <Metric label="Lead CAPI" value={String(leadEvents)} tone="blue" />
-          <Metric label="Purchase CAPI" value={String(purchaseEvents)} tone="emerald" />
-        </div>
-
-        <section className="rounded-[1.75rem] border border-white/10 bg-white/[0.055] p-5 shadow-[0_18px_55px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Configuration</h2>
-              <p className="mt-1 text-sm text-slate-500">No secret value is displayed here.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Pill tone={hasCapiToken ? "emerald" : "amber"}>
-                {hasCapiToken ? "CAPI actif" : "Token manquant"}
-              </Pill>
-              <Pill tone="blue">{graphApiVersion}</Pill>
-              <Pill tone="slate">{facebookEvents.length + marketingEvents.length} events</Pill>
-              <Pill tone="emerald">{whatsappClicks} WhatsApp</Pill>
-            </div>
-          </div>
+        <section className="grid grid-cols-2 gap-3">
+          <Metric label="CAPI" value={String(capiItems.length)} tone="emerald" />
+          <Metric label="Pixel" value={String(pixelItems.length)} tone="blue" />
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
-          <Panel title="Événements Meta récents" description="Lead, Purchase, déduplication and Graph API responses.">
-            {facebookEvents.length ? (
-              <div className="space-y-3">
-                {facebookEvents.map((event) => (
-                  <article key={event.id} className="rounded-3xl border border-white/10 bg-[#06141f] p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Pill tone={event.eventName === "Purchase" ? "emerald" : "blue"}>
-                          {event.eventName}
-                        </Pill>
-                        {facebookStatusPill(event.fbResponse)}
-                      </div>
-                      <span className="text-xs text-slate-500">{formatDateTime(event.sentAt)}</span>
-                    </div>
-                    <p className="mt-3 break-all font-mono text-xs text-slate-400">
-                      Client: {event.clientId}
-                    </p>
-                    <pre className="mt-3 max-h-52 overflow-auto rounded-2xl border border-white/10 bg-black/20 p-3 text-xs leading-5 text-slate-300">
-                      {stringifyResponse(event.fbResponse)}
-                    </pre>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <Empty title="Aucun événement Meta enregistré" description="Submit a lead or convert a client to paid to see Graph responses here." />
-            )}
-          </Panel>
+        <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.055] p-3 shadow-[0_18px_55px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-3 px-1">
+            <h2 className="text-base font-semibold">Recent events</h2>
+            <span className="text-xs font-medium text-slate-500">{feed.length} shown</span>
+          </div>
 
-          <Panel title="Handoff WhatsApp" description="Automatic redirects and manual WhatsApp sends from confirmation flows.">
-            {marketingEvents.length ? (
-              <div className="space-y-3">
-                {marketingEvents.map((event) => (
-                  <article key={event.id} className="rounded-3xl border border-white/10 bg-[#06141f] p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <Pill tone="blue">{event.eventName}</Pill>
-                      <span className="text-xs text-slate-500">{formatDateTime(event.createdAt)}</span>
-                    </div>
-                    <div className="mt-3 space-y-2 text-sm text-slate-400">
-                      <p className="break-all">Phone: {event.phone || "unknown"}</p>
-                      <p className="break-all">Event ID: {event.eventId || "none"}</p>
-                      <p className="break-all">Source: {event.sourceUrl || "unknown"}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <Empty title="Aucun handoff WhatsApp" description="Clicks and redirects will appear here after users reach /merci." />
-            )}
-          </Panel>
+          {feed.length ? (
+            <div className="space-y-2">
+              {feed.map((event) => (
+                <EventRow key={event.id} event={event} />
+              ))}
+            </div>
+          ) : (
+            <Empty />
+          )}
         </section>
       </div>
     </main>
+  );
+}
+
+function EventRow({ event }: { event: TrackingFeedItem }) {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-[#06141f] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div
+            className={`mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-xs font-bold ${
+              event.source === "capi"
+                ? "bg-emerald-500/14 text-emerald-300"
+                : "bg-[#0a84ff]/14 text-[#35a6ff]"
+            }`}
+          >
+            {event.source === "capi" ? "CA" : "PX"}
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold text-slate-100">{event.eventName}</p>
+              <Pill tone={event.source === "capi" ? "emerald" : "blue"}>
+                {event.source === "capi" ? "CAPI" : "Pixel"}
+              </Pill>
+            </div>
+            <p className="mt-1 truncate text-sm text-slate-300">{event.clientName}</p>
+            {event.phone ? (
+              <p className="mt-1 text-xs text-slate-500">{formatPhone(event.phone)}</p>
+            ) : null}
+          </div>
+        </div>
+        <time className="shrink-0 text-right text-xs leading-5 text-slate-500">
+          {formatDateTime(event.createdAt)}
+        </time>
+      </div>
+    </article>
   );
 }
 
@@ -136,92 +162,79 @@ function Metric({
 }: {
   label: string;
   value: string;
-  tone: "blue" | "emerald" | "amber";
+  tone: "blue" | "emerald";
 }) {
-  const toneClass = {
-    blue: "text-[#35a6ff]",
-    emerald: "text-emerald-300",
-    amber: "text-amber-300",
-  }[tone];
+  const toneClass = tone === "emerald" ? "text-emerald-300" : "text-[#35a6ff]";
 
   return (
-    <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.055] p-4 backdrop-blur-xl">
+    <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.055] p-4 backdrop-blur-xl">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-      <p className={`mt-2 break-all text-xl font-semibold ${toneClass}`}>{value}</p>
+      <p className={`mt-2 text-3xl font-semibold ${toneClass}`}>{value}</p>
     </div>
   );
 }
 
-function Panel({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
+function Empty() {
   return (
-    <section className="rounded-[1.75rem] border border-white/10 bg-white/[0.055] p-5 shadow-[0_18px_55px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-}
-
-function Empty({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-3xl border border-dashed border-white/12 bg-white/[0.035] p-6 text-center">
-      <p className="font-semibold">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
+    <div className="rounded-2xl border border-dashed border-white/12 bg-white/[0.035] p-6 text-center">
+      <p className="font-semibold">No tracking events yet</p>
+      <p className="mt-2 text-sm leading-6 text-slate-500">
+        Submit a funnel lead or send a WhatsApp handoff to populate this feed.
+      </p>
     </div>
   );
 }
 
-function Pill({
-  tone,
-  children,
-}: {
-  tone: "blue" | "emerald" | "amber" | "slate";
-  children: ReactNode;
-}) {
-  const toneClass = {
-    blue: "bg-[#0a84ff]/14 text-[#35a6ff]",
-    emerald: "bg-emerald-500/14 text-emerald-300",
-    amber: "bg-amber-500/14 text-amber-300",
-    slate: "bg-white/[0.07] text-slate-300",
-  }[tone];
+function Pill({ tone, children }: { tone: "blue" | "emerald"; children: ReactNode }) {
+  const toneClass =
+    tone === "emerald"
+      ? "bg-emerald-500/14 text-emerald-300"
+      : "bg-[#0a84ff]/14 text-[#35a6ff]";
 
   return <span className={`rounded-xl px-2.5 py-1 text-xs font-semibold ${toneClass}`}>{children}</span>;
 }
 
-function facebookStatusPill(response: unknown) {
-  if (response && typeof response === "object" && "skipped" in response) {
-    const skipped = (response as { skipped?: unknown }).skipped;
-    if (skipped) {
-      return <Pill tone="amber">Skipped</Pill>;
-    }
+function clientLabel(client: PipelineClientRecord | undefined, fallback?: string) {
+  if (client?.name?.trim()) {
+    return client.name.trim();
   }
 
-  if (response && typeof response === "object" && "ok" in response) {
-    return (response as { ok?: unknown }).ok ? <Pill tone="emerald">OK</Pill> : <Pill tone="amber">Erreur</Pill>;
+  if (client?.phone) {
+    return formatPhone(client.phone);
   }
 
-  return <Pill tone="slate">Stocké</Pill>;
+  if (fallback) {
+    return formatPhone(fallback);
+  }
+
+  return "Unknown client";
 }
 
-function stringifyResponse(response: unknown) {
-  try {
-    return JSON.stringify(response ?? null, null, 2).slice(0, 2200);
-  } catch {
-    return String(response);
-  }
+function phoneKey(phone: string) {
+  const digits = String(phone ?? "").replace(/[^\d]/g, "");
+  return digits.length >= 8 ? digits.slice(-8) : digits;
+}
+
+function formatPhone(phone: string) {
+  return normalizeTunisiaWhatsappNumber(phone)?.display ?? phone;
+}
+
+function eventLabel(eventName: string) {
+  const labels: Record<string, string> = {
+    FunnelSuccess: "Funnel success",
+    InitiateCheckout: "Initiate checkout",
+    Lead: "Lead",
+    Purchase: "Purchase",
+    StartTrial: "Start trial",
+    WhatsAppClick: "WhatsApp click",
+  };
+
+  return labels[eventName] ?? eventName;
 }
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "medium",
+    dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
 }
