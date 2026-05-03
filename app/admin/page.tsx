@@ -1,69 +1,33 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { listAccessRequests } from "@/lib/access-request-store";
+import { listAccessRequests, type AccessRequestRecord } from "@/lib/access-request-store";
 import {
   listPipelineClients,
-  type ClientStatus,
+  listRecentFacebookEvents,
   type PipelineClientRecord,
 } from "@/lib/client-pipeline-store";
-import { getStoredConfig, LOCAL_CONFIG_RELATIVE_PATH } from "@/lib/config-store";
-import { listLicenseKeys } from "@/lib/license-store";
-import { buildWhatsAppUrl, normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Sidebar,
-  SidebarGroup,
-  SidebarInset,
-  SidebarItem,
-  SidebarLayout,
-  SidebarPanel,
-} from "@/components/ui/sidebar";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import CopyLicenseCard from "./copy-license-card";
-import {
-  acceptAccessRequestAction,
-  activatePipelineTrialAction,
-  convertPipelineClientToPaidAction,
-  createLicenseAction,
-  loginAdmin,
-  logoutAdmin,
-  saveAdminConfig,
-  updateLicenseStatusAction,
-} from "./actions";
-
-type AdminSection = "dashboard" | "subscriptions" | "pipeline" | "requests";
+import { getStoredConfig } from "@/lib/config-store";
+import { listLicenseKeys, type LicenseRecord } from "@/lib/license-store";
+import { listRecentMarketingEvents } from "@/lib/marketing-event-store";
+import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
+import AdminConsole from "./admin-console-client";
+import { loginAdmin } from "./actions";
 
 type AdminSearchParams = Promise<{
   created?: string;
   customer?: string;
+  deleted?: string;
   error?: string;
-  environment?: string;
   licenseKey?: string;
   loggedOut?: string;
-  q?: string;
+  lost?: string;
+  paidConverted?: string;
   requestAccepted?: string;
   saved?: string;
   section?: string;
-  status?: string;
-  pipelineStatus?: string;
   trialCreated?: string;
-  paidConverted?: string;
   updated?: string;
   whatsapp?: string;
 }>;
-
-type TutorialPreviewItem = {
-  label: string;
-  url: string;
-};
 
 export default async function AdminPage({
   searchParams,
@@ -77,833 +41,71 @@ export default async function AdminPage({
     return <AdminLoginPage params={params} />;
   }
 
-  const [config, licenses, accessRequests, pipelineClients] = await Promise.all([
-    getStoredConfig(),
-    listLicenseKeys(),
-    listAccessRequests(),
-    listPipelineClients(),
-  ]);
+  const [config, licenses, accessRequests, pipelineClients, facebookEvents, marketingEvents] =
+    await Promise.all([
+      getStoredConfig(),
+      listLicenseKeys(),
+      listAccessRequests(),
+      listPipelineClients(),
+      listRecentFacebookEvents(25),
+      listRecentMarketingEvents(25),
+    ]);
 
-  const section = readSection(params.section);
-  const usesDatabase = Boolean(process.env.DATABASE_URL);
   const uniqueLicenses = dedupeLicenses(licenses);
-  const activeCount = uniqueLicenses.filter((license) => license.status === "active").length;
-  const pendingRequests = accessRequests.filter((request) => request.status === "pending");
-  const acceptedRequests = accessRequests.filter((request) => request.status === "accepted");
-  const pipelineFilters: {
-    query: string;
-    status: "all" | ClientStatus;
-  } = {
-    query: normalizeSearchQuery(params.q),
-    status: normalizePipelineStatusFilter(params.pipelineStatus),
-  };
-  const filteredPipelineClients = filterPipelineClients(pipelineClients, pipelineFilters);
-  const pipelineStats = {
-    leads: pipelineClients.filter((client) => client.status === "lead").length,
-    trials: pipelineClients.filter((client) => client.status === "trial").length,
-    paid: pipelineClients.filter((client) => client.status === "paid").length,
-    expired: pipelineClients.filter((client) => client.status === "expired").length,
-  };
-  const licenseFilters: {
-    query: string;
-    status: "all" | "active" | "disabled";
-    environment: "all" | "codex" | "vscode-codex" | "t3code" | "opencode";
-  } = {
-    query: normalizeSearchQuery(params.q),
-    status: normalizeLicenseStatusFilter(params.status),
-    environment: normalizeEnvironmentFilter(params.environment),
-  };
-  const filteredLicenses = filterLicenses(uniqueLicenses, licenseFilters);
-  const hiddenDuplicateCount = Math.max(0, licenses.length - uniqueLicenses.length);
-  const tutorialPreview = buildTutorialPreview(
-    config.managerTutorialLinks,
-    config.supportVideoUrl,
-  );
+  const canonicalLicenses = buildCanonicalLicenses(uniqueLicenses, pipelineClients);
+  const uniqueAccessRequests = dedupeAccessRequestsByWhatsapp(accessRequests);
+  const flashClient = params.licenseKey
+    ? pipelineClients.find((client) => client.licenseKey === params.licenseKey)
+    : undefined;
+  const flashLicense =
+    params.licenseKey && !flashClient
+      ? uniqueLicenses.find((license) => license.licenseKey === params.licenseKey)
+      : undefined;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.1),_transparent_30%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_45%,#f8fafc_100%)]">
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <HeroHeader
-            usesDatabase={usesDatabase}
-            licenseCount={uniqueLicenses.length}
-            activeCount={activeCount}
-            pendingCount={pendingRequests.length}
-          />
-
-        <FlashMessages params={params} />
-        {params.requestAccepted === "1" && params.licenseKey ? (
-          <CopyLicenseCard
-            customer={params.customer ?? "Client"}
-            licenseKey={params.licenseKey}
-            whatsapp={params.whatsapp}
-          />
-        ) : null}
-
-        <div className="mt-6">
-          <SidebarLayout
-            sidebar={
-              <Sidebar>
-                <SidebarPanel>
-                  <SidebarGroup title="Navigation">
-                    <SidebarItem
-                      href="/admin?section=dashboard"
-                      title="Dashboard"
-                      hint="Vue d’ensemble et configuration"
-                      badge={section === "dashboard" ? "Actif" : undefined}
-                      active={section === "dashboard"}
-                    />
-                    <SidebarItem
-                      href="/admin?section=subscriptions"
-                      title="Subscriptions"
-                      hint="Licences, statuts et clients"
-                      badge={String(licenses.length)}
-                      active={section === "subscriptions"}
-                    />
-                    <SidebarItem
-                      href="/admin?section=pipeline"
-                      title="Pipeline"
-                      hint="Leads, trials en attente et conversions paid"
-                      badge={String(
-                        pipelineStats.leads + pipelineStats.trials + pipelineStats.paid,
-                      )}
-                      active={section === "pipeline"}
-                    />
-                    <SidebarItem
-                      href="/admin?section=requests"
-                      title="Requests"
-                      hint="Demandes WhatsApp et génération"
-                      badge={String(pendingRequests.length)}
-                      active={section === "requests"}
-                    />
-                  </SidebarGroup>
-
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Workflow
-                    </p>
-                    <ol className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
-                      <li>1. Le client demande l’accès sur le portail.</li>
-                      <li>2. Tu acceptes la demande dans `Requests`.</li>
-                      <li>3. Tu copies la clé et tu l’envoies sur WhatsApp.</li>
-                    </ol>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <TopLink href="/">Portail</TopLink>
-                    <TopLink href="/dev">Page technique</TopLink>
-                  </div>
-
-                  <form action={logoutAdmin} className="mt-4">
-                    <Button type="submit" variant="outline" className="w-full">
-                      Se déconnecter
-                    </Button>
-                  </form>
-                </SidebarPanel>
-              </Sidebar>
-            }
-          >
-            <SidebarInset>
-              {section === "dashboard" ? (
-                <>
-                  <SectionIntro
-                    eyebrow="Dashboard"
-                    title="Une base admin propre et prête production"
-                    description="Configuration Azure, création manuelle de licences, métriques et aperçu rapide de l’activité."
-                  />
-
-                  <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Configuration Azure</CardTitle>
-                        <CardDescription>
-                          Les réglages principaux du portail, du manager et des installateurs
-                          sont centralisés ici.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {usesDatabase ? (
-                          <Notice tone="blue">
-                            Les réglages Azure sont enregistrés dans Neon côté serveur. La clé
-                            API peut être chiffrée si <InlineCode>CONFIG_ENCRYPTION_KEY</InlineCode>{" "}
-                            est définie.
-                          </Notice>
-                        ) : (
-                          <Notice tone="amber">
-                            <InlineCode>DATABASE_URL</InlineCode> n’est pas défini, donc les
-                            réglages retombent sur{" "}
-                            <InlineCode>{LOCAL_CONFIG_RELATIVE_PATH}</InlineCode>.
-                          </Notice>
-                        )}
-
-                        <form action={saveAdminConfig} className="mt-5 space-y-5">
-                          <Field
-                            label="Nom de ressource Azure"
-                            name="azureResourceName"
-                            defaultValue={config.azureResourceName}
-                          />
-                          <Field
-                            label="Nom exact du déploiement Azure"
-                            name="azureDefaultDeployment"
-                            defaultValue={config.azureDefaultDeployment}
-                            helperText="Important: utilisez le nom exact du déploiement créé dans Azure AI Foundry. Pour Codex et T3 Code, une valeur incorrecte provoque souvent l’erreur 404 `The API deployment for this resource does not exist`."
-                          />
-                          <Field
-                            label="Déploiement GPT-5.5 optionnel"
-                            name="azureGpt55Deployment"
-                            defaultValue={config.azureGpt55Deployment ?? ""}
-                            placeholder="Ex: gpt-5.5-1"
-                            helperText="Optionnel. Si vous le renseignez, GPT-5.5 sera aussi disponible directement dans Codex, T3 Code et OpenCode, tout en gardant GPT-5.4 comme choix par défaut."
-                          />
-                          <Field
-                            label="Clé API Azure"
-                            name="azureApiKey"
-                            defaultValue=""
-                            placeholder="Collez une nouvelle clé pour remplacer celle déjà stockée"
-                            type="password"
-                          />
-                          <Field
-                            label="Email support"
-                            name="supportEmail"
-                            defaultValue={config.supportEmail ?? ""}
-                            placeholder="Optionnel"
-                            type="email"
-                          />
-                          <Field
-                            label="Numéro WhatsApp AIPilot"
-                            name="supportWhatsappNumber"
-                            defaultValue={config.supportWhatsappNumber ?? ""}
-                            placeholder="Ex: +216 29 293 038"
-                            helperText="Ce numéro est utilisé par le funnel /funnel pour rediriger le prospect vers WhatsApp après l’envoi du formulaire."
-                          />
-                          <Field
-                            label="URL de la vidéo YouTube"
-                            name="supportVideoUrl"
-                            defaultValue={config.supportVideoUrl ?? ""}
-                            placeholder="https://..."
-                            type="url"
-                          />
-                          <TextAreaField
-                            label="Tutoriels du manager"
-                            name="managerTutorialLinks"
-                            defaultValue={config.managerTutorialLinks ?? ""}
-                            placeholder={"Premiers pas | https://...\nInstaller Codex | https://...\nConfigurer T3 Code | https://..."}
-                            helperText="Un tutoriel par ligne. Format recommandé: Titre | https://lien. Ces liens apparaîtront directement dans la section Tutoriels de AIPilot Manager."
-                          />
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                              Aperçu du manager
-                            </p>
-                            <h3 className="mt-2 text-base font-semibold text-slate-950">
-                              Section Tutoriels
-                            </h3>
-                            <p className="mt-2 text-sm leading-7 text-slate-600">
-                              Voici le rendu actuel des liens que le client verra dans AIPilot Manager.
-                            </p>
-                            <div className="mt-4 space-y-3">
-                              {tutorialPreview.length > 0 ? (
-                                tutorialPreview.map((tutorial) => (
-                                  <div
-                                    key={`${tutorial.label}-${tutorial.url}`}
-                                    className="rounded-2xl border border-slate-200 bg-white p-4"
-                                  >
-                                    <p className="font-semibold text-slate-950">
-                                      {tutorial.label}
-                                    </p>
-                                    <p className="mt-1 break-all text-sm text-slate-500">
-                                      {tutorial.url}
-                                    </p>
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-sm leading-7 text-slate-500">
-                                  Aucun tutoriel configuré pour le moment. Ajoute une vidéo YouTube
-                                  ou des liens ligne par ligne pour voir l’aperçu ici.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <Field
-                            label="URL des mises à jour du manager"
-                            name="managerUpdateUrl"
-                            defaultValue={config.managerUpdateUrl ?? ""}
-                            placeholder="https://downloads.aipilot.tn/manager/stable"
-                            type="url"
-                          />
-                          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                            <input
-                              className="mt-1"
-                              type="checkbox"
-                              name="includeApiKeyInInstaller"
-                              defaultChecked={config.includeApiKeyInInstaller}
-                            />
-                            <span>
-                              Inclure la clé API stockée dans les scripts d’installation générés.
-                              <span className="mt-1 block text-xs text-amber-700">
-                                À utiliser seulement si tu acceptes que la clé soit récupérable
-                                depuis les endpoints d’installation.
-                              </span>
-                            </span>
-                          </label>
-                          <Button type="submit" className="w-full sm:w-auto">
-                            Enregistrer la configuration
-                          </Button>
-                        </form>
-                      </CardContent>
-                    </Card>
-
-                    <div className="space-y-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Créer une licence manuellement</CardTitle>
-                          <CardDescription>
-                            Pour les cas où tu veux créer une clé sans passer par une demande
-                            d’accès.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <form action={createLicenseAction} className="space-y-5">
-                            <Field
-                              label="Nom du client"
-                              name="customerName"
-                              defaultValue=""
-                              placeholder="Ex: Mohamed Amine"
-                            />
-                            <Field
-                              label="Email client"
-                              name="customerEmail"
-                              defaultValue=""
-                              placeholder="Optionnel"
-                              type="email"
-                            />
-                            <Field
-                              label="Clé API Azure du client"
-                              name="azureApiKey"
-                              defaultValue=""
-                              placeholder="Optionnel, sinon fallback sur la clé globale"
-                              type="password"
-                            />
-                            <Field
-                              label="Clé de licence personnalisée"
-                              name="licenseKey"
-                              defaultValue=""
-                              placeholder="Optionnel, format XXXX-XXXX-XXXX-XXXX"
-                            />
-                            <div className="grid gap-5 md:grid-cols-2">
-                              <SelectField
-                                label="Tier"
-                                name="tier"
-                                defaultValue="pro"
-                                options={[
-                                  { label: "Starter", value: "starter" },
-                                  { label: "Pro", value: "pro" },
-                                  { label: "Max", value: "max" },
-                                ]}
-                              />
-                              <SelectField
-                                label="Environnement préféré"
-                                name="preferredEnvironment"
-                                defaultValue="opencode"
-                                options={[
-                                  { label: "OpenCode", value: "opencode" },
-                                  { label: "Codex app", value: "codex" },
-                                  { label: "VS Code Codex", value: "vscode-codex" },
-                                  { label: "T3 Code", value: "t3code" },
-                                ]}
-                              />
-                            </div>
-                            <TextAreaField
-                              label="Notes internes"
-                              name="notes"
-                              defaultValue=""
-                              placeholder="Ex: client beta, payé via D17, installer Windows demandé"
-                            />
-                            <Button type="submit" variant="success" className="w-full sm:w-auto">
-                              Générer la licence
-                            </Button>
-                          </form>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Résumé opérationnel</CardTitle>
-                          <CardDescription>
-                            Un aperçu rapide pour savoir où tu en es.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid gap-3 sm:grid-cols-2">
-                          <MiniMetric label="Demandes en attente" value={String(pendingRequests.length)} />
-                          <MiniMetric label="Demandes traitées" value={String(acceptedRequests.length)} />
-                          <MiniMetric
-                            label="Répartition outils"
-                            value={`${uniqueLicenses.filter((item) => item.preferredEnvironment === "codex").length}/${uniqueLicenses.filter((item) => item.preferredEnvironment === "vscode-codex").length}/${uniqueLicenses.filter((item) => item.preferredEnvironment === "t3code").length}/${uniqueLicenses.filter((item) => item.preferredEnvironment === "opencode").length}`}
-                          />
-                          <MiniMetric
-                            label="Source de vérité"
-                            value={usesDatabase ? "Neon" : "Local fallback"}
-                          />
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
-                </>
-              ) : null}
-
-              {section === "subscriptions" ? (
-                <>
-                  <SectionIntro
-                    eyebrow="Subscriptions"
-                    title="Licences et abonnements"
-                    description="Une vue table propre sur desktop, et des cartes compactes sur mobile."
-                  />
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Toutes les licences</CardTitle>
-                      <CardDescription>
-                        Suspend ou réactive rapidement une clé, et visualise le client,
-                        l’environnement et l’activité.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-5">
-                      {uniqueLicenses.length === 0 ? (
-                        <EmptyState
-                          title="Aucune licence pour le moment"
-                          description="Les licences générées apparaîtront ici."
-                        />
-                      ) : (
-                        <>
-                          <form
-                            action="/admin"
-                            className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(11rem,0.8fr)_minmax(12rem,0.9fr)_auto]"
-                          >
-                            <input type="hidden" name="section" value="subscriptions" />
-                            <Field
-                              label="Rechercher"
-                              name="q"
-                              defaultValue={licenseFilters.query}
-                              placeholder="Client, email, licence..."
-                            />
-                            <SelectField
-                              label="Statut"
-                              name="status"
-                              defaultValue={licenseFilters.status}
-                              options={[
-                                { label: "Tous les statuts", value: "all" },
-                                { label: "Actives", value: "active" },
-                                { label: "Suspendues", value: "disabled" },
-                              ]}
-                            />
-                            <SelectField
-                              label="Outil"
-                              name="environment"
-                              defaultValue={licenseFilters.environment}
-                              options={[
-                                { label: "Tous les outils", value: "all" },
-                                { label: "Codex app", value: "codex" },
-                                { label: "VS Code Codex", value: "vscode-codex" },
-                                { label: "T3 Code", value: "t3code" },
-                                { label: "OpenCode", value: "opencode" },
-                              ]}
-                            />
-                            <div className="flex items-end gap-2 lg:justify-end">
-                              <Button type="submit" className="flex-1 sm:flex-none">
-                                Rechercher
-                              </Button>
-                              <a
-                                href="/admin?section=subscriptions"
-                                className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 sm:flex-none"
-                              >
-                                Réinitialiser
-                              </a>
-                            </div>
-                          </form>
-
-                          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-                            <Badge tone="blue">{filteredLicenses.length} affichée(s)</Badge>
-                            <Badge tone="slate">{uniqueLicenses.length} unique(s)</Badge>
-                            {hiddenDuplicateCount > 0 ? (
-                              <Badge tone="amber">
-                                {hiddenDuplicateCount} doublon(s) masqué(s)
-                              </Badge>
-                            ) : null}
-                          </div>
-
-                          {filteredLicenses.length === 0 ? (
-                            <EmptyState
-                              title="Aucune licence ne correspond à cette recherche"
-                              description="Essaie un autre nom, une autre clé ou réinitialise les filtres."
-                            />
-                          ) : (
-                            <>
-                              <MobileLicenseCards licenses={filteredLicenses} />
-                              <div className="hidden overflow-x-auto md:block">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Client</TableHead>
-                                  <TableHead>Licence</TableHead>
-                                  <TableHead>Plan</TableHead>
-                                  <TableHead>Outil</TableHead>
-                                  <TableHead>Statut</TableHead>
-                                  <TableHead>Dernière activité</TableHead>
-                                  <TableHead>Action</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {filteredLicenses.map((license) => (
-                                  <TableRow key={license.id} className="align-top">
-                                    <TableCell className="min-w-[14rem]">
-                                      <p className="font-semibold text-slate-950">
-                                        {license.customerName}
-                                      </p>
-                                      <p className="mt-1 break-words text-xs leading-6 text-slate-500">
-                                        {license.customerEmail || "Email non renseigné"}
-                                      </p>
-                                    </TableCell>
-                                    <TableCell className="min-w-[14rem]">
-                                      <code className="block break-all rounded-xl bg-slate-100 px-2.5 py-2 font-mono text-[13px] text-slate-900">
-                                        {license.licenseKey}
-                                      </code>
-                                      <div className="mt-2">
-                                        <Badge tone={license.azureApiKey ? "blue" : "slate"}>
-                                          {license.azureApiKey ? "Clé Azure dédiée" : "Clé Azure globale"}
-                                        </Badge>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                      <Badge tone="blue">{license.tier.toUpperCase()}</Badge>
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                      <Badge tone="slate">{formatEnvironmentLabel(license.preferredEnvironment)}</Badge>
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                      <Badge tone={license.status === "active" ? "emerald" : "amber"}>
-                                        {license.status === "active" ? "Active" : "Suspendue"}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="min-w-[11rem] text-sm text-slate-600">
-                                      {license.lastValidatedAt
-                                        ? formatDateTime(license.lastValidatedAt)
-                                        : formatDateTime(license.createdAt)}
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                      <form action={updateLicenseStatusAction}>
-                                        <input type="hidden" name="licenseId" value={license.id} />
-                                        <input
-                                          type="hidden"
-                                          name="status"
-                                          value={license.status === "active" ? "disabled" : "active"}
-                                        />
-                                        <Button type="submit" variant="outline" size="sm">
-                                          {license.status === "active" ? "Suspendre" : "Réactiver"}
-                                        </Button>
-                                      </form>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </>
-              ) : null}
-
-              {section === "requests" ? (
-                <>
-                  <SectionIntro
-                    eyebrow="Requests"
-                    title="Demandes d’accès WhatsApp"
-                    description="Cette vue montre uniquement les demandes en attente, pour que tu traites seulement ce qui reste à faire."
-                  />
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Demandes en attente</CardTitle>
-                      <CardDescription>
-                        Dès qu’une demande est acceptée, elle disparaît de cette vue.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {pendingRequests.length === 0 ? (
-                        <EmptyState
-                          title="Aucune demande en attente"
-                          description="Toutes les demandes reçues ont déjà été traitées."
-                        />
-                      ) : (
-                        <>
-                          <MobileRequestCards requests={pendingRequests} />
-                          <div className="hidden overflow-x-auto md:block">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Client</TableHead>
-                                  <TableHead>WhatsApp</TableHead>
-                                  <TableHead>Outil</TableHead>
-                                  <TableHead>OS</TableHead>
-                                  <TableHead>Statut</TableHead>
-                                  <TableHead>Demandée le</TableHead>
-                                  <TableHead>Action</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {pendingRequests.map((request) => (
-                                  <TableRow key={request.id}>
-                                    <TableCell className="font-semibold text-slate-950">
-                                      {request.customerName}
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="space-y-2">
-                                        <p className="break-all text-slate-700">
-                                          {normalizeTunisiaWhatsappNumber(request.whatsappNumber)?.display ??
-                                            request.whatsappNumber}
-                                        </p>
-                                        {buildAdminWhatsAppUrl(
-                                          request.whatsappNumber,
-                                          request.generatedLicenseKey,
-                                          request.customerName,
-                                        ) ? (
-                                          <a
-                                            href={
-                                              buildAdminWhatsAppUrl(
-                                                request.whatsappNumber,
-                                                request.generatedLicenseKey,
-                                                request.customerName,
-                                              ) ?? undefined
-                                            }
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="break-all text-xs font-medium text-sky-700 hover:text-sky-900"
-                                          >
-                                            Ouvrir WhatsApp
-                                          </a>
-                                        ) : (
-                                          <p className="text-xs font-medium text-rose-700">
-                                            Numéro WhatsApp à corriger
-                                          </p>
-                                        )}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge tone="blue">{formatEnvironmentLabel(request.preferredEnvironment)}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge tone="slate">{request.requestedOs}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge tone={request.status === "pending" ? "amber" : "emerald"}>
-                                        {request.status === "pending" ? "En attente" : "Acceptée"}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-slate-600">
-                                      {formatDateTime(request.createdAt)}
-                                    </TableCell>
-                                    <TableCell>
-                                      <form action={acceptAccessRequestAction} className="space-y-3">
-                                        <input type="hidden" name="requestId" value={request.id} />
-                                        <select
-                                          name="tier"
-                                          defaultValue="pro"
-                                          className="w-full min-w-[8rem] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                                        >
-                                          <option value="starter">Starter</option>
-                                          <option value="pro">Pro</option>
-                                          <option value="max">Max</option>
-                                        </select>
-                                        <Button type="submit" variant="success" size="sm">
-                                          Générer la licence
-                                        </Button>
-                                      </form>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </>
-              ) : null}
-
-              {section === "pipeline" ? (
-                <>
-                  <SectionIntro
-                    eyebrow="Pipeline"
-                    title="Leads, essais gratuits et conversions paid"
-                    description="Cette vue relie le funnel marketing, la licence d’essai 24h et la conversion finale en licence payante. Tu peux passer un lead en trial, puis convertir le trial en paid sans quitter l’admin."
-                  />
-
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <MiniMetric label="Leads" value={String(pipelineStats.leads)} />
-                    <MiniMetric label="Trials créés" value={String(pipelineStats.trials)} />
-                    <MiniMetric label="Paid" value={String(pipelineStats.paid)} />
-                    <MiniMetric label="Expired" value={String(pipelineStats.expired)} />
-                  </div>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Suivi du funnel</CardTitle>
-                      <CardDescription>
-                        Tu peux rechercher un client, voir son statut actuel, lancer un essai 24h,
-                        puis le convertir en abonnement paid 60 DT quand le paiement est confirmé.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-5">
-                      <form method="GET" className="space-y-4">
-                        <input type="hidden" name="section" value="pipeline" />
-                        <div className="grid gap-4 lg:grid-cols-[1fr_220px_auto] lg:items-end">
-                          <Field
-                            label="Recherche"
-                            name="q"
-                            defaultValue={pipelineFilters.query}
-                            placeholder="Nom, téléphone, email ou clé..."
-                            helperText="Recherche rapide par lead, client, WhatsApp ou licence."
-                          />
-                          <SelectField
-                            label="Statut"
-                            name="pipelineStatus"
-                            defaultValue={pipelineFilters.status}
-                            options={[
-                              { label: "Tous", value: "all" },
-                              { label: "Lead", value: "lead" },
-                              { label: "Trial", value: "trial" },
-                              { label: "Paid", value: "paid" },
-                              { label: "Expired", value: "expired" },
-                              { label: "Cancelled", value: "cancelled" },
-                            ]}
-                          />
-                          <div className="flex flex-wrap gap-2">
-                            <Button type="submit">Filtrer</Button>
-                            <a
-                              href="/admin?section=pipeline"
-                              className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
-                            >
-                              Réinitialiser
-                            </a>
-                          </div>
-                        </div>
-                      </form>
-
-                      {filteredPipelineClients.length === 0 ? (
-                        <EmptyState
-                          title="Aucun client dans le pipeline"
-                          description="Les leads capturés depuis le funnel, les essais gratuits et les conversions paid apparaîtront ici."
-                        />
-                      ) : (
-                        <>
-                          <MobilePipelineClientCards clients={filteredPipelineClients} />
-                          <div className="hidden overflow-x-auto md:block">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Client</TableHead>
-                                  <TableHead>WhatsApp</TableHead>
-                                  <TableHead>Statut</TableHead>
-                                  <TableHead>Source pub</TableHead>
-                                  <TableHead>Licence</TableHead>
-                                  <TableHead>Dernière étape</TableHead>
-                                  <TableHead>Actions</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {filteredPipelineClients.map((client) => (
-                                  <TableRow key={client.id}>
-                                    <TableCell>
-                                      <div className="space-y-1">
-                                        <p className="font-semibold text-slate-950">
-                                          {client.name || "Lead sans prénom"}
-                                        </p>
-                                        <p className="break-all text-xs text-slate-500">
-                                          {client.email || "Email non renseigné"}
-                                        </p>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <p className="font-mono text-[13px] text-slate-700">
-                                        {normalizeTunisiaWhatsappNumber(client.phone)?.display ??
-                                          client.phone}
-                                      </p>
-                                    </TableCell>
-                                    <TableCell>
-                                      <PipelineStatusBadge status={client.status} />
-                                    </TableCell>
-                                    <TableCell className="text-sm text-slate-600">
-                                      {client.adSource || "—"}
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="space-y-1">
-                                        <p className="font-mono text-[12px] text-slate-700">
-                                          {client.licenseKey ?? "—"}
-                                        </p>
-                                        <p className="text-xs text-slate-500">
-                                          {client.licenseType ? client.licenseType.toUpperCase() : "Aucune"}
-                                        </p>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-sm text-slate-600">
-                                      {formatPipelineDate(client)}
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="space-y-3">
-                                        {client.status !== "paid" ? (
-                                          <form action={convertPipelineClientToPaidAction} className="space-y-2">
-                                            <input type="hidden" name="clientId" value={client.id} />
-                                            <input
-                                              type="hidden"
-                                              name="preferredEnvironment"
-                                              value="codex"
-                                            />
-                                            <input type="hidden" name="tier" value="pro" />
-                                            <Button type="submit" variant="success" size="sm">
-                                              Passer en paid
-                                            </Button>
-                                          </form>
-                                        ) : null}
-
-                                        {client.status === "lead" || client.status === "expired" ? (
-                                          <form action={activatePipelineTrialAction} className="space-y-2">
-                                            <input type="hidden" name="clientId" value={client.id} />
-                                            <select
-                                              name="preferredEnvironment"
-                                              defaultValue="codex"
-                                              className="w-full min-w-[9rem] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                                            >
-                                              <option value="codex">Codex app</option>
-                                              <option value="vscode-codex">VS Code Codex</option>
-                                              <option value="t3code">T3 Code</option>
-                                              <option value="opencode">OpenCode</option>
-                                            </select>
-                                            <Button type="submit" variant="outline" size="sm">
-                                              Créer le trial
-                                            </Button>
-                                          </form>
-                                        ) : null}
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </>
-              ) : null}
-            </SidebarInset>
-          </SidebarLayout>
-        </div>
-      </div>
-    </main>
+    <AdminConsole
+      usesDatabase={Boolean(process.env.DATABASE_URL)}
+      config={config}
+      licenses={canonicalLicenses}
+      requests={uniqueAccessRequests}
+      pipelineClients={pipelineClients}
+      hiddenDuplicateCount={Math.max(0, licenses.length - canonicalLicenses.length)}
+      initialTab={readAdminTab(params.section)}
+      tracking={{
+        pixelId:
+          process.env.FB_PIXEL_ID ||
+          process.env.NEXT_PUBLIC_META_PIXEL_ID ||
+          process.env.NEXT_PUBLIC_FB_PIXEL_ID ||
+          "",
+        hasCapiToken: Boolean(process.env.FB_CAPI_TOKEN),
+        graphApiVersion: process.env.FB_GRAPH_API_VERSION || "v19.0",
+        facebookEventCount: facebookEvents.length,
+        marketingEventCount: marketingEvents.length,
+      }}
+      flash={{
+        saved: params.saved === "1",
+        created: params.created === "1",
+        deleted: params.deleted === "1",
+        updated: params.updated === "1",
+        trialCreated: params.trialCreated === "1",
+        paidConverted: params.paidConverted === "1",
+        lost: params.lost === "1",
+        requestAccepted: params.requestAccepted === "1",
+        licenseKey: params.paidConverted === "1" ? undefined : params.licenseKey,
+        customer:
+          params.customer ||
+          flashClient?.name ||
+          flashLicense?.customerName,
+        whatsapp: params.whatsapp || flashClient?.phone,
+      }}
+    />
   );
+}
+
+function readAdminTab(value?: string) {
+  return value === "subscriptions" || value === "requests" || value === "pipeline"
+    ? value
+    : "dashboard";
 }
 
 function AdminLoginPage({
@@ -912,533 +114,64 @@ function AdminLoginPage({
   params: Awaited<AdminSearchParams>;
 }) {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-10 sm:px-6">
-      <Card className="w-full">
-        <CardHeader>
-          <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">
-            Admin
-          </p>
-          <CardTitle className="mt-3">Connexion administrateur</CardTitle>
-          <CardDescription>
-            Entrez le mot de passe admin pour accéder au backoffice AIPilot.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {params.error === "invalid-password" ? (
-            <Notice tone="rose">Mot de passe invalide.</Notice>
-          ) : null}
-          {params.error === "auth-required" ? (
-            <Notice tone="amber">Connectez-vous pour accéder à l’espace admin.</Notice>
-          ) : null}
-          {params.loggedOut === "1" ? (
-            <Notice tone="emerald">Vous êtes bien déconnecté.</Notice>
-          ) : null}
+    <main className="grid min-h-screen place-items-center bg-[#020b12] px-4 text-slate-100">
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_12%,rgba(0,136,255,0.24),transparent_28%),radial-gradient(circle_at_92%_4%,rgba(15,185,129,0.16),transparent_24%),linear-gradient(180deg,#04131d_0%,#020910_42%,#010509_100%)]" />
+      <section className="relative w-full max-w-md rounded-[2rem] border border-white/10 bg-white/[0.055] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#35a6ff]">
+          AIPilot Admin
+        </p>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">Connexion administrateur</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-400">
+          Entrez le mot de passe admin pour accéder au backoffice.
+        </p>
 
-          <form action={loginAdmin} className="mt-5 space-y-5">
-            <Field
-              label="Mot de passe admin"
+        {params.error === "invalid-password" ? (
+          <Notice>Mot de passe invalide.</Notice>
+        ) : null}
+        {params.error === "auth-required" ? (
+          <Notice>Connectez-vous pour accéder à l’espace admin.</Notice>
+        ) : null}
+        {params.loggedOut === "1" ? (
+          <Notice tone="emerald">Vous êtes bien déconnecté.</Notice>
+        ) : null}
+
+        <form action={loginAdmin} className="mt-6 space-y-4">
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-300">
+              Mot de passe admin
+            </span>
+            <input
+              className="h-12 w-full rounded-2xl border border-white/10 bg-[#06141f] px-4 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-[#0a84ff]/70"
               name="password"
-              defaultValue=""
               placeholder="Mot de passe"
               type="password"
             />
-            <Button type="submit" className="w-full">
-              Se connecter
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </label>
+          <button className="h-12 w-full rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white shadow-[0_18px_50px_rgba(10,132,255,0.32)]">
+            Se connecter
+          </button>
+        </form>
+      </section>
     </main>
   );
 }
 
-function HeroHeader({
-  usesDatabase,
-  licenseCount,
-  activeCount,
-  pendingCount,
-}: {
-  usesDatabase: boolean;
-  licenseCount: number;
-  activeCount: number;
-  pendingCount: number;
-}) {
-  return (
-    <Card className="overflow-hidden border-white/70 bg-[radial-gradient(circle_at_top_right,_rgba(14,165,233,0.16),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.12),_transparent_30%),linear-gradient(135deg,#ffffff_0%,#f8fafc_45%,#f2fbf7_100%)] shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
-      <CardContent className="p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">
-              AIPilot Admin
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Un backoffice plus propre pour gérer les licences et les demandes
-            </h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-              Interface pensée pour traiter vite les demandes WhatsApp, suivre les
-              abonnements et garder la configuration Azure sous contrôle.
-            </p>
-          </div>
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-3 lg:min-w-[24rem]">
-            <MetricCard label="Licences" value={String(licenseCount)} />
-            <MetricCard label="Actives" value={String(activeCount)} />
-            <MetricCard label="En attente" value={String(pendingCount)} />
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          <Badge tone="blue">UI admin production-ready</Badge>
-          <Badge tone="emerald">{usesDatabase ? "Neon connecté" : "Fallback local"}</Badge>
-          <Badge tone="slate">Mobile friendly</Badge>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function FlashMessages({
-  params,
-}: {
-  params: Awaited<AdminSearchParams>;
-}) {
-  return (
-    <div className="mt-4 space-y-3">
-      {params.saved === "1" ? (
-        <Notice tone="emerald">Configuration Azure enregistrée.</Notice>
-      ) : null}
-      {params.created === "1" ? (
-        <Notice tone="emerald">Nouvelle licence créée avec succès.</Notice>
-      ) : null}
-      {params.updated === "1" ? (
-        <Notice tone="emerald">Statut de licence mis à jour.</Notice>
-      ) : null}
-      {params.trialCreated === "1" ? (
-        <Notice tone="emerald">
-          Trial créée et laissée inactive{params.customer ? ` pour ${params.customer}` : ""}.
-        </Notice>
-      ) : null}
-      {params.paidConverted === "1" ? (
-        <Notice tone="emerald">
-          Client converti en licence paid{params.customer ? ` pour ${params.customer}` : ""}.
-        </Notice>
-      ) : null}
-    </div>
-  );
-}
-
-function SectionIntro({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-          {eyebrow}
-        </p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-          {title}
-        </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white/85 p-4 backdrop-blur">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  name,
-  defaultValue,
-  placeholder,
-  type,
-  helperText,
-}: {
-  label: string;
-  name: string;
-  defaultValue: string;
-  placeholder?: string;
-  type?: string;
-  helperText?: string;
-}) {
-  return (
-    <label className="block min-w-0">
-      <span className="mb-2 block text-sm font-medium text-slate-900">{label}</span>
-      <input
-        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-        name={name}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        type={type ?? "text"}
-      />
-      {helperText ? (
-        <span className="mt-2 block break-words text-xs leading-6 text-slate-500">{helperText}</span>
-      ) : null}
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  name,
-  defaultValue,
-  options,
-}: {
-  label: string;
-  name: string;
-  defaultValue: string;
-  options: Array<{ label: string; value: string }>;
-}) {
-  return (
-    <label className="block min-w-0">
-      <span className="mb-2 block text-sm font-medium text-slate-900">{label}</span>
-      <select
-        name={name}
-        defaultValue={defaultValue}
-        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function TextAreaField({
-  label,
-  name,
-  defaultValue,
-  placeholder,
-  helperText,
-}: {
-  label: string;
-  name: string;
-  defaultValue: string;
-  placeholder?: string;
-  helperText?: string;
-}) {
-  return (
-    <label className="block min-w-0">
-      <span className="mb-2 block text-sm font-medium text-slate-900">{label}</span>
-      <textarea
-        name={name}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        rows={4}
-        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-      />
-      {helperText ? (
-        <span className="mt-2 block break-words text-xs leading-6 text-slate-500">{helperText}</span>
-      ) : null}
-    </label>
-  );
-}
-
 function Notice({
-  tone,
   children,
+  tone = "amber",
 }: {
-  tone: "emerald" | "amber" | "rose" | "blue";
   children: React.ReactNode;
+  tone?: "amber" | "emerald";
 }) {
-  const tones = {
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    amber: "border-amber-200 bg-amber-50 text-amber-800",
-    rose: "border-rose-200 bg-rose-50 text-rose-800",
-    blue: "border-sky-200 bg-sky-50 text-sky-800",
-  };
+  const toneClass =
+    tone === "emerald"
+      ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+      : "border-amber-400/20 bg-amber-500/10 text-amber-200";
 
-  return <p className={`rounded-xl border px-3 py-2 text-sm ${tones[tone]}`}>{children}</p>;
+  return <p className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${toneClass}`}>{children}</p>;
 }
 
-function EmptyState({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-      <p className="text-base font-semibold text-slate-900">{title}</p>
-      <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
-    </div>
-  );
-}
-
-function InlineCode({ children }: { children: React.ReactNode }) {
-  return (
-    <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[13px] text-slate-900">
-      {children}
-    </code>
-  );
-}
-
-function TopLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a
-      href={href}
-      className="inline-flex min-w-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
-    >
-      {children}
-    </a>
-  );
-}
-
-function MobileLicenseCards({
-  licenses,
-}: {
-  licenses: Awaited<ReturnType<typeof listLicenseKeys>>;
-}) {
-  return (
-    <div className="space-y-4 md:hidden">
-      {licenses.map((license) => (
-        <article
-          key={license.id}
-          className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold text-slate-950">{license.customerName}</p>
-              <p className="mt-1 break-words text-xs text-slate-500">
-                {license.customerEmail || "Email non renseigné"}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge tone={license.status === "active" ? "emerald" : "amber"}>
-                {license.status === "active" ? "Active" : "Suspendue"}
-              </Badge>
-              <Badge tone="blue">{license.tier.toUpperCase()}</Badge>
-            </div>
-          </div>
-
-          <code className="mt-4 block break-all rounded-xl bg-white px-3 py-2 font-mono text-[13px] text-slate-900">
-            {license.licenseKey}
-          </code>
-
-          <div className="mt-4 space-y-2 text-sm text-slate-600">
-            <p>Outil: {formatEnvironmentLabel(license.preferredEnvironment)}</p>
-            <p>{license.azureApiKey ? "Clé Azure dédiée" : "Clé Azure globale"}</p>
-            <p>
-              Dernière activité:{" "}
-              {license.lastValidatedAt
-                ? formatDateTime(license.lastValidatedAt)
-                : formatDateTime(license.createdAt)}
-            </p>
-          </div>
-
-          <form action={updateLicenseStatusAction} className="mt-4">
-            <input type="hidden" name="licenseId" value={license.id} />
-            <input
-              type="hidden"
-              name="status"
-              value={license.status === "active" ? "disabled" : "active"}
-            />
-            <Button type="submit" variant="outline" className="w-full">
-              {license.status === "active" ? "Suspendre la licence" : "Réactiver la licence"}
-            </Button>
-          </form>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function MobileRequestCards({
-  requests,
-}: {
-  requests: Awaited<ReturnType<typeof listAccessRequests>>;
-}) {
-  return (
-    <div className="space-y-4 md:hidden">
-      {requests.map((request) => (
-        <article
-          key={request.id}
-          className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold text-slate-950">{request.customerName}</p>
-              <p className="mt-1 break-all text-sm text-slate-700">
-                {normalizeTunisiaWhatsappNumber(request.whatsappNumber)?.display ??
-                  request.whatsappNumber}
-              </p>
-            </div>
-            <Badge tone={request.status === "pending" ? "amber" : "emerald"}>
-              {request.status === "pending" ? "En attente" : "Acceptée"}
-            </Badge>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Badge tone="blue">{formatEnvironmentLabel(request.preferredEnvironment)}</Badge>
-            <Badge tone="slate">{request.requestedOs}</Badge>
-          </div>
-
-          <p className="mt-4 text-sm text-slate-600">
-            Demandée le {formatDateTime(request.createdAt)}
-          </p>
-
-          {buildAdminWhatsAppUrl(
-            request.whatsappNumber,
-            request.generatedLicenseKey,
-            request.customerName,
-          ) ? (
-            <a
-              href={
-                buildAdminWhatsAppUrl(
-                  request.whatsappNumber,
-                  request.generatedLicenseKey,
-                  request.customerName,
-                ) ?? undefined
-              }
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex break-all text-sm font-medium text-sky-700 hover:text-sky-900"
-            >
-              Ouvrir WhatsApp
-            </a>
-          ) : (
-            <p className="mt-3 text-sm font-medium text-rose-700">
-              Numéro WhatsApp à corriger avant l’envoi.
-            </p>
-          )}
-
-          {request.status === "pending" ? (
-            <form action={acceptAccessRequestAction} className="mt-4 space-y-3">
-              <input type="hidden" name="requestId" value={request.id} />
-              <SelectField
-                label="Tier à attribuer"
-                name="tier"
-                defaultValue="pro"
-                options={[
-                  { label: "Starter", value: "starter" },
-                  { label: "Pro", value: "pro" },
-                  { label: "Max", value: "max" },
-                ]}
-              />
-              <Button type="submit" variant="success" className="w-full">
-                Accepter et générer la licence
-              </Button>
-            </form>
-          ) : (
-            <div className="mt-4 rounded-xl bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Clé générée
-              </p>
-              <code className="mt-2 block break-all font-mono text-[13px] text-slate-900">
-                {request.generatedLicenseKey ?? "Clé non disponible"}
-              </code>
-            </div>
-          )}
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function MobilePipelineClientCards({
-  clients,
-}: {
-  clients: PipelineClientRecord[];
-}) {
-  return (
-    <div className="space-y-4 md:hidden">
-      {clients.map((client) => (
-        <article key={client.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold text-slate-950">{client.name || "Lead sans prénom"}</p>
-              <p className="mt-1 break-all text-xs text-slate-500">
-                {client.email || "Email non renseigné"}
-              </p>
-            </div>
-            <PipelineStatusBadge status={client.status} />
-          </div>
-
-          <div className="mt-4 space-y-2 text-sm text-slate-600">
-            <p className="font-mono text-[13px] text-slate-700">
-              {normalizeTunisiaWhatsappNumber(client.phone)?.display ?? client.phone}
-            </p>
-            <p>Source pub: {client.adSource || "—"}</p>
-            <p>Licence: {client.licenseKey ?? "Aucune"}</p>
-            <p>{formatPipelineDate(client)}</p>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {client.status !== "paid" ? (
-              <form action={convertPipelineClientToPaidAction} className="space-y-2">
-                <input type="hidden" name="clientId" value={client.id} />
-                <input type="hidden" name="preferredEnvironment" value="codex" />
-                <input type="hidden" name="tier" value="pro" />
-                <Button type="submit" variant="success" className="w-full">
-                  Passer en paid
-                </Button>
-              </form>
-            ) : null}
-
-            {client.status === "lead" || client.status === "expired" ? (
-              <form action={activatePipelineTrialAction} className="space-y-3">
-                <input type="hidden" name="clientId" value={client.id} />
-                <SelectField
-                  label="Environnement du trial"
-                  name="preferredEnvironment"
-                  defaultValue="codex"
-                  options={[
-                    { label: "Codex app", value: "codex" },
-                    { label: "VS Code Codex", value: "vscode-codex" },
-                    { label: "T3 Code", value: "t3code" },
-                    { label: "OpenCode", value: "opencode" },
-                  ]}
-                />
-                <Button type="submit" variant="outline" className="w-full">
-                  Créer le trial
-                </Button>
-              </form>
-            ) : null}
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function readSection(value: string | undefined): AdminSection {
-  return value === "subscriptions" || value === "requests" || value === "pipeline"
-    ? value
-    : "dashboard";
-}
-
-function dedupeLicenses(licenses: Awaited<ReturnType<typeof listLicenseKeys>>) {
+function dedupeLicenses(licenses: LicenseRecord[]) {
   const seen = new Set<string>();
 
   return licenses.filter((license) => {
@@ -1451,190 +184,33 @@ function dedupeLicenses(licenses: Awaited<ReturnType<typeof listLicenseKeys>>) {
   });
 }
 
-function normalizeSearchQuery(value: string | undefined) {
-  return String(value ?? "").trim();
-}
-
-function normalizeLicenseStatusFilter(value: string | undefined) {
-  return value === "active" || value === "disabled" ? value : "all";
-}
-
-function normalizePipelineStatusFilter(value: string | undefined) {
-  return value === "lead" ||
-    value === "trial" ||
-    value === "paid" ||
-    value === "expired" ||
-    value === "cancelled"
-    ? value
-    : "all";
-}
-
-function normalizeEnvironmentFilter(value: string | undefined) {
-  return value === "codex" ||
-    value === "vscode-codex" ||
-    value === "t3code" ||
-    value === "opencode"
-    ? value
-    : "all";
-}
-
-function filterLicenses(
-  licenses: Awaited<ReturnType<typeof listLicenseKeys>>,
-  filters: {
-    query: string;
-    status: "all" | "active" | "disabled";
-    environment: "all" | "codex" | "vscode-codex" | "t3code" | "opencode";
-  },
-) {
-  const query = filters.query.toLowerCase();
-
-  return licenses.filter((license) => {
-    const matchesQuery =
-      !query ||
-      [
-        license.customerName,
-        license.customerEmail ?? "",
-        license.licenseKey,
-        formatEnvironmentLabel(license.preferredEnvironment),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-
-    const matchesStatus = filters.status === "all" || license.status === filters.status;
-    const matchesEnvironment =
-      filters.environment === "all" || license.preferredEnvironment === filters.environment;
-
-    return matchesQuery && matchesStatus && matchesEnvironment;
-  });
-}
-
-function filterPipelineClients(
+function buildCanonicalLicenses(
+  licenses: LicenseRecord[],
   clients: PipelineClientRecord[],
-  filters: {
-    query: string;
-    status: "all" | ClientStatus;
-  },
 ) {
-  const query = filters.query.toLowerCase();
+  const byKey = new Map(licenses.map((license) => [license.licenseKey, license]));
+  const canonical = clients
+    .map((client) => (client.licenseKey ? byKey.get(client.licenseKey) : undefined))
+    .filter((license): license is LicenseRecord => Boolean(license));
 
-  return clients.filter((client) => {
-    const matchesQuery =
-      !query ||
-      [
-        client.name ?? "",
-        client.phone,
-        client.email ?? "",
-        client.adSource ?? "",
-        client.licenseKey ?? "",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-
-    const matchesStatus = filters.status === "all" || client.status === filters.status;
-    return matchesQuery && matchesStatus;
-  });
+  return canonical.length > 0 ? dedupeLicenses(canonical) : dedupeLicenses(licenses);
 }
 
-function formatEnvironmentLabel(value: string) {
-  if (value === "codex") return "Codex app";
-  if (value === "vscode-codex") return "VS Code Codex";
-  if (value === "t3code") return "T3 Code";
-  return "OpenCode";
-}
+function dedupeAccessRequestsByWhatsapp(requests: AccessRequestRecord[]) {
+  const byPhone = new Map<string, AccessRequestRecord>();
 
-function PipelineStatusBadge({ status }: { status: ClientStatus }) {
-  if (status === "paid") return <Badge tone="emerald">Paid</Badge>;
-  if (status === "trial") return <Badge tone="amber">Trial</Badge>;
-  if (status === "expired") return <Badge tone="amber">Expired</Badge>;
-  if (status === "cancelled") return <Badge tone="slate">Cancelled</Badge>;
-  return <Badge tone="blue">Lead</Badge>;
-}
-
-function formatPipelineDate(client: PipelineClientRecord) {
-  if (client.status === "paid" && client.paidAt) {
-    return `Paid le ${formatDateTime(client.paidAt)}`;
-  }
-
-  if (client.status === "trial" && client.trialEndsAt) {
-    return `Trial jusqu’au ${formatDateTime(client.trialEndsAt)}`;
-  }
-
-  if (client.status === "expired" && client.trialEndsAt) {
-    return `Expiré le ${formatDateTime(client.trialEndsAt)}`;
-  }
-
-  return `Lead du ${formatDateTime(client.leadAt)}`;
-}
-
-function buildTutorialPreview(
-  managerTutorialLinks: string | undefined,
-  supportVideoUrl: string | undefined,
-) {
-  const tutorials: TutorialPreviewItem[] = [];
-  const videoUrl = normalizeTutorialUrl(supportVideoUrl);
-
-  if (videoUrl) {
-    tutorials.push({
-      label: "Vidéo de démarrage AIPilot",
-      url: videoUrl,
-    });
-  }
-
-  for (const line of String(managerTutorialLinks ?? "").split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
+  for (const request of requests) {
+    const normalized =
+      normalizeTunisiaWhatsappNumber(request.whatsappNumber)?.waId ??
+      request.whatsappNumber.replace(/[^\d]/g, "");
+    const key = normalized || request.id;
+    const existing = byPhone.get(key);
+    if (!existing || request.updatedAt.localeCompare(existing.updatedAt) > 0) {
+      byPhone.set(key, request);
     }
-
-    const [labelPart, urlPart] = trimmed.split("|");
-    const url = normalizeTutorialUrl((urlPart ?? labelPart).trim());
-    if (!url) {
-      continue;
-    }
-
-    tutorials.push({
-      label: (urlPart ? labelPart : "Tutoriel AIPilot").trim() || "Tutoriel AIPilot",
-      url,
-    });
   }
 
-  return tutorials;
-}
-
-function normalizeTutorialUrl(value: string | undefined) {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
-      return parsed.toString();
-    }
-  } catch {
-    return "";
-  }
-
-  return "";
-}
-
-function buildAdminWhatsAppUrl(
-  whatsappNumber: string,
-  licenseKey: string | undefined,
-  customerName: string,
-) {
-  const message = licenseKey
-    ? `Bonjour ${customerName}, voici votre clé de licence AIPilot : ${licenseKey}`
-    : `Bonjour ${customerName}, votre demande AIPilot est bien reçue.`;
-  return buildWhatsAppUrl(whatsappNumber, message);
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return Array.from(byPhone.values()).sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt),
+  );
 }

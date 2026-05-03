@@ -1,6 +1,6 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { sendCapiEvent } from "@/lib/capi";
-import { convertClientToPaid, getPipelineClientById, recordFacebookEvent } from "@/lib/client-pipeline-store";
+import { getPipelineClientById, markClientPaid, recordFacebookEvent } from "@/lib/client-pipeline-store";
 
 export async function POST(request: Request) {
   if (!(await isAdminAuthenticated())) {
@@ -21,11 +21,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Client manquant" }, { status: 400 });
   }
 
-  const conversion = await convertClientToPaid({
-    clientId,
-    tier: payload?.tier,
-    preferredEnvironment: payload?.preferredEnvironment,
-  });
+  const conversion = await markClientPaid({ clientId });
 
   const client = await getPipelineClientById(clientId);
   if (client) {
@@ -38,6 +34,8 @@ export async function POST(request: Request) {
       ip: client.ip,
       userAgent: client.userAgent,
       sourceUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://aipilot.tn",
+      eventId: `aipilot-purchase-${clientId}-${Date.now()}`,
+      subscriptionId: clientId,
       value: payload?.amount ?? 60,
       currency: "TND",
       contentName: "AIPilot Monthly 60DT",
@@ -52,6 +50,6 @@ export async function POST(request: Request) {
 
   return Response.json({
     success: true,
-    licenseKey: conversion.licenseKey,
+    licenseKey: conversion.licenseKey ?? null,
   });
 }

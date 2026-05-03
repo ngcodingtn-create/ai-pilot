@@ -9,9 +9,16 @@ export type TrialLeadRecord = {
   name: string;
   whatsappNumber: string;
   fbclid?: string;
+  fbp?: string;
+  fbc?: string;
   utmSource?: string;
   utmCampaign?: string;
   utmMedium?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  landingUrl?: string;
+  referrer?: string;
+  eventId?: string;
   createdAt: string;
 };
 
@@ -20,9 +27,16 @@ type TrialLeadRow = {
   name: string;
   whatsapp_number: string;
   fbclid: string | null;
+  fbp: string | null;
+  fbc: string | null;
   utm_source: string | null;
   utm_campaign: string | null;
   utm_medium: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  landing_url: string | null;
+  referrer: string | null;
+  event_id: string | null;
   created_at: string | Date;
 };
 
@@ -69,21 +83,43 @@ export async function ensureTrialLeadsTable() {
       name text NOT NULL,
       whatsapp_number text NOT NULL,
       fbclid text,
+      fbp text,
+      fbc text,
       utm_source text,
       utm_campaign text,
       utm_medium text,
+      utm_content text,
+      utm_term text,
+      landing_url text,
+      referrer text,
+      event_id text,
       created_at timestamptz NOT NULL DEFAULT now()
     )
   `;
+
+  await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS fbp text`;
+  await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS fbc text`;
+  await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS utm_content text`;
+  await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS utm_term text`;
+  await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS landing_url text`;
+  await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS referrer text`;
+  await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS event_id text`;
 }
 
 export async function createTrialLead(input: {
   name: string;
   whatsappNumber: string;
   fbclid?: string;
+  fbp?: string;
+  fbc?: string;
   utmSource?: string;
   utmCampaign?: string;
   utmMedium?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  landingUrl?: string;
+  referrer?: string;
+  eventId?: string;
 }) {
   const name = String(input.name ?? "").trim();
   const normalizedWhatsapp = normalizeTunisiaWhatsappNumber(
@@ -105,9 +141,16 @@ export async function createTrialLead(input: {
     name,
     whatsappNumber: normalizedWhatsapp.e164,
     fbclid: String(input.fbclid ?? "").trim() || undefined,
+    fbp: String(input.fbp ?? "").trim() || undefined,
+    fbc: String(input.fbc ?? "").trim() || undefined,
     utmSource: String(input.utmSource ?? "").trim() || undefined,
     utmCampaign: String(input.utmCampaign ?? "").trim() || undefined,
     utmMedium: String(input.utmMedium ?? "").trim() || undefined,
+    utmContent: String(input.utmContent ?? "").trim() || undefined,
+    utmTerm: String(input.utmTerm ?? "").trim() || undefined,
+    landingUrl: String(input.landingUrl ?? "").trim() || undefined,
+    referrer: String(input.referrer ?? "").trim() || undefined,
+    eventId: String(input.eventId ?? "").trim() || undefined,
     createdAt: new Date().toISOString(),
   };
 
@@ -126,9 +169,16 @@ export async function createTrialLead(input: {
       name,
       whatsapp_number,
       fbclid,
+      fbp,
+      fbc,
       utm_source,
       utm_campaign,
       utm_medium,
+      utm_content,
+      utm_term,
+      landing_url,
+      referrer,
+      event_id,
       created_at
     )
     VALUES (
@@ -136,9 +186,16 @@ export async function createTrialLead(input: {
       ${record.name},
       ${record.whatsappNumber},
       ${record.fbclid ?? null},
+      ${record.fbp ?? null},
+      ${record.fbc ?? null},
       ${record.utmSource ?? null},
       ${record.utmCampaign ?? null},
       ${record.utmMedium ?? null},
+      ${record.utmContent ?? null},
+      ${record.utmTerm ?? null},
+      ${record.landingUrl ?? null},
+      ${record.referrer ?? null},
+      ${record.eventId ?? null},
       ${record.createdAt}
     )
   `;
@@ -152,9 +209,16 @@ export function mapTrialLeadRow(row: TrialLeadRow): TrialLeadRecord {
     name: row.name,
     whatsappNumber: row.whatsapp_number,
     fbclid: row.fbclid ?? undefined,
+    fbp: row.fbp ?? undefined,
+    fbc: row.fbc ?? undefined,
     utmSource: row.utm_source ?? undefined,
     utmCampaign: row.utm_campaign ?? undefined,
     utmMedium: row.utm_medium ?? undefined,
+    utmContent: row.utm_content ?? undefined,
+    utmTerm: row.utm_term ?? undefined,
+    landingUrl: row.landing_url ?? undefined,
+    referrer: row.referrer ?? undefined,
+    eventId: row.event_id ?? undefined,
     createdAt: new Date(row.created_at).toISOString(),
   };
 }

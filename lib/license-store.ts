@@ -34,6 +34,15 @@ export type CreateLicenseInput = {
   licenseKey?: string;
 };
 
+export type UpdateLicenseInput = {
+  customerName: string;
+  customerEmail?: string;
+  tier: LicenseTier;
+  preferredEnvironment: LicenseEnvironment;
+  status: LicenseStatus;
+  notes?: string;
+};
+
 type LocalLicenseFile = {
   licenses: LicenseRecord[];
 };
@@ -311,6 +320,116 @@ export async function updateLicenseStatus(id: string, status: LicenseStatus) {
     UPDATE license_keys
     SET status = ${status}, updated_at = now()
     WHERE id = ${id}
+  `;
+}
+
+export async function findLicenseById(id: string) {
+  const licenseId = String(id ?? "").trim();
+  if (!licenseId) {
+    return null;
+  }
+
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalLicenseFile();
+    return local.licenses.find((license) => license.id === licenseId) ?? null;
+  }
+
+  await ensureLicenseTable();
+  const rows = await sql`
+    SELECT
+      id,
+      license_key,
+      customer_name,
+      customer_email,
+      azure_api_key,
+      azure_api_key_encrypted,
+      tier,
+      preferred_environment,
+      status,
+      notes,
+      created_at,
+      updated_at,
+      last_validated_at
+    FROM license_keys
+    WHERE id = ${licenseId}
+    LIMIT 1
+  `;
+
+  const row = (rows as Array<LicenseRow>)[0];
+  return row ? mapRowToLicenseRecord(row) : null;
+}
+
+export async function deleteLicenseById(id: string) {
+  const licenseId = String(id ?? "").trim();
+  if (!licenseId) {
+    throw new Error("Missing license id");
+  }
+
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalLicenseFile();
+    local.licenses = local.licenses.filter((license) => license.id !== licenseId);
+    await writeLocalLicenseFile(local);
+    return;
+  }
+
+  await ensureLicenseTable();
+  await sql`
+    DELETE FROM license_keys
+    WHERE id = ${licenseId}
+  `;
+}
+
+export async function updateLicenseDetails(id: string, input: UpdateLicenseInput) {
+  const licenseId = String(id ?? "").trim();
+  const customerName = input.customerName.trim();
+
+  if (!licenseId) {
+    throw new Error("Missing license id");
+  }
+
+  if (!customerName) {
+    throw new Error("Customer name is required");
+  }
+
+  const updatedAt = new Date().toISOString();
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalLicenseFile();
+    local.licenses = local.licenses.map((license) =>
+      license.id === licenseId
+        ? {
+            ...license,
+            customerName,
+            customerEmail: input.customerEmail?.trim() || undefined,
+            tier: input.tier,
+            preferredEnvironment: input.preferredEnvironment,
+            status: input.status,
+            notes: input.notes?.trim() || undefined,
+            updatedAt,
+          }
+        : license,
+    );
+    await writeLocalLicenseFile(local);
+    return;
+  }
+
+  await ensureLicenseTable();
+  await sql`
+    UPDATE license_keys
+    SET
+      customer_name = ${customerName},
+      customer_email = ${input.customerEmail?.trim() || null},
+      tier = ${input.tier},
+      preferred_environment = ${input.preferredEnvironment},
+      status = ${input.status},
+      notes = ${input.notes?.trim() || null},
+      updated_at = now()
+    WHERE id = ${licenseId}
   `;
 }
 

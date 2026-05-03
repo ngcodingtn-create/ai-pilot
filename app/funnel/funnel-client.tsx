@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 
@@ -11,8 +10,6 @@ type TrialFormState =
   | { status: "idle"; message?: undefined }
   | { status: "submitting"; message?: undefined }
   | { status: "success" | "error"; message: string };
-
-const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "TON_PIXEL_ID";
 
 const features = [
   ["🤖", "Codex Officiel OpenAI", "L’app desktop officielle d’OpenAI, pas une copie."],
@@ -103,6 +100,7 @@ const proofSlides = [
 ];
 
 const PROOF_VIDEO_STORAGE_KEY = "aipilot-funnel-proof-video-state";
+const WHATSAPP_REDIRECT_STORAGE_KEY = "aipilot-whatsapp-redirect";
 
 type ProofStoredState = {
   slideIndex: number;
@@ -143,49 +141,6 @@ function readStoredProofState(): ProofStoredState {
   }
 }
 
-function attemptWhatsAppRedirect(appUrl: string | null | undefined, webUrl: string | null | undefined) {
-  if (typeof window === "undefined") return;
-
-  if (!appUrl && !webUrl) return;
-
-  const fallbackUrl = webUrl ?? null;
-
-  if (!appUrl) {
-    if (fallbackUrl) {
-      window.location.href = fallbackUrl;
-    }
-    return;
-  }
-
-  let pageHidden = false;
-  const onVisibilityChange = () => {
-    if (document.visibilityState === "hidden") {
-      pageHidden = true;
-    }
-  };
-
-  document.addEventListener("visibilitychange", onVisibilityChange);
-
-  const fallbackTimer = window.setTimeout(() => {
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    if (!pageHidden && document.visibilityState === "visible" && fallbackUrl) {
-      window.location.href = fallbackUrl;
-    }
-  }, 1400);
-
-  window.addEventListener(
-    "pagehide",
-    () => {
-      pageHidden = true;
-      window.clearTimeout(fallbackTimer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    },
-    { once: true },
-  );
-
-  window.location.href = appUrl;
-}
-
 const faqs = [
   {
     q: "C’est quoi exactement AIPilot ?",
@@ -214,6 +169,37 @@ function formatWhatsappInput(value: string) {
   const keepPlus = trimmed.trim().startsWith("+");
   const digits = trimmed.replace(/[^\d]/g, "");
   return keepPlus ? `+${digits}` : digits;
+}
+
+function readCookie(name: string) {
+  if (typeof document === "undefined") {
+    return "";
+  }
+
+  return (
+    document.cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${name}=`))
+      ?.slice(name.length + 1) ?? ""
+  );
+}
+
+function buildFbcFromFbclid(fbclid: string) {
+  if (!fbclid) {
+    return "";
+  }
+
+  return `fb.1.${Math.floor(Date.now() / 1000)}.${fbclid}`;
+}
+
+function buildMetaEventId(eventName: string) {
+  const randomPart =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return `aipilot-${eventName.toLowerCase()}-${randomPart}`;
 }
 
 function useReveal(ids: string[]) {
@@ -308,6 +294,10 @@ export default function FunnelClient() {
     const utmSource = params.get("utm_source") ?? "";
     const utmCampaign = params.get("utm_campaign") ?? "";
     const utmMedium = params.get("utm_medium") ?? "";
+    const utmContent = params.get("utm_content") ?? "";
+    const utmTerm = params.get("utm_term") ?? "";
+    const testEventCode =
+      params.get("test_event_code") ?? params.get("meta_test_event_code") ?? "";
 
     if (fbclid) {
       window.localStorage.setItem("aipilot-fbclid", fbclid);
@@ -320,6 +310,15 @@ export default function FunnelClient() {
     }
     if (utmMedium) {
       window.localStorage.setItem("aipilot-utm_medium", utmMedium);
+    }
+    if (utmContent) {
+      window.localStorage.setItem("aipilot-utm_content", utmContent);
+    }
+    if (utmTerm) {
+      window.localStorage.setItem("aipilot-utm_term", utmTerm);
+    }
+    if (/^TEST\d+$/i.test(testEventCode)) {
+      window.localStorage.setItem("aipilot-test_event_code", testEventCode.toUpperCase());
     }
   }, []);
 
@@ -453,6 +452,13 @@ export default function FunnelClient() {
     const utmSource = window.localStorage.getItem("aipilot-utm_source") ?? "";
     const utmCampaign = window.localStorage.getItem("aipilot-utm_campaign") ?? "";
     const utmMedium = window.localStorage.getItem("aipilot-utm_medium") ?? "";
+    const utmContent = window.localStorage.getItem("aipilot-utm_content") ?? "";
+    const utmTerm = window.localStorage.getItem("aipilot-utm_term") ?? "";
+    const testEventCode = window.localStorage.getItem("aipilot-test_event_code") ?? "";
+    const fbp = readCookie("_fbp");
+    const fbc = readCookie("_fbc") || buildFbcFromFbclid(fbclid);
+    const eventId = buildMetaEventId("Lead");
+    const initiateCheckoutEventId = buildMetaEventId("InitiateCheckout");
 
     try {
       const response = await fetch("/api/trial", {
@@ -462,9 +468,18 @@ export default function FunnelClient() {
           nom: name,
           telephone: normalizedPhone.e164,
           fbclid,
+          fbp,
+          fbc,
           utm_source: utmSource,
           utm_campaign: utmCampaign,
           utm_medium: utmMedium,
+          utm_content: utmContent,
+          utm_term: utmTerm,
+          landing_url: window.location.href,
+          referrer: document.referrer,
+          event_id: eventId,
+          initiate_checkout_event_id: initiateCheckoutEventId,
+          test_event_code: testEventCode,
           timestamp: new Date().toISOString(),
         }),
       });
@@ -472,6 +487,12 @@ export default function FunnelClient() {
       const payload = (await response.json()) as {
         ok?: boolean;
         error?: string;
+        leadId?: string;
+        requestId?: string | null;
+        clientId?: string | null;
+        phone?: string | null;
+        eventId?: string | null;
+        initiateCheckoutEventId?: string | null;
         appRedirectUrl?: string | null;
         redirectUrl?: string | null;
       };
@@ -487,16 +508,37 @@ export default function FunnelClient() {
       if (typeof window !== "undefined" && typeof (window as Window & { fbq?: (...args: unknown[]) => void }).fbq === "function") {
         (window as Window & { fbq?: (...args: unknown[]) => void }).fbq?.("track", "Lead", {
           content_name: "AIPilot Trial",
-        });
+        }, { eventID: eventId });
+        (window as Window & { fbq?: (...args: unknown[]) => void }).fbq?.("track", "InitiateCheckout", {
+          content_name: "AIPilot Free Trial Request",
+          content_type: "product",
+          currency: "TND",
+          value: 0,
+        }, { eventID: initiateCheckoutEventId });
       }
 
       setFormState({
         status: "success",
-        message: "Essai gratuit demandé. Redirection vers WhatsApp...",
+        message: "Essai gratuit demandé. Préparation de WhatsApp...",
       });
 
       window.setTimeout(() => {
-        attemptWhatsAppRedirect(payload.appRedirectUrl, payload.redirectUrl);
+        window.sessionStorage.setItem(
+          WHATSAPP_REDIRECT_STORAGE_KEY,
+          JSON.stringify({
+            leadId: payload.leadId ?? "",
+            requestId: payload.requestId ?? "",
+            clientId: payload.clientId ?? "",
+            phone: payload.phone ?? normalizedPhone.e164,
+            eventId,
+            initiateCheckoutEventId,
+            appRedirectUrl: payload.appRedirectUrl ?? "",
+            redirectUrl: payload.redirectUrl ?? "",
+            sourceUrl: window.location.href,
+            referrer: document.referrer,
+          }),
+        );
+        window.location.href = `/merci?leadId=${encodeURIComponent(payload.leadId ?? "")}`;
       }, 900);
     } catch {
       setFormState({
@@ -579,18 +621,6 @@ export default function FunnelClient() {
 
   return (
     <>
-      <Script id="meta-pixel-base" strategy="afterInteractive">
-        {`
-          !(function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-          n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)})(window, document,'script',
-          'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '${PIXEL_ID}');
-          fbq('track', 'PageView');
-        `}
-      </Script>
-
       <div className="relative min-h-screen overflow-x-hidden bg-[#050607] pb-28 text-white sm:pb-32">
         <div className="sticky top-0 z-50 border-b border-white/10 bg-[#FF3D3D] px-2 py-2 text-center text-[11px] font-semibold text-white shadow-[0_0_24px_rgba(255,61,61,0.32)] sm:px-4 sm:text-sm">
           <span className="inline-flex max-w-full items-center justify-center gap-2 whitespace-nowrap">
@@ -1242,7 +1272,12 @@ export default function FunnelClient() {
                   ) : null}
 
                   <p className="text-sm leading-7 text-[#A9A9A9]">
-                    🔒 Tes informations sont 100% privées. Tu recevras uniquement ton lien de téléchargement sur WhatsApp.
+                    Tes informations servent à te contacter sur WhatsApp et à mesurer la
+                    performance de nos publicités. Voir la{" "}
+                    <a href="/privacy" className="font-semibold text-[#8BFFBF] underline underline-offset-4">
+                      politique de confidentialité
+                    </a>
+                    .
                   </p>
                   <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-[#D5DEE7]">
                     <span className="font-semibold text-white">Confiance:</span> un humain AIPilot te répond sur WhatsApp après ton essai, pas un bot anonyme.

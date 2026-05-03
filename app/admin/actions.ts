@@ -8,22 +8,34 @@ import {
   requireAdminAuth,
 } from "@/lib/admin-auth";
 import { saveStoredConfig } from "@/lib/config-store";
+import { sendCapiEvent } from "@/lib/capi";
 import {
   acceptAccessRequest,
+  deleteAccessRequestById,
   findAccessRequestById,
 } from "@/lib/access-request-store";
 import {
   createLicense,
+  deleteLicenseById,
+  findLicenseById,
   type LicenseEnvironment,
   type LicenseStatus,
   type LicenseTier,
+  updateLicenseDetails,
   updateLicenseStatus,
 } from "@/lib/license-store";
 import {
   activateTrialForClient,
   convertClientToPaid,
+  deletePipelineClientById,
   getPipelineClientById,
+  markClientLostById,
+  markClientLostByLicenseKey,
+  markClientPaid,
+  recordFacebookEvent,
+  upsertLeadClient,
 } from "@/lib/client-pipeline-store";
+import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 
 function readTier(value: FormDataEntryValue | null): LicenseTier {
   return value === "starter" || value === "max" ? value : "pro";
@@ -37,6 +49,10 @@ function readEnvironment(value: FormDataEntryValue | null): LicenseEnvironment {
 
 function readStatus(value: FormDataEntryValue | null): LicenseStatus {
   return value === "disabled" ? "disabled" : "active";
+}
+
+function readQuickStage(value: FormDataEntryValue | null) {
+  return value === "trial" || value === "paid" || value === "done" ? value : "lead";
 }
 
 export async function loginAdmin(formData: FormData) {
@@ -95,6 +111,76 @@ export async function createLicenseAction(formData: FormData) {
   redirect("/admin?created=1");
 }
 
+export async function createQuickSubscriptionAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const customerName = String(formData.get("customerName") ?? "").trim();
+  const normalizedWhatsapp = normalizeTunisiaWhatsappNumber(
+    String(formData.get("whatsappNumber") ?? ""),
+  );
+  const stage = readQuickStage(formData.get("stage"));
+
+  if (!customerName) {
+    throw new Error("Customer name is required");
+  }
+
+  if (!normalizedWhatsapp) {
+    throw new Error("WhatsApp number is invalid");
+  }
+
+  const client = await upsertLeadClient({
+    name: customerName,
+    phone: normalizedWhatsapp.e164,
+  });
+
+  if (stage === "lead") {
+    redirect(
+      `/admin?created=1&customer=${encodeURIComponent(customerName)}&whatsapp=${encodeURIComponent(normalizedWhatsapp.e164)}`,
+    );
+  }
+
+  if (stage === "trial") {
+    const activation = await activateTrialForClient({
+      clientId: client.id,
+      tier: "pro",
+      preferredEnvironment: "opencode",
+      isActive: true,
+      markStatus: "trial",
+    });
+
+    redirect(
+      `/admin?trialCreated=1&licenseKey=${encodeURIComponent(activation.licenseKey)}&customer=${encodeURIComponent(customerName)}&whatsapp=${encodeURIComponent(normalizedWhatsapp.e164)}`,
+    );
+  }
+
+  const conversion = await convertClientToPaid({
+    clientId: client.id,
+    tier: "pro",
+    preferredEnvironment: "opencode",
+  });
+
+  const fbResponse = await sendCapiEvent({
+    eventName: "Purchase",
+    phone: normalizedWhatsapp.e164,
+    sourceUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://aipilot.tn",
+    eventId: `aipilot-purchase-${client.id}-${Date.now()}`,
+    subscriptionId: client.id,
+    value: 60,
+    currency: "TND",
+    contentName: "AIPilot Monthly 60DT",
+  });
+
+  await recordFacebookEvent({
+    clientId: client.id,
+    eventName: "Purchase",
+    fbResponse,
+  });
+
+  redirect(
+    `/admin?paidConverted=1&licenseKey=${encodeURIComponent(conversion.licenseKey)}&customer=${encodeURIComponent(customerName)}&whatsapp=${encodeURIComponent(normalizedWhatsapp.e164)}`,
+  );
+}
+
 export async function updateLicenseStatusAction(formData: FormData) {
   await requireAdminAuth();
 
@@ -105,6 +191,50 @@ export async function updateLicenseStatusAction(formData: FormData) {
 
   await updateLicenseStatus(licenseId, readStatus(formData.get("status")));
   redirect("/admin?updated=1");
+}
+
+export async function updateLicenseDetailsAction(formData: FormData) {
+  await requireAdminAuth();
+
+  await updateLicenseDetails(String(formData.get("licenseId") ?? ""), {
+    customerName: String(formData.get("customerName") ?? ""),
+    customerEmail: String(formData.get("customerEmail") ?? "").trim() || undefined,
+    tier: readTier(formData.get("tier")),
+    preferredEnvironment: readEnvironment(formData.get("preferredEnvironment")),
+    status: readStatus(formData.get("status")),
+    notes: String(formData.get("notes") ?? "").trim() || undefined,
+  });
+
+  redirect("/admin?updated=1");
+}
+
+export async function deleteSubscriptionAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const licenseId = String(formData.get("licenseId") ?? "").trim();
+  if (!licenseId) {
+    throw new Error("Missing license id");
+  }
+
+  const license = await findLicenseById(licenseId);
+  if (license?.licenseKey) {
+    await markClientLostByLicenseKey(license.licenseKey);
+  }
+
+  await deleteLicenseById(licenseId);
+  redirect("/admin?section=subscriptions&deleted=1");
+}
+
+export async function deleteAccessRequestAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const requestId = String(formData.get("requestId") ?? "").trim();
+  if (!requestId) {
+    throw new Error("Missing access request id");
+  }
+
+  await deleteAccessRequestById(requestId);
+  redirect("/admin?section=requests&deleted=1");
 }
 
 export async function acceptAccessRequestAction(formData: FormData) {
@@ -122,25 +252,31 @@ export async function acceptAccessRequestAction(formData: FormData) {
 
   if (request.status === "accepted" && request.generatedLicenseKey) {
     redirect(
-      `/admin?requestAccepted=1&licenseKey=${encodeURIComponent(request.generatedLicenseKey)}&customer=${encodeURIComponent(request.customerName)}`,
+      `/admin?section=requests&requestAccepted=1&licenseKey=${encodeURIComponent(request.generatedLicenseKey)}&customer=${encodeURIComponent(request.customerName)}&whatsapp=${encodeURIComponent(request.whatsappNumber)}`,
     );
   }
 
-  const license = await createLicense({
-    customerName: request.customerName,
+  const normalizedWhatsapp = normalizeTunisiaWhatsappNumber(request.whatsappNumber);
+  const client = await upsertLeadClient({
+    name: request.customerName,
+    phone: normalizedWhatsapp?.waId ?? request.whatsappNumber,
+  });
+  const activation = await activateTrialForClient({
+    clientId: client.id,
     tier: readTier(formData.get("tier")),
     preferredEnvironment: request.preferredEnvironment,
-    notes: `WhatsApp: ${request.whatsappNumber}\nOS demandé: ${request.requestedOs}`,
+    isActive: true,
+    markStatus: "trial",
   });
 
   await acceptAccessRequest({
     requestId: request.id,
-    generatedLicenseKey: license.licenseKey,
-    generatedLicenseId: license.id,
+    generatedLicenseKey: activation.licenseKey,
+    generatedLicenseId: activation.licenseId,
   });
 
   redirect(
-    `/admin?requestAccepted=1&licenseKey=${encodeURIComponent(license.licenseKey)}&customer=${encodeURIComponent(request.customerName)}&whatsapp=${encodeURIComponent(request.whatsappNumber)}`,
+    `/admin?section=requests&requestAccepted=1&licenseKey=${encodeURIComponent(activation.licenseKey)}&customer=${encodeURIComponent(request.customerName)}&whatsapp=${encodeURIComponent(normalizedWhatsapp?.e164 ?? request.whatsappNumber)}`,
   );
 }
 
@@ -156,14 +292,14 @@ export async function activatePipelineTrialAction(formData: FormData) {
     clientId,
     tier: readTier(formData.get("tier")),
     preferredEnvironment: readEnvironment(formData.get("preferredEnvironment")),
-    isActive: false,
+    isActive: true,
     markStatus: "trial",
   });
   const client = await getPipelineClientById(clientId);
   const customerName = client?.name?.trim() || client?.phone || clientId;
 
   redirect(
-    `/admin?section=pipeline&trialCreated=1&licenseKey=${encodeURIComponent(activation.licenseKey)}&customer=${encodeURIComponent(customerName)}`,
+    `/admin?section=pipeline&trialCreated=1&licenseKey=${encodeURIComponent(activation.licenseKey)}&customer=${encodeURIComponent(customerName)}&whatsapp=${encodeURIComponent(client?.phone ?? "")}`,
   );
 }
 
@@ -175,15 +311,56 @@ export async function convertPipelineClientToPaidAction(formData: FormData) {
     throw new Error("Missing client id");
   }
 
-  const conversion = await convertClientToPaid({
-    clientId,
-    tier: readTier(formData.get("tier")),
-    preferredEnvironment: readEnvironment(formData.get("preferredEnvironment")),
-  });
+  await markClientPaid({ clientId });
   const client = await getPipelineClientById(clientId);
-  const customerName = client?.name?.trim() || client?.phone || clientId;
 
-  redirect(
-    `/admin?section=pipeline&paidConverted=1&licenseKey=${encodeURIComponent(conversion.licenseKey)}&customer=${encodeURIComponent(customerName)}`,
-  );
+  if (client) {
+    const fbResponse = await sendCapiEvent({
+      eventName: "Purchase",
+      phone: client.phone,
+      email: client.email,
+      fbp: client.fbp,
+      fbc: client.fbc,
+      ip: client.ip,
+      userAgent: client.userAgent,
+      sourceUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://aipilot.tn",
+      eventId: `aipilot-purchase-${clientId}-${Date.now()}`,
+      subscriptionId: clientId,
+      value: 60,
+      currency: "TND",
+      contentName: "AIPilot Monthly 60DT",
+    });
+
+    await recordFacebookEvent({
+      clientId,
+      eventName: "Purchase",
+      fbResponse,
+    });
+  }
+
+  redirect("/admin?section=pipeline&paidConverted=1");
+}
+
+export async function markPipelineClientLostAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const clientId = String(formData.get("clientId") ?? "").trim();
+  if (!clientId) {
+    throw new Error("Missing client id");
+  }
+
+  await markClientLostById(clientId);
+  redirect("/admin?section=pipeline&lost=1");
+}
+
+export async function deletePipelineClientAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const clientId = String(formData.get("clientId") ?? "").trim();
+  if (!clientId) {
+    throw new Error("Missing client id");
+  }
+
+  await deletePipelineClientById(clientId);
+  redirect("/admin?section=pipeline&deleted=1");
 }

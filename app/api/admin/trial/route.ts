@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     clientId,
     tier: payload?.tier,
     preferredEnvironment: payload?.preferredEnvironment,
-    isActive: false,
+    isActive: true,
     markStatus: "trial",
   });
 
@@ -31,6 +31,6 @@ export async function POST(request: Request) {
     success: true,
     licenseKey: activation.licenseKey,
     expiresAt: activation.expiresAt,
-    active: false,
+    active: true,
   });
 }

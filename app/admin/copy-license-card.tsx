@@ -52,19 +52,15 @@ export default function CopyLicenseCard({
             </div>
           </div>
 
-          {whatsappUrl ? (
+          {whatsapp || whatsappUrl ? (
             <a
-              href={whatsappUrl}
+              href={whatsappUrl ?? buildLooseWhatsAppUrl(whatsapp ?? "", customer, licenseKey)}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-sm font-medium text-emerald-900 transition hover:bg-emerald-100"
             >
               Ouvrir WhatsApp
             </a>
-          ) : whatsapp ? (
-            <p className="text-sm font-medium text-rose-700">
-              Numéro WhatsApp à corriger avant l’envoi.
-            </p>
           ) : null}
         </div>
 
@@ -86,4 +82,15 @@ export default function CopyLicenseCard({
       </CardContent>
     </Card>
   );
+}
+
+function buildLooseWhatsAppUrl(whatsappNumber: string, customer: string, licenseKey: string) {
+  const message = `Bonjour ${customer}, voici votre clé de licence AIPilot : ${licenseKey}`;
+  const normalized = normalizeTunisiaWhatsappNumber(whatsappNumber);
+  const digits = String(whatsappNumber ?? "").replace(/[^\d]/g, "");
+  const phone = normalized?.waId || digits || "";
+
+  return phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    : `https://wa.me/?text=${encodeURIComponent(message)}`;
 }

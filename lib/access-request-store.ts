@@ -50,6 +50,29 @@ function buildId() {
   return randomBytes(12).toString("hex");
 }
 
+function normalizePhoneKey(phone: string) {
+  return String(phone ?? "").replace(/[^\d]/g, "");
+}
+
+function normalizePhoneSuffix(phone: string) {
+  const normalized = normalizePhoneKey(phone);
+  return normalized.length >= 8 ? normalized.slice(-8) : normalized;
+}
+
+function samePhoneIdentity(left: string, right: string) {
+  const leftNormalized = normalizePhoneKey(left);
+  const rightNormalized = normalizePhoneKey(right);
+
+  if (!leftNormalized || !rightNormalized) {
+    return false;
+  }
+
+  return (
+    leftNormalized === rightNormalized ||
+    normalizePhoneSuffix(leftNormalized) === normalizePhoneSuffix(rightNormalized)
+  );
+}
+
 function mapRowToAccessRequest(row: AccessRequestRow): AccessRequestRecord {
   return {
     id: row.id,
@@ -178,6 +201,132 @@ export async function createAccessRequest(input: {
   return record;
 }
 
+export async function upsertPendingAccessRequest(input: {
+  customerName: string;
+  whatsappNumber: string;
+  preferredEnvironment: AccessRequestEnvironment;
+  requestedOs: AccessRequestOs;
+}) {
+  const customerName = String(input.customerName ?? "").trim();
+  const normalizedWhatsapp = normalizeTunisiaWhatsappNumber(
+    String(input.whatsappNumber ?? ""),
+  );
+
+  if (!customerName) {
+    throw new Error("Le nom est requis.");
+  }
+
+  if (!normalizedWhatsapp) {
+    throw new Error(
+      "Le numéro WhatsApp est invalide. Entrez un numéro tunisien valide, par exemple +216 29 293 038.",
+    );
+  }
+
+  const now = new Date().toISOString();
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalAccessRequestFile();
+    const existingIndex = local.requests.findIndex(
+      (request) =>
+        request.status === "pending" &&
+        samePhoneIdentity(request.whatsappNumber, normalizedWhatsapp.waId),
+    );
+
+    if (existingIndex >= 0) {
+      const existing = local.requests[existingIndex];
+      const updated: AccessRequestRecord = {
+        ...existing,
+        customerName,
+        whatsappNumber: normalizedWhatsapp.e164,
+        preferredEnvironment: input.preferredEnvironment,
+        requestedOs: input.requestedOs,
+        updatedAt: now,
+      };
+      local.requests.splice(existingIndex, 1);
+      local.requests.unshift(updated);
+      await writeLocalAccessRequestFile(local);
+      return updated;
+    }
+
+    const record: AccessRequestRecord = {
+      id: buildId(),
+      customerName,
+      whatsappNumber: normalizedWhatsapp.e164,
+      preferredEnvironment: input.preferredEnvironment,
+      requestedOs: input.requestedOs,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    };
+    local.requests.unshift(record);
+    await writeLocalAccessRequestFile(local);
+    return record;
+  }
+
+  await ensureAccessRequestTable();
+  const normalized = normalizePhoneKey(normalizedWhatsapp.waId);
+  const suffix = normalizePhoneSuffix(normalizedWhatsapp.waId);
+  const existingRows = await sql`
+    SELECT
+      id,
+      customer_name,
+      whatsapp_number,
+      preferred_environment,
+      requested_os,
+      status,
+      created_at,
+      updated_at,
+      accepted_at,
+      generated_license_key,
+      generated_license_id
+    FROM access_requests
+    WHERE
+      status = 'pending'
+      AND (
+        regexp_replace(whatsapp_number, '[^0-9]', '', 'g') = ${normalized}
+        OR right(regexp_replace(whatsapp_number, '[^0-9]', '', 'g'), 8) = ${suffix}
+      )
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `;
+
+  const existing = (existingRows as Array<AccessRequestRow>)[0];
+  if (existing) {
+    const rows = await sql`
+      UPDATE access_requests
+      SET
+        customer_name = ${customerName},
+        whatsapp_number = ${normalizedWhatsapp.e164},
+        preferred_environment = ${input.preferredEnvironment},
+        requested_os = ${input.requestedOs},
+        updated_at = now()
+      WHERE id = ${existing.id}
+      RETURNING
+        id,
+        customer_name,
+        whatsapp_number,
+        preferred_environment,
+        requested_os,
+        status,
+        created_at,
+        updated_at,
+        accepted_at,
+        generated_license_key,
+        generated_license_id
+    `;
+
+    return mapRowToAccessRequest((rows as Array<AccessRequestRow>)[0]);
+  }
+
+  return createAccessRequest({
+    customerName,
+    whatsappNumber: normalizedWhatsapp.e164,
+    preferredEnvironment: input.preferredEnvironment,
+    requestedOs: input.requestedOs,
+  });
+}
+
 export async function listAccessRequests() {
   const sql = getSql();
   if (!sql) {
@@ -239,6 +388,27 @@ export async function findAccessRequestById(id: string) {
 
   const row = (rows as Array<AccessRequestRow>)[0];
   return row ? mapRowToAccessRequest(row) : null;
+}
+
+export async function deleteAccessRequestById(id: string) {
+  const requestId = String(id ?? "").trim();
+  if (!requestId) {
+    throw new Error("Missing access request id");
+  }
+
+  const sql = getSql();
+  if (!sql) {
+    const local = await readLocalAccessRequestFile();
+    local.requests = local.requests.filter((request) => request.id !== requestId);
+    await writeLocalAccessRequestFile(local);
+    return;
+  }
+
+  await ensureAccessRequestTable();
+  await sql`
+    DELETE FROM access_requests
+    WHERE id = ${requestId}
+  `;
 }
 
 export async function acceptAccessRequest(input: {

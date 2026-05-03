@@ -7,6 +7,7 @@ This project is the AIPilot download portal MVP. It currently exposes:
 - a developer page at `/dev` for the full technical setup details
 - optional Neon-backed encrypted storage for installer configuration
 - a desktop manager in `manager-app/` that can install, configure, diagnose, and repair Codex, T3 Code, and OpenCode
+- a project knowledge base in `ai-docs/` for future agents and developers
 
 Important current scope: the web portal now downloads AIPilot Manager. The manager is the component that applies the environment-specific setup for Codex, T3 Code, and OpenCode.
 
@@ -38,6 +39,7 @@ Main files:
 - `app/api/manager/session` - server-side manager manifest bootstrap
 - `manager-app/` - Electron-based AIPilot Manager app
 - `setup/` - script templates served by the app
+- `ai-docs/` - project handoff docs for architecture, funnel, admin, pipeline, and production
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

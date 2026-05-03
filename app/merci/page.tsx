@@ -3,8 +3,7 @@ import {
   Manrope,
   Outfit,
 } from "next/font/google";
-import FunnelClient from "./funnel-client";
-import MetaPixelBootstrap from "./meta-pixel-bootstrap";
+import MerciClient from "./merci-client";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -24,15 +23,12 @@ const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
 });
 
-export default function FunnelPage() {
+export default function MerciPage() {
   return (
-    <>
-      <MetaPixelBootstrap />
-      <main
-        className={`${outfit.variable} ${manrope.variable} ${plexMono.variable} bg-[#0A0A0A] text-white`}
-      >
-        <FunnelClient />
-      </main>
-    </>
+    <main
+      className={`${outfit.variable} ${manrope.variable} ${plexMono.variable} min-h-screen bg-[#050607] text-white`}
+    >
+      <MerciClient />
+    </main>
   );
 }

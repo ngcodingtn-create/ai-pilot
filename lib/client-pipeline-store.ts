@@ -5,13 +5,14 @@ import { getSql } from "./db";
 import { normalizeTunisiaWhatsappNumber } from "./whatsapp";
 import {
   createLicense,
+  deleteLicenseById,
   disableLicenseByKey,
   findLicenseByKey,
   type LicenseEnvironment,
   type LicenseTier,
 } from "./license-store";
 
-export type ClientStatus = "lead" | "trial" | "paid" | "expired" | "cancelled";
+export type ClientStatus = "lead" | "trial" | "paid" | "expired" | "cancelled" | "lost";
 export type ClientLicenseType = "trial" | "paid";
 export type FacebookEventName = "Lead" | "StartTrial" | "Purchase" | "InitiateCheckout";
 
@@ -25,6 +26,14 @@ export type PipelineClientRecord = {
   ip?: string;
   userAgent?: string;
   adSource?: string;
+  fbclid?: string;
+  utmSource?: string;
+  utmCampaign?: string;
+  utmMedium?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  landingUrl?: string;
+  referrer?: string;
   status: ClientStatus;
   leadAt: string;
   trialAt?: string;
@@ -76,6 +85,14 @@ type ClientRow = {
   ip: string | null;
   user_agent: string | null;
   ad_source: string | null;
+  fbclid: string | null;
+  utm_source: string | null;
+  utm_campaign: string | null;
+  utm_medium: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  landing_url: string | null;
+  referrer: string | null;
   status: ClientStatus;
   lead_at: string | Date;
   trial_at: string | Date | null;
@@ -122,6 +139,14 @@ type UpsertLeadInput = {
   ip?: string;
   userAgent?: string;
   adSource?: string;
+  fbclid?: string;
+  utmSource?: string;
+  utmCampaign?: string;
+  utmMedium?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  landingUrl?: string;
+  referrer?: string;
 };
 
 const LOCAL_PIPELINE_RELATIVE_PATH = ".opencode/client-pipeline.json";
@@ -170,6 +195,14 @@ function mapClientRow(row: ClientRow): PipelineClientRecord {
     ip: row.ip ?? undefined,
     userAgent: row.user_agent ?? undefined,
     adSource: row.ad_source ?? undefined,
+    fbclid: row.fbclid ?? undefined,
+    utmSource: row.utm_source ?? undefined,
+    utmCampaign: row.utm_campaign ?? undefined,
+    utmMedium: row.utm_medium ?? undefined,
+    utmContent: row.utm_content ?? undefined,
+    utmTerm: row.utm_term ?? undefined,
+    landingUrl: row.landing_url ?? undefined,
+    referrer: row.referrer ?? undefined,
     status: row.status,
     leadAt: new Date(row.lead_at).toISOString(),
     trialAt: toIso(row.trial_at),
@@ -235,6 +268,14 @@ async function findMatchingSqlClientByPhone(phone: string) {
       ip,
       user_agent,
       ad_source,
+      fbclid,
+      utm_source,
+      utm_campaign,
+      utm_medium,
+      utm_content,
+      utm_term,
+      landing_url,
+      referrer,
       status,
       lead_at,
       trial_at,
@@ -314,7 +355,7 @@ async function syncLegacyTrialLeadsIntoPipeline() {
         ${createdAt},
         ${createdAt}
       )
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (phone) DO NOTHING
     `;
   }
 }
@@ -342,6 +383,14 @@ export async function ensurePipelineTables() {
       ip text,
       user_agent text,
       ad_source text,
+      fbclid text,
+      utm_source text,
+      utm_campaign text,
+      utm_medium text,
+      utm_content text,
+      utm_term text,
+      landing_url text,
+      referrer text,
       status text NOT NULL DEFAULT 'lead',
       lead_at timestamptz NOT NULL DEFAULT now(),
       trial_at timestamptz,
@@ -354,6 +403,15 @@ export async function ensurePipelineTables() {
       updated_at timestamptz NOT NULL DEFAULT now()
     )
   `;
+
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS fbclid text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS utm_source text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS utm_campaign text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS utm_medium text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS utm_content text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS utm_term text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS landing_url text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS referrer text`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS fb_events (
@@ -400,6 +458,14 @@ export async function listPipelineClients() {
       ip,
       user_agent,
       ad_source,
+      fbclid,
+      utm_source,
+      utm_campaign,
+      utm_medium,
+      utm_content,
+      utm_term,
+      landing_url,
+      referrer,
       status,
       lead_at,
       trial_at,
@@ -437,6 +503,14 @@ export async function getPipelineClientById(id: string) {
       ip,
       user_agent,
       ad_source,
+      fbclid,
+      utm_source,
+      utm_campaign,
+      utm_medium,
+      utm_content,
+      utm_term,
+      landing_url,
+      referrer,
       status,
       lead_at,
       trial_at,
@@ -469,6 +543,14 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
   const ip = String(input.ip ?? "").trim() || undefined;
   const userAgent = String(input.userAgent ?? "").trim() || undefined;
   const adSource = String(input.adSource ?? "").trim() || undefined;
+  const fbclid = String(input.fbclid ?? "").trim() || undefined;
+  const utmSource = String(input.utmSource ?? "").trim() || undefined;
+  const utmCampaign = String(input.utmCampaign ?? "").trim() || undefined;
+  const utmMedium = String(input.utmMedium ?? "").trim() || undefined;
+  const utmContent = String(input.utmContent ?? "").trim() || undefined;
+  const utmTerm = String(input.utmTerm ?? "").trim() || undefined;
+  const landingUrl = String(input.landingUrl ?? "").trim() || undefined;
+  const referrer = String(input.referrer ?? "").trim() || undefined;
   const now = new Date().toISOString();
 
   const sql = getSql();
@@ -489,6 +571,14 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
         ip: ip ?? existing.ip,
         userAgent: userAgent ?? existing.userAgent,
         adSource: adSource ?? existing.adSource,
+        fbclid: fbclid ?? existing.fbclid,
+        utmSource: utmSource ?? existing.utmSource,
+        utmCampaign: utmCampaign ?? existing.utmCampaign,
+        utmMedium: utmMedium ?? existing.utmMedium,
+        utmContent: utmContent ?? existing.utmContent,
+        utmTerm: utmTerm ?? existing.utmTerm,
+        landingUrl: landingUrl ?? existing.landingUrl,
+        referrer: referrer ?? existing.referrer,
         updatedAt: now,
       };
       local.clients[existingIndex] = next;
@@ -506,6 +596,14 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
       ip,
       userAgent,
       adSource,
+      fbclid,
+      utmSource,
+      utmCampaign,
+      utmMedium,
+      utmContent,
+      utmTerm,
+      landingUrl,
+      referrer,
       status: "lead",
       leadAt: now,
       createdAt: now,
@@ -534,6 +632,14 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
         ip,
         user_agent,
         ad_source,
+        fbclid,
+        utm_source,
+        utm_campaign,
+        utm_medium,
+        utm_content,
+        utm_term,
+        landing_url,
+        referrer,
         status,
         lead_at,
         created_at,
@@ -549,6 +655,14 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
         ${ip ?? null},
         ${userAgent ?? null},
         ${adSource ?? null},
+        ${fbclid ?? null},
+        ${utmSource ?? null},
+        ${utmCampaign ?? null},
+        ${utmMedium ?? null},
+        ${utmContent ?? null},
+        ${utmTerm ?? null},
+        ${landingUrl ?? null},
+        ${referrer ?? null},
         ${"lead"},
         ${now},
         ${now},
@@ -564,6 +678,14 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
         ip,
         user_agent,
         ad_source,
+        fbclid,
+        utm_source,
+        utm_campaign,
+        utm_medium,
+        utm_content,
+        utm_term,
+        landing_url,
+        referrer,
         status,
         lead_at,
         trial_at,
@@ -589,6 +711,14 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
       ip = COALESCE(${ip ?? null}, ip),
       user_agent = COALESCE(${userAgent ?? null}, user_agent),
       ad_source = COALESCE(${adSource ?? null}, ad_source),
+      fbclid = COALESCE(${fbclid ?? null}, fbclid),
+      utm_source = COALESCE(${utmSource ?? null}, utm_source),
+      utm_campaign = COALESCE(${utmCampaign ?? null}, utm_campaign),
+      utm_medium = COALESCE(${utmMedium ?? null}, utm_medium),
+      utm_content = COALESCE(${utmContent ?? null}, utm_content),
+      utm_term = COALESCE(${utmTerm ?? null}, utm_term),
+      landing_url = COALESCE(${landingUrl ?? null}, landing_url),
+      referrer = COALESCE(${referrer ?? null}, referrer),
       updated_at = now()
     WHERE id = ${existing.id}
     RETURNING
@@ -601,6 +731,14 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
       ip,
       user_agent,
       ad_source,
+      fbclid,
+      utm_source,
+      utm_campaign,
+      utm_medium,
+      utm_content,
+      utm_term,
+      landing_url,
+      referrer,
       status,
       lead_at,
       trial_at,
@@ -644,6 +782,44 @@ export async function recordFacebookEvent(input: {
     VALUES (${record.id}, ${record.clientId}, ${record.eventName}, ${JSON.stringify(record.fbResponse ?? null)}, ${record.sentAt})
   `;
   return record;
+}
+
+export async function listRecentFacebookEvents(limit = 25) {
+  const sql = getSql();
+  if (!sql) {
+    const local = await readLocalPipelineFile();
+    return local.fbEvents
+      .slice()
+      .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
+      .slice(0, limit);
+  }
+
+  await ensurePipelineTables();
+  const rows = await sql`
+    SELECT
+      id,
+      client_id,
+      event_name,
+      fb_response,
+      sent_at
+    FROM fb_events
+    ORDER BY sent_at DESC
+    LIMIT ${limit}
+  `;
+
+  return (rows as Array<{
+    id: string;
+    client_id: string;
+    event_name: FacebookEventName;
+    fb_response: unknown;
+    sent_at: string | Date;
+  }>).map((row) => ({
+    id: row.id,
+    clientId: row.client_id,
+    eventName: row.event_name,
+    fbResponse: row.fb_response,
+    sentAt: new Date(row.sent_at).toISOString(),
+  }));
 }
 
 async function deactivateClientLicenses(clientId: string, currentLicenseKey?: string) {
@@ -755,6 +931,7 @@ export async function activateTrialForClient(input: ActivateTrialOptions) {
 
       return {
         clientId: client.id,
+        licenseId: existingInstallLicense.id,
         licenseKey: existingPendingTrial.key,
         expiresAt: undefined,
         preferredEnvironment: input.preferredEnvironment ?? "codex",
@@ -855,6 +1032,7 @@ export async function activateTrialForClient(input: ActivateTrialOptions) {
 
   return {
     clientId: client.id,
+    licenseId: installLicense.id,
     licenseKey: installLicense.licenseKey,
     expiresAt,
     preferredEnvironment,
@@ -884,6 +1062,182 @@ export async function ensurePendingTrialForClient(input: {
     isActive: false,
     markStatus: "lead",
   });
+}
+
+export async function markClientPaid(input: { clientId: string }) {
+  const client = await getPipelineClientById(input.clientId);
+  if (!client) {
+    throw new Error("Client introuvable");
+  }
+
+  const now = new Date().toISOString();
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalPipelineFile();
+    local.licenses = local.licenses.map((license) =>
+      license.clientId === client.id && license.key === client.licenseKey
+        ? { ...license, type: "paid", isActive: true, expiresAt: undefined, revokedAt: undefined }
+        : license,
+    );
+    local.clients = local.clients.map((record) =>
+      record.id === client.id
+        ? {
+            ...record,
+            status: "paid",
+            paidAt: now,
+            licenseType: record.licenseKey ? "paid" : record.licenseType,
+            licenseExpiresAt: undefined,
+            updatedAt: now,
+          }
+        : record,
+    );
+    await writeLocalPipelineFile(local);
+    return { clientId: client.id, licenseKey: client.licenseKey };
+  }
+
+  await ensurePipelineTables();
+  if (client.licenseKey) {
+    await sql`
+      UPDATE licenses
+      SET type = ${"paid"}, is_active = true, expires_at = ${null}, revoked_at = ${null}
+      WHERE client_id = ${client.id} AND key = ${client.licenseKey}
+    `;
+  }
+
+  await sql`
+    UPDATE clients
+    SET
+      status = ${"paid"},
+      paid_at = ${now},
+      license_type = CASE WHEN license_key IS NULL THEN license_type ELSE ${"paid"} END,
+      license_expires_at = ${null},
+      updated_at = now()
+    WHERE id = ${client.id}
+  `;
+
+  return { clientId: client.id, licenseKey: client.licenseKey };
+}
+
+export async function markClientLostById(clientId: string) {
+  const client = await getPipelineClientById(clientId);
+  if (!client) {
+    throw new Error("Client introuvable");
+  }
+
+  await deactivateClientLicenses(client.id, client.licenseKey);
+
+  const now = new Date().toISOString();
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalPipelineFile();
+    local.licenses = local.licenses.map((license) =>
+      license.clientId === client.id
+        ? { ...license, isActive: false, revokedAt: now }
+        : license,
+    );
+    local.clients = local.clients.map((record) =>
+      record.id === client.id
+        ? {
+            ...record,
+            status: "lost",
+            trialAt: undefined,
+            trialEndsAt: undefined,
+            paidAt: undefined,
+            licenseKey: undefined,
+            licenseType: undefined,
+            licenseExpiresAt: undefined,
+            updatedAt: now,
+          }
+        : record,
+    );
+    await writeLocalPipelineFile(local);
+    return;
+  }
+
+  await ensurePipelineTables();
+  await sql`
+    UPDATE licenses
+    SET is_active = false, revoked_at = now()
+    WHERE client_id = ${client.id}
+  `;
+  await sql`
+    UPDATE clients
+    SET
+      status = ${"lost"},
+      trial_at = ${null},
+      trial_ends_at = ${null},
+      paid_at = ${null},
+      license_key = ${null},
+      license_type = ${null},
+      license_expires_at = ${null},
+      updated_at = now()
+    WHERE id = ${client.id}
+  `;
+}
+
+export async function markClientLostByLicenseKey(licenseKey: string) {
+  const normalized = String(licenseKey ?? "").trim();
+  if (!normalized) {
+    return false;
+  }
+
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalPipelineFile();
+    const client = local.clients.find((record) => record.licenseKey === normalized);
+    if (!client) {
+      return false;
+    }
+    await markClientLostById(client.id);
+    return true;
+  }
+
+  await ensurePipelineTables();
+  const rows = await sql`
+    SELECT id
+    FROM clients
+    WHERE license_key = ${normalized}
+    LIMIT 1
+  `;
+  const row = (rows as Array<{ id: string }>)[0];
+  if (!row) {
+    return false;
+  }
+  await markClientLostById(row.id);
+  return true;
+}
+
+export async function deletePipelineClientById(clientId: string) {
+  const client = await getPipelineClientById(clientId);
+  if (!client) {
+    return;
+  }
+
+  const linkedLicense = client.licenseKey ? await findLicenseByKey(client.licenseKey) : null;
+  if (linkedLicense) {
+    await deleteLicenseById(linkedLicense.id);
+  } else if (client.licenseKey) {
+    await disableLicenseByKey(client.licenseKey);
+  }
+
+  const sql = getSql();
+  if (!sql) {
+    const local = await readLocalPipelineFile();
+    local.clients = local.clients.filter((record) => record.id !== client.id);
+    local.licenses = local.licenses.filter((license) => license.clientId !== client.id);
+    local.fbEvents = local.fbEvents.filter((event) => event.clientId !== client.id);
+    await writeLocalPipelineFile(local);
+    return;
+  }
+
+  await ensurePipelineTables();
+  await sql`
+    DELETE FROM clients
+    WHERE id = ${client.id}
+  `;
 }
 
 export async function convertClientToPaid(input: {

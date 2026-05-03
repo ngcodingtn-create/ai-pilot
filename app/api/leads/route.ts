@@ -17,6 +17,14 @@ export async function POST(request: Request) {
         fbc?: string;
         adSource?: string;
         sourceUrl?: string;
+        eventId?: string;
+        fbclid?: string;
+        utmSource?: string;
+        utmCampaign?: string;
+        utmMedium?: string;
+        utmContent?: string;
+        utmTerm?: string;
+        referrer?: string;
       }
     | null;
 
@@ -37,6 +45,14 @@ export async function POST(request: Request) {
     ip: readClientIp(request),
     userAgent: request.headers.get("user-agent") ?? undefined,
     adSource: String(payload?.adSource ?? "").trim() || undefined,
+    fbclid: String(payload?.fbclid ?? "").trim() || undefined,
+    utmSource: String(payload?.utmSource ?? "").trim() || undefined,
+    utmCampaign: String(payload?.utmCampaign ?? "").trim() || undefined,
+    utmMedium: String(payload?.utmMedium ?? "").trim() || undefined,
+    utmContent: String(payload?.utmContent ?? "").trim() || undefined,
+    utmTerm: String(payload?.utmTerm ?? "").trim() || undefined,
+    landingUrl: String(payload?.sourceUrl ?? "").trim() || undefined,
+    referrer: String(payload?.referrer ?? "").trim() || undefined,
   });
 
   const fbResponse = await sendCapiEvent({
@@ -47,6 +63,8 @@ export async function POST(request: Request) {
     fbc: client.fbc,
     ip: client.ip,
     userAgent: client.userAgent,
+    eventId: String(payload?.eventId ?? "").trim() || undefined,
+    subscriptionId: client.id,
     sourceUrl:
       String(payload?.sourceUrl ?? "").trim() ||
       request.headers.get("origin") ||
