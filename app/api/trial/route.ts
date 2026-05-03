@@ -20,8 +20,9 @@ export async function POST(request: Request) {
     | null;
 
   try {
+    const normalizedName = String(payload?.nom ?? "").trim();
     const lead = await createTrialLead({
-      name: String(payload?.nom ?? ""),
+      name: normalizedName,
       whatsappNumber: String(payload?.telephone ?? ""),
       fbclid: String(payload?.fbclid ?? "").trim() || undefined,
       utmSource: String(payload?.utm_source ?? "").trim() || undefined,
@@ -34,16 +35,18 @@ export async function POST(request: Request) {
       config.supportWhatsappNumber ?? "",
     );
 
+    const whatsappMessage = `Aahla, je suis ${normalizedName} et je suis intéressé par l'offre Codex 100 dollar. Code: TRIAL-${lead.id}`;
+
     const redirectUrl = supportWhatsapp
       ? buildWhatsAppUrl(
           supportWhatsapp.e164,
-          `Salam AIPilot! Code: TRIAL-${lead.id}`,
+          whatsappMessage,
         )
       : null;
     const appRedirectUrl = supportWhatsapp
       ? buildWhatsAppAppUrl(
           supportWhatsapp.e164,
-          `Salam AIPilot! Code: TRIAL-${lead.id}`,
+          whatsappMessage,
         )
       : null;
 
