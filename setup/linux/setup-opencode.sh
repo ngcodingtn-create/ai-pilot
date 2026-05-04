@@ -29,6 +29,40 @@ OPENCODE_DIR="$PROJECT_ROOT/.opencode"
 
 step "Project root: $PROJECT_ROOT"
 
+sync_skill_repo() {
+  local url="$1"
+  local target="$2"
+  local tarball_url="$3"
+  local temp_dir
+  temp_dir="$(mktemp -d)"
+
+  if command -v git >/dev/null 2>&1; then
+    if [[ ! -d "$target/.git" ]]; then
+      rm -rf "$target"
+      git clone "$url" "$target"
+    else
+      git -C "$target" pull --ff-only
+    fi
+    rm -rf "$temp_dir"
+    return
+  fi
+
+  echo "Git non détecté; téléchargement direct des skills."
+  rm -rf "$target"
+  mkdir -p "$target"
+  curl -fsSL "$tarball_url" -o "$temp_dir/skills.tar.gz"
+  tar -xzf "$temp_dir/skills.tar.gz" -C "$temp_dir"
+  local extracted
+  extracted="$(find "$temp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  if [[ -z "$extracted" ]]; then
+    rm -rf "$temp_dir"
+    echo "Impossible d'extraire les skills depuis $tarball_url" >&2
+    exit 1
+  fi
+  cp -R "$extracted"/. "$target"/
+  rm -rf "$temp_dir"
+}
+
 step "Ensure opencode is installed"
 if ! command -v opencode >/dev/null 2>&1; then
   npm install -g opencode-ai
@@ -56,20 +90,11 @@ grep -q "AZURE_RESOURCE_NAME=$AZURE_RESOURCE_NAME" "$SHELL_RC" || echo "export A
 grep -q "AZURE_OPENAI_API_KEY=$AZURE_OPENAI_API_KEY" "$SHELL_RC" || echo "export AZURE_OPENAI_API_KEY=$AZURE_OPENAI_API_KEY" >> "$SHELL_RC"
 grep -q "AZURE_OPENAI_DEPLOYMENT=$AZURE_OPENAI_DEPLOYMENT" "$SHELL_RC" || echo "export AZURE_OPENAI_DEPLOYMENT=$AZURE_OPENAI_DEPLOYMENT" >> "$SHELL_RC"
 
-step "Clone or update skill repositories"
+step "Install or update skill repositories"
 mkdir -p "$EXTERNAL_SKILLS_DIR"
 
-if [[ ! -d "$ANTHROPIC_REPO/.git" ]]; then
-  git clone "https://github.com/anthropics/skills.git" "$ANTHROPIC_REPO"
-else
-  git -C "$ANTHROPIC_REPO" pull --ff-only
-fi
-
-if [[ ! -d "$CLAUDE_SKILLS_REPO/.git" ]]; then
-  git clone "https://github.com/alirezarezvani/claude-skills.git" "$CLAUDE_SKILLS_REPO"
-else
-  git -C "$CLAUDE_SKILLS_REPO" pull --ff-only
-fi
+sync_skill_repo "https://github.com/anthropics/skills.git" "$ANTHROPIC_REPO" "https://codeload.github.com/anthropics/skills/tar.gz/refs/heads/main"
+sync_skill_repo "https://github.com/alirezarezvani/claude-skills.git" "$CLAUDE_SKILLS_REPO" "https://codeload.github.com/alirezarezvani/claude-skills/tar.gz/refs/heads/main"
 
 step "Write OpenCode project config"
 mkdir -p "$OPENCODE_DIR"

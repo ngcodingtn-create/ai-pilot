@@ -261,7 +261,7 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
       recommendedSteps: [
         "1. Récupérez votre licence AIPilot et installez AIPilot Manager.",
         "2. Connectez la licence pour que le backend fournisse la clé APIM individuelle.",
-        "3. Installez Node.js, npm, Git et les outils choisis.",
+        "3. Installez Node.js, npm et les outils choisis. Git n’est pas obligatoire.",
         "4. Laissez le manager écrire les variables et fichiers, ou recopiez les blocs APIM ci-dessous.",
         "5. Lancez l’outil, vérifiez le modèle actif et corrigez si nécessaire.",
       ],

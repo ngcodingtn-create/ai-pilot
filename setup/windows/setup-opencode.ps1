@@ -13,6 +13,41 @@ function Step($text) {
   Write-Host "`n==> $text" -ForegroundColor Cyan
 }
 
+function SyncSkillRepo($Url, $Target, $ZipUrl) {
+  if (Get-Command git -ErrorAction SilentlyContinue) {
+    if (-not (Test-Path (Join-Path $Target ".git"))) {
+      if (Test-Path $Target) {
+        Remove-Item -LiteralPath $Target -Recurse -Force
+      }
+      git clone $Url $Target
+    } else {
+      git -C $Target pull --ff-only
+    }
+    return
+  }
+
+  Write-Host "Git non détecté; téléchargement direct des skills."
+  $TempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("aipilot-skills-" + [Guid]::NewGuid().ToString("N"))
+  $ZipPath = Join-Path $TempRoot "skills.zip"
+  $ExtractPath = Join-Path $TempRoot "extract"
+
+  New-Item -ItemType Directory -Force -Path $TempRoot, $ExtractPath | Out-Null
+  Invoke-WebRequest -UseBasicParsing -Uri $ZipUrl -OutFile $ZipPath
+  Expand-Archive -LiteralPath $ZipPath -DestinationPath $ExtractPath -Force
+
+  $Source = Get-ChildItem -LiteralPath $ExtractPath -Directory | Select-Object -First 1
+  if (-not $Source) {
+    throw "Impossible d'extraire les skills depuis $ZipUrl"
+  }
+
+  if (Test-Path $Target) {
+    Remove-Item -LiteralPath $Target -Recurse -Force
+  }
+  New-Item -ItemType Directory -Force -Path $Target | Out-Null
+  Copy-Item -LiteralPath (Join-Path $Source.FullName "*") -Destination $Target -Recurse -Force
+  Remove-Item -LiteralPath $TempRoot -Recurse -Force
+}
+
 function SelectProjectFolder() {
   Add-Type -AssemblyName System.Windows.Forms
 
@@ -71,20 +106,11 @@ setx AZURE_RESOURCE_NAME $AzureResourceName | Out-Null
 setx AZURE_OPENAI_API_KEY $AzureApiKey | Out-Null
 setx AZURE_OPENAI_DEPLOYMENT $AzureDeployment | Out-Null
 
-Step "Clone or update skill repositories"
+Step "Install or update skill repositories"
 New-Item -ItemType Directory -Force -Path $ExternalSkillsDir | Out-Null
 
-if (-not (Test-Path $AnthropicRepo)) {
-  git clone "https://github.com/anthropics/skills.git" $AnthropicRepo
-} else {
-  git -C $AnthropicRepo pull --ff-only
-}
-
-if (-not (Test-Path $ClaudeSkillsRepo)) {
-  git clone "https://github.com/alirezarezvani/claude-skills.git" $ClaudeSkillsRepo
-} else {
-  git -C $ClaudeSkillsRepo pull --ff-only
-}
+SyncSkillRepo "https://github.com/anthropics/skills.git" $AnthropicRepo "https://codeload.github.com/anthropics/skills/zip/refs/heads/main"
+SyncSkillRepo "https://github.com/alirezarezvani/claude-skills.git" $ClaudeSkillsRepo "https://codeload.github.com/alirezarezvani/claude-skills/zip/refs/heads/main"
 
 Step "Write OpenCode project config"
 New-Item -ItemType Directory -Force -Path $OpenCodeDir | Out-Null

@@ -132,7 +132,6 @@ const toolHelperLabels = {
 const prepDefinitions = [
   { key: "node", label: "Node.js", description: "Runtime nécessaire pour les outils et le manager." },
   { key: "npm", label: "npm", description: "Gestionnaire de paquets utilisé par les CLI." },
-  { key: "git", label: "Git", description: "Requis pour les workflows de développement." },
   { key: "cli", label: "CLI", description: "CLI associée à l’outil sélectionné et à Codex si requis." },
   { key: "desktop", label: "Outil sélectionné", description: "Application ou intégration principale choisie." },
   { key: "env", label: "Variables d’environnement Azure", description: "Variables Azure appliquées sur la machine." },
@@ -518,19 +517,6 @@ function buildPrepRows() {
         status: check?.ok ? "À jour" : "À vérifier",
         tone: check?.ok ? "success" : state.manifest ? "warning" : "neutral",
         detail: check?.details || "Gestionnaire de paquets prêt.",
-        icon: "package",
-      };
-    }
-
-    if (item.key === "git") {
-      const check = checkByMatch(["git"]);
-      return {
-        label: item.label,
-        description: item.description,
-        version: check?.version || extractVersion(check?.details) || "Disponible",
-        status: check?.ok ? "À jour" : "À vérifier",
-        tone: check?.ok ? "success" : state.manifest ? "warning" : "neutral",
-        detail: check?.details || "Git requis pour les workflows de développement.",
         icon: "package",
       };
     }
