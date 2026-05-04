@@ -166,12 +166,36 @@ function normalizeBackendUrl(value) {
   return trimmed.replace(/\/+$/, "");
 }
 
+function isLocalBackendUrl(value) {
+  const normalized = normalizeBackendUrl(value);
+  if (!normalized) {
+    return false;
+  }
+
+  try {
+    const { hostname } = new URL(normalized);
+    const host = hostname.toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+
+function productionSafeBackendUrl(value) {
+  const normalized = normalizeBackendUrl(value);
+  if (app.isPackaged && isLocalBackendUrl(normalized)) {
+    return "";
+  }
+
+  return normalized;
+}
+
 async function getEffectiveDefaults() {
   const saved = await loadPersistedState();
   const explicitBackendUrl =
-    normalizeBackendUrl(readCliArg("--backend-url")) ||
-    normalizeBackendUrl(process.env.AIPILOT_MANAGER_BACKEND_URL);
-  const savedBackendUrl = normalizeBackendUrl(saved.backendUrl);
+    productionSafeBackendUrl(readCliArg("--backend-url")) ||
+    productionSafeBackendUrl(process.env.AIPILOT_MANAGER_BACKEND_URL);
+  const savedBackendUrl = productionSafeBackendUrl(saved.backendUrl);
   const backendUrl =
     explicitBackendUrl ||
     (app.isPackaged ? savedBackendUrl : savedBackendUrl.startsWith(LOCAL_BACKEND_URL) ? savedBackendUrl : "") ||
@@ -351,7 +375,7 @@ function initAutoUpdaterEvents() {
 }
 
 async function configureAutoUpdates(backendUrl) {
-  const normalizedBackendUrl = normalizeBackendUrl(backendUrl) || PRODUCTION_BACKEND_URL;
+  const normalizedBackendUrl = productionSafeBackendUrl(backendUrl) || PRODUCTION_BACKEND_URL;
 
   if (!app.isPackaged) {
     setUpdateState({
@@ -2331,7 +2355,7 @@ ipcMain.handle("manager:pick-project-directory", async () => {
 
 ipcMain.handle("manager:create-session", async (_event, payload) => {
   const defaults = await getEffectiveDefaults();
-  const backendUrl = normalizeBackendUrl(payload?.backendUrl) || defaults.backendUrl;
+  const backendUrl = productionSafeBackendUrl(payload?.backendUrl) || defaults.backendUrl;
   let response;
 
   try {

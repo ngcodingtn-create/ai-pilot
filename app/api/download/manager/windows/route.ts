@@ -1,7 +1,7 @@
 import { resolveSiteUrlFromRequest } from "@/lib/site-url";
 import {
   downloadTextFile,
-  findManagerReleaseAsset,
+  findManagerReleaseAssetForVersion,
   getManagerAppVersion,
 } from "../../lib";
 
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   const managerVersion = (await getManagerAppVersion()) || "0.2.2";
   const environment = readEnvironment(searchParams.get("environment"));
   const licenseKey = readLicenseKey(searchParams.get("licenseKey"));
-  const releaseAsset = await findManagerReleaseAsset((asset) =>
+  const releaseAsset = await findManagerReleaseAssetForVersion(managerVersion, (asset) =>
     /^AIPilot[. -]Manager-Setup-.*-x64\.exe$/i.test(asset.name),
   );
   const fallbackInstallerUrls = [
