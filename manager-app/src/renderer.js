@@ -12,15 +12,19 @@ const state = {
   desktopStatus: null,
   activity: [],
   currentAction: "",
+  licenseError: "",
+  lastLicenseAttempt: "",
 };
 
 const UI_STORAGE_KEY = "aipilot-manager-ui";
 const LAST_AUTO_CONFIG_VERSION_KEY = "aipilot-manager-last-auto-config-version";
+const PRODUCTION_BACKEND_URL = "https://ai-pilot-ten.vercel.app";
 
 const elements = {
   appShell: document.querySelector(".app-shell"),
   versionChip: document.querySelector("#version-chip"),
   globalStatusTitle: document.querySelector("#global-status-title"),
+  licenseCenterDot: document.querySelector(".license-center-dot"),
   sidebarToggle: document.querySelector("#sidebar-toggle"),
   helpButton: document.querySelector("#help-button"),
   notificationButton: document.querySelector("#notification-button"),
@@ -135,15 +139,6 @@ const prepDefinitions = [
   { key: "files", label: "Fichiers de configuration", description: "config.toml, auth.json ou config OpenCode écrits." },
 ];
 
-const diagnosticsDefinitions = [
-  { key: "azure", label: "Connexion Azure", description: "Authentification et accès à Azure." },
-  { key: "files", label: "Fichiers de configuration", description: "Présence des fichiers requis pour l’outil choisi." },
-  { key: "permissions", label: "Permissions", description: "Accès aux dossiers et fichiers nécessaires." },
-  { key: "tool", label: "Outil sélectionné", description: "Présence et disponibilité de l’outil ciblé." },
-  { key: "model", label: "Modèle Azure", description: "Déploiement Azure actif et cohérent." },
-  { key: "integrity", label: "Intégrité du système", description: "Vérification générale de l’environnement." },
-];
-
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -192,6 +187,39 @@ function normalizeLicenseKey(value) {
     .slice(0, 16);
   const groups = clean.match(/.{1,4}/g);
   return groups ? groups.join("-") : "";
+}
+
+function looksLikeNonLicenseInput(value) {
+  const text = String(value ?? "").trim().toLowerCase();
+  return Boolean(
+    text &&
+      (text.includes("http://") ||
+        text.includes("https://") ||
+        text.includes("www.") ||
+        text.includes(".com") ||
+        text.includes(".tn") ||
+        text.includes("youtube") ||
+        text.includes("/") ||
+        text.includes("?")),
+  );
+}
+
+function getLicenseInputError(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "Saisissez d’abord votre clé de licence.";
+  }
+
+  if (looksLikeNonLicenseInput(raw)) {
+    return "Ce champ attend une clé de licence AIPilot, pas un lien ou du texte.";
+  }
+
+  const normalized = normalizeLicenseKey(raw);
+  if (normalized.replace(/-/g, "").length !== 16) {
+    return "La clé doit contenir 16 caractères, au format XXXX-XXXX-XXXX-XXXX.";
+  }
+
+  return "";
 }
 
 function tierLabel(value) {
@@ -271,8 +299,9 @@ function getAvailableDeployments() {
 
   if (!deployments.length) {
     return [
-      { id: "gpt-5.4", label: "GPT-5.4", deployment: "gpt-5.4-1", recommended: true },
-      { id: "gpt-5.5", label: "GPT-5.5", deployment: "gpt-5.5-1", recommended: false },
+      { id: "gpt-5.4", label: "GPT-5.4 stable", deployment: "gpt-5.4-1", recommended: true },
+      { id: "gpt-5.5", label: "GPT-5.5 premium", deployment: "gpt-5.5-1", recommended: false },
+      { id: "gpt-5.3-codex", label: "GPT-5.3 Codex", deployment: "gpt-5.3-codex", recommended: false },
     ];
   }
 
@@ -449,13 +478,6 @@ async function persistState() {
   });
 }
 
-function statusTone(status) {
-  if (status === "Prêt" || status === "OK" || status === "À jour") return "success";
-  if (status === "Attention" || status === "Optionnel") return "warning";
-  if (status === "Erreur" || status === "Manquant") return "error";
-  return "neutral";
-}
-
 function checkByMatch(patterns) {
   const checks = Array.isArray(state.lastDiagnostics?.checks) ? state.lastDiagnostics.checks : [];
   const loweredPatterns = patterns.map((item) => String(item).toLowerCase());
@@ -582,7 +604,6 @@ function buildDiagnosticRows() {
   const azureCheck = checkByMatch(["azure", "deployment", "responses"]);
   const fileCheck = checkByMatch(["config.toml", "auth.json", "fichier", "configuration"]);
   const permissionCheck = checkByMatch(["permission", "trusted", "sandbox"]);
-  const toolCheck = checkByMatch(["visual studio code", "codex", "t3 code", "opencode", "desktop"]);
 
   const rows = [
     {
@@ -683,9 +704,16 @@ function renderToolCards() {
 function renderTopStatus() {
   if (state.manifest?.license?.customerName) {
     elements.globalStatusTitle.textContent = "Licence connectée";
+    if (elements.licenseCenterDot) elements.licenseCenterDot.style.background = "#22c55e";
+    return;
+  }
+  if (state.licenseError) {
+    elements.globalStatusTitle.textContent = "Licence non valide";
+    if (elements.licenseCenterDot) elements.licenseCenterDot.style.background = "#ef4444";
     return;
   }
   elements.globalStatusTitle.textContent = "Licence non connectée";
+  if (elements.licenseCenterDot) elements.licenseCenterDot.style.background = "#94a3b8";
 }
 
 function renderBannerStats() {
@@ -696,17 +724,28 @@ function renderBannerStats() {
   const errors = checks.filter((item) => !item?.ok && !item?.optional).length;
 
   const ready = Boolean(state.manifest) && (state.lastDiagnostics?.overallOk || !total);
-  elements.environmentReadyIcon.style.background = ready ? "#22c55e" : warnings || errors ? "#f97316" : "#94a3b8";
-  elements.environmentReadyIcon.textContent = ready ? "✓" : warnings || errors ? "!" : "•";
+  const licenseError = !state.manifest && state.licenseError;
+  elements.environmentReadyIcon.style.background = ready
+    ? "#22c55e"
+    : licenseError || errors
+      ? "#ef4444"
+      : warnings
+        ? "#f97316"
+        : "#94a3b8";
+  elements.environmentReadyIcon.textContent = ready ? "✓" : licenseError || warnings || errors ? "!" : "•";
   elements.environmentReadyTitle.textContent = ready
     ? "Votre environnement est prêt"
     : state.manifest
       ? "Votre environnement demande encore une vérification"
+      : licenseError
+        ? "Licence non valide"
       : "Commencez par connecter votre licence";
   elements.environmentReadySubtitle.textContent = ready
     ? "Tous les composants sont installés et configurés correctement."
     : state.manifest
       ? "AIPilot a chargé la configuration, mais quelques points doivent encore être validés."
+      : licenseError
+        ? state.licenseError
       : "AIPilot chargera la configuration complète après la connexion de votre licence.";
 
   const stats = [
@@ -730,14 +769,17 @@ function renderBannerStats() {
 
 function renderLicenseSummary() {
   if (!state.manifest) {
+    const hasError = Boolean(state.licenseError);
     elements.licenseSummaryGrid.innerHTML = `
       <div class="summary-metric">
         <span class="summary-metric-label">Statut</span>
-        <div class="summary-metric-value"><span class="summary-badge is-warning">En attente</span></div>
+        <div class="summary-metric-value"><span class="summary-badge ${hasError ? "is-error" : "is-warning"}">${
+          hasError ? "Licence invalide" : "En attente"
+        }</span></div>
       </div>
       <div class="summary-metric">
         <span class="summary-metric-label">Client</span>
-        <div class="summary-metric-value">Connectez votre licence</div>
+        <div class="summary-metric-value">${escapeHtml(hasError ? state.licenseError : "Connectez votre licence")}</div>
       </div>
       <div class="summary-metric">
         <span class="summary-metric-label">Tier</span>
@@ -897,7 +939,7 @@ function renderUpdateBanner() {
 function renderTutorials(manifest) {
   const tutorials = Array.isArray(manifest?.manager?.tutorials) ? manifest.manager.tutorials : [];
   const fallbackVideo = manifest?.manager?.supportVideoUrl || "https://youtu.be/WwDvzdM9YWw";
-  const fallbackManualGuide = `${state.defaults?.backendUrl || "http://localhost:3000"}/tuto`;
+  const fallbackManualGuide = `${state.defaults?.backendUrl || PRODUCTION_BACKEND_URL}/tuto`;
   const merged = [
     { label: "Téléchargement et configuration pas à pas", url: fallbackVideo },
     { label: "Guide manuel AIPilot", url: fallbackManualGuide },
@@ -1073,23 +1115,44 @@ async function autoRefreshConfigForCurrentVersion() {
 
 async function connectSession({ autoDiagnose = true } = {}) {
   const backendUrl = state.defaults.backendUrl;
-  const licenseKey = normalizeLicenseKey(elements.configLicenseKey.value);
-  const environment = getSelectedEnvironment();
-  if (!licenseKey) {
-    throw new Error("Saisissez d’abord votre clé de licence.");
+  const inputError = getLicenseInputError(elements.configLicenseKey.value);
+  if (inputError) {
+    state.manifest = null;
+    state.lastDiagnostics = null;
+    state.licenseError = inputError;
+    state.lastLicenseAttempt = normalizeLicenseKey(elements.configLicenseKey.value);
+    renderAll();
+    throw new Error(inputError);
   }
 
+  const licenseKey = normalizeLicenseKey(elements.configLicenseKey.value);
+  const environment = getSelectedEnvironment();
+
   elements.configLicenseKey.value = licenseKey;
+  state.licenseError = "";
+  state.lastLicenseAttempt = licenseKey;
+  renderAll();
   appendActivity(`Connexion de la licence ${licenseKey}...`, "live");
 
-  const manifest = await window.aipilotManager.createSession({
-    backendUrl,
-    licenseKey,
-    environment,
-    projectRoot: state.projectRoot,
-  });
+  let manifest;
+  try {
+    manifest = await window.aipilotManager.createSession({
+      backendUrl,
+      licenseKey,
+      environment,
+      projectRoot: state.projectRoot,
+    });
+  } catch (error) {
+    state.manifest = null;
+    state.lastDiagnostics = null;
+    state.licenseError =
+      error instanceof Error ? error.message.replace(/^Error invoking remote method 'manager:create-session': Error:\s*/, "") : "Licence introuvable ou inactive.";
+    renderAll();
+    throw error;
+  }
 
   state.manifest = manifest;
+  state.licenseError = "";
   state.selectedModel = manifest?.azure?.deployment || getAvailableDeployments()[0]?.deployment || "";
   await persistState();
   await refreshInstallSignals();
@@ -1101,7 +1164,7 @@ async function connectSession({ autoDiagnose = true } = {}) {
   }
 }
 
-async function reconnectForEnvironment(environment) {
+async function reconnectForEnvironment() {
   if (!state.manifest) return;
   setBusy(true, "connect");
   try {
@@ -1122,10 +1185,6 @@ async function handleInstall() {
 async function handleRepair() {
   await ensureProjectRoot(getSelectedEnvironment(), "réparer OpenCode");
   await runManagerAction("repair");
-}
-
-async function handleDiagnose() {
-  await runManagerAction("diagnose");
 }
 
 async function handleLaunch() {
@@ -1201,7 +1260,20 @@ function bindBasicEvents() {
   elements.sidebarOpenTutorials.addEventListener("click", () => setActiveView("tutorials"));
 
   elements.configLicenseKey.addEventListener("input", (event) => {
+    if (looksLikeNonLicenseInput(event.target.value)) {
+      event.target.value = "";
+      state.manifest = null;
+      state.lastDiagnostics = null;
+      state.licenseError = "Ce champ attend une clé de licence AIPilot, pas un lien ou du texte.";
+      renderAll();
+      return;
+    }
+
     event.target.value = normalizeLicenseKey(event.target.value);
+    if (state.licenseError) {
+      state.licenseError = "";
+      renderAll();
+    }
   });
 
   elements.configChooseFolder.addEventListener("click", async () => {

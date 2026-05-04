@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  AIPILOT_APIM_OPENAI_BASE_URL,
+  normalizeApimOpenAiBaseUrl,
+} from "./aipilot-apim-settings";
 
 export type ApimSubscriptionState = "active" | "suspended" | "cancelled";
 
@@ -32,7 +36,6 @@ type ApimSecretsResponse = {
 
 const DEFAULT_API_VERSION = "2022-08-01";
 const DEFAULT_PRODUCT_ID = "aipilot-pro";
-const DEFAULT_OPENAI_BASE_URL = "https://nextgen.azure-api.net/openai";
 
 function readApimConfig(): ApimConfig | null {
   const tenantId = process.env.AZURE_TENANT_ID?.trim();
@@ -148,14 +151,9 @@ export function buildApimSubscriptionId(clientId: string) {
 }
 
 export function getApimOpenAiBaseUrl() {
-  const configured = process.env.APIM_OPENAI_BASE_URL?.trim();
-  if (
-    configured === "https://nextgen.azure-api.net/amine-3125-resource/openai/v1"
-  ) {
-    return DEFAULT_OPENAI_BASE_URL;
-  }
-
-  return configured || DEFAULT_OPENAI_BASE_URL;
+  return normalizeApimOpenAiBaseUrl(
+    process.env.APIM_OPENAI_BASE_URL?.trim() || AIPILOT_APIM_OPENAI_BASE_URL,
+  );
 }
 
 export async function createApimSubscription(input: {
@@ -169,8 +167,8 @@ export async function createApimSubscription(input: {
     method: "PUT",
     body: JSON.stringify({
       properties: {
-        displayName: input.displayName,
-        scope: `/products/${config.productId}`,
+        displayName: `Client-${input.displayName}-${new Date().toISOString().slice(0, 10)}`,
+        scope: `/subscriptions/${config.subscriptionId}/resourceGroups/${config.resourceGroup}/providers/Microsoft.ApiManagement/service/${config.serviceName}/products/${config.productId}`,
         state: "active",
       },
     }),

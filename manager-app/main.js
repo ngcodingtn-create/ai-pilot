@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const PRODUCTION_BACKEND_URL = "https://ai-pilot-ten.vercel.app";
+const LOCAL_BACKEND_URL = "http://localhost:3000";
 
 function readCliArg(flag) {
   const args = process.argv.slice(app.isPackaged ? 1 : 2);
@@ -27,7 +28,7 @@ const DEFAULT_LICENSE_KEY =
 const DEFAULT_ENVIRONMENT =
   readCliArg("--environment") ||
   process.env.AIPILOT_MANAGER_DEFAULT_ENVIRONMENT ||
-  "opencode";
+  "";
 const DEFAULT_AUTO_SETUP =
   hasCliFlag("--auto-setup") || process.env.AIPILOT_MANAGER_AUTO_SETUP === "1";
 const PLATFORM_KEY =
@@ -167,16 +168,19 @@ function normalizeBackendUrl(value) {
 
 async function getEffectiveDefaults() {
   const saved = await loadPersistedState();
-  const backendUrl =
+  const explicitBackendUrl =
     normalizeBackendUrl(readCliArg("--backend-url")) ||
-    normalizeBackendUrl(process.env.AIPILOT_MANAGER_BACKEND_URL) ||
-    normalizeBackendUrl(saved.backendUrl) ||
-    PRODUCTION_BACKEND_URL;
+    normalizeBackendUrl(process.env.AIPILOT_MANAGER_BACKEND_URL);
+  const savedBackendUrl = normalizeBackendUrl(saved.backendUrl);
+  const backendUrl =
+    explicitBackendUrl ||
+    (app.isPackaged ? savedBackendUrl : savedBackendUrl.startsWith(LOCAL_BACKEND_URL) ? savedBackendUrl : "") ||
+    (app.isPackaged ? PRODUCTION_BACKEND_URL : LOCAL_BACKEND_URL);
 
   const licenseKey =
     DEFAULT_LICENSE_KEY || String(saved.licenseKey ?? "");
   const environment =
-    DEFAULT_ENVIRONMENT || String(saved.environment ?? "opencode");
+    DEFAULT_ENVIRONMENT || String(saved.environment ?? "") || "opencode";
   const projectRoot = String(saved.projectRoot ?? "");
 
   return {
@@ -367,7 +371,7 @@ async function configureAutoUpdates(backendUrl) {
         Accept: "application/json",
       },
     });
-  } catch (error) {
+  } catch {
     throw new Error(
       `Impossible de joindre le portail AIPilot (${normalizedBackendUrl}). Vérifiez votre connexion ou réinstallez la dernière version du manager.`,
     );
@@ -628,7 +632,7 @@ function getSetupGuidance(manifest, projectRoot) {
   };
 }
 
-function applyCodexSelectionToConfigToml(configToml, model, _effort) {
+function applyCodexSelectionToConfigToml(configToml, model) {
   let next = String(configToml || "");
 
   if (model) {
@@ -971,32 +975,6 @@ async function getCodexCliCommand(logs = null) {
 
 async function runPowerShell(script) {
   return runCommand("powershell", ["-NoProfile", "-Command", script]);
-}
-
-async function installWingetPackage(id, logs, options = {}) {
-  ensureCommandOrThrow(
-    await commandExists("winget"),
-    "winget est requis sur Windows pour installer cette application.",
-  );
-
-  const args = ["install", "-e", "--id", id];
-  if (options.source) {
-    args.push("--source", options.source);
-  }
-  args.push(
-    "--silent",
-    "--scope",
-    "user",
-    "--accept-package-agreements",
-    "--accept-source-agreements",
-    "--disable-interactivity",
-  );
-
-  logs.push(`Installation via winget: ${id}`);
-  await runCommand("winget", args, {
-    timeoutMs: options.timeoutMs ?? 480000,
-    timeoutMessage: `L'installation via winget (${id}) prend trop de temps. Vérifiez le Microsoft Store ou réessayez plus tard.`,
-  });
 }
 
 async function getWindowsStartApps() {
@@ -1364,7 +1342,7 @@ function buildOpenCodeRuntimeConfig(manifest) {
 
 async function configureCodex(manifest, logs) {
   const configPath = getCodexConfigPath();
-  const resolvedConfigToml = String(manifest?.azure?.codex?.configToml ?? "");
+  const resolvedConfigToml = resolveCodexConfigToml(manifest);
   const selectedModel = manifest?.azure?.deployment;
   logs.push(`Écriture de la configuration Codex dans ${configPath}`);
   await writeFileWithDirs(configPath, resolvedConfigToml);
@@ -1495,6 +1473,12 @@ function buildCodexVsCodeAuth(apiKey) {
   };
 }
 
+function resolveCodexConfigToml(manifest) {
+  const windowsUser = os.userInfo().username || path.basename(os.homedir());
+  return String(manifest?.azure?.codex?.configToml ?? "")
+    .replaceAll("CLIENT_USERNAME", windowsUser);
+}
+
 async function configureVsCodeCodex(manifest, logs) {
   const configResult = await configureCodex(manifest, logs);
   const authPath = getCodexAuthPath();
@@ -1512,7 +1496,7 @@ async function normalizeCodexConfigToml(manifest, logs, reason = "") {
     return "";
   }
 
-  const minimalConfig = String(manifest?.azure?.codex?.configToml ?? "");
+  const minimalConfig = resolveCodexConfigToml(manifest);
   if (!minimalConfig) {
     return "";
   }
@@ -1555,7 +1539,7 @@ async function enforceMinimalCodexConfigAfterLaunch(manifest, logs) {
 
 async function ensureCodexConfigPresent(manifest, logs) {
   const configPath = getCodexConfigPath();
-  const resolvedConfigToml = String(manifest?.azure?.codex?.configToml ?? "");
+  const resolvedConfigToml = resolveCodexConfigToml(manifest);
 
   logs.push(`Vérification finale: alignement du config.toml Codex dans ${configPath}.`);
   await writeFileWithDirs(configPath, resolvedConfigToml);
@@ -2370,6 +2354,10 @@ ipcMain.handle("manager:create-session", async (_event, payload) => {
   const data = await response.json();
 
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Clé de licence incorrecte ou inactive.");
+    }
+
     throw new Error(data.error || "Impossible de récupérer la session manager.");
   }
 

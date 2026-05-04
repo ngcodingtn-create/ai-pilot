@@ -2,9 +2,17 @@ import { getStoredConfig } from "@/lib/config-store";
 import { createApimSubscription, getApimOpenAiBaseUrl } from "@/lib/apim";
 import { findLifecycleLicenseByKey } from "@/lib/client-pipeline-store";
 import {
+  createLicense,
   findLicenseByKey,
   setLicenseApimCredentials,
+  updateLicenseStatus,
+  type LicenseRecord,
 } from "@/lib/license-store";
+import {
+  AIPILOT_DEPLOYMENTS,
+  AIPILOT_PRIMARY_DEPLOYMENT,
+  buildAipilotCodexConfig,
+} from "@/lib/aipilot-apim-settings";
 
 type EnvironmentKey = "codex" | "vscode-codex" | "t3code" | "opencode";
 
@@ -30,6 +38,7 @@ type AvailableDeployment = {
 };
 
 const DEFAULT_SUPPORT_VIDEO_URL = "https://youtu.be/WwDvzdM9YWw";
+const PRODUCTION_SITE_URL = "https://ai-pilot-ten.vercel.app";
 
 function normalizeEnvironment(value: unknown): EnvironmentKey | undefined {
   if (
@@ -42,35 +51,6 @@ function normalizeEnvironment(value: unknown): EnvironmentKey | undefined {
   }
 
   return undefined;
-}
-
-function buildCodexConfig(baseUrl: string, deployment: string) {
-  return `model = "${deployment}"
-model_provider = "azure"
-model_reasoning_effort = "medium"
-profile = "azure-medium"
-
-[model_providers.azure]
-name = "AIPilot AI"
-base_url = "${baseUrl}"
-env_key = "AZURE_OPENAI_API_KEY"
-wire_api = "responses"
-
-[profiles.azure-medium]
-model_provider = "azure"
-model = "${deployment}"
-model_reasoning_effort = "medium"
-
-[profiles.azure-high]
-model_provider = "azure"
-model = "${deployment}"
-model_reasoning_effort = "high"
-
-[profiles.azure-xhigh]
-model_provider = "azure"
-model = "${deployment}"
-model_reasoning_effort = "xhigh"
-`;
 }
 
 function buildOpenCodeConfig(
@@ -182,34 +162,15 @@ function dedupeTutorialLinks(items: TutorialLink[]) {
   });
 }
 
-function buildAvailableDeployments(config: Awaited<ReturnType<typeof getStoredConfig>>) {
-  const deployments: AvailableDeployment[] = [
-    {
-      id: "gpt-5.4",
-      label: "GPT-5.4",
-      deployment: config.azureDefaultDeployment,
-      recommended: true,
-    },
-  ];
-
-  const gpt55 = String(config.azureGpt55Deployment ?? "").trim();
-  if (gpt55 && gpt55 !== config.azureDefaultDeployment) {
-    deployments.push({
-      id: "gpt-5.5",
-      label: "GPT-5.5",
-      deployment: gpt55,
-      recommended: false,
-    });
-  }
-
-  return deployments;
+function buildAvailableDeployments() {
+  return AIPILOT_DEPLOYMENTS.map((item) => ({ ...item })) satisfies AvailableDeployment[];
 }
 
 function buildManagerTutorials(config: Awaited<ReturnType<typeof getStoredConfig>>, tool: ToolDetails) {
   const tutorials = parseTutorialLinks(config.managerTutorialLinks);
   const supportVideoUrl =
     safeTutorialUrl(config.supportVideoUrl) || DEFAULT_SUPPORT_VIDEO_URL;
-  const siteUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
+  const siteUrl = String(process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL).replace(
     /\/$/,
     "",
   );
@@ -317,6 +278,98 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
   };
 }
 
+function lifecycleIsInactive(
+  lifecycle: Awaited<ReturnType<typeof findLifecycleLicenseByKey>>,
+) {
+  if (!lifecycle?.license) {
+    return false;
+  }
+
+  const expired =
+    lifecycle.license.expiresAt &&
+    new Date(lifecycle.license.expiresAt).getTime() <= Date.now();
+  const revoked = !lifecycle.license.isActive;
+  const inactiveClient =
+    lifecycle.client?.status === "expired" ||
+    lifecycle.client?.status === "lost" ||
+    lifecycle.client?.status === "cancelled";
+
+  return Boolean(expired || revoked || inactiveClient);
+}
+
+function inactiveLifecycleMessage(
+  lifecycle: Awaited<ReturnType<typeof findLifecycleLicenseByKey>>,
+) {
+  return lifecycle?.license?.type === "trial"
+    ? "Trial license expired or inactive."
+    : "Paid license inactive.";
+}
+
+async function repairInstallLicenseFromLifecycle(
+  licenseKey: string,
+  lifecycle: Awaited<ReturnType<typeof findLifecycleLicenseByKey>>,
+  environment: EnvironmentKey | undefined,
+) {
+  if (!lifecycle?.license || !lifecycle.client || lifecycleIsInactive(lifecycle)) {
+    return null;
+  }
+
+  return createLicense({
+    customerName: lifecycle.client.name?.trim() || lifecycle.client.phone || "AIPilot Client",
+    customerEmail: lifecycle.client.email,
+    tier: "pro",
+    preferredEnvironment: environment ?? "codex",
+    status: "active",
+    licenseKey,
+    notes: `Repaired from lifecycle client ${lifecycle.client.id} — ${lifecycle.license.type}`,
+  });
+}
+
+async function resolveManagerLicense(
+  licenseKey: string,
+  environment: EnvironmentKey | undefined,
+) {
+  let license = await findLicenseByKey(licenseKey);
+  const lifecycle = await findLifecycleLicenseByKey(license?.licenseKey ?? licenseKey);
+
+  if (lifecycleIsInactive(lifecycle)) {
+    return {
+      license: null,
+      lifecycle,
+      error: inactiveLifecycleMessage(lifecycle),
+      status: 403,
+    };
+  }
+
+  if (license?.status === "disabled" && lifecycle?.license?.isActive) {
+    await updateLicenseStatus(license.id, "active");
+    license = {
+      ...license,
+      status: "active",
+      apimStatus: "active",
+    };
+  }
+
+  if (!license && lifecycle?.license?.isActive) {
+    license = await repairInstallLicenseFromLifecycle(
+      lifecycle.license.key,
+      lifecycle,
+      environment,
+    );
+  }
+
+  if (!license || license.status !== "active") {
+    return {
+      license: null,
+      lifecycle,
+      error: "License not found or inactive.",
+      status: 404,
+    };
+  }
+
+  return { license, lifecycle, error: "", status: 200 };
+}
+
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as
     | {
@@ -326,38 +379,21 @@ export async function POST(request: Request) {
     | null;
 
   const licenseKey = String(payload?.licenseKey ?? "");
-  let license = await findLicenseByKey(licenseKey);
+  const requestedEnvironment = normalizeEnvironment(payload?.environment);
+  const resolved = await resolveManagerLicense(licenseKey, requestedEnvironment);
 
-  if (!license || license.status !== "active") {
+  if (!resolved.license) {
     return Response.json(
-      { error: "License not found or inactive." },
-      { status: 404 },
+      { error: resolved.error },
+      { status: resolved.status },
     );
   }
 
-  const lifecycle = await findLifecycleLicenseByKey(license.licenseKey);
-  if (lifecycle?.license) {
-    const expired =
-      lifecycle.license.expiresAt &&
-      new Date(lifecycle.license.expiresAt).getTime() <= Date.now();
-    const revoked = !lifecycle.license.isActive;
-
-    if (expired || revoked) {
-      return Response.json(
-        {
-          error:
-            lifecycle.license.type === "trial"
-              ? "Trial license expired or inactive."
-              : "Paid license inactive.",
-        },
-        { status: 403 },
-      );
-    }
-  }
+  let license: LicenseRecord = resolved.license;
 
   const config = await getStoredConfig();
   const selectedEnvironment =
-    normalizeEnvironment(payload?.environment) ?? license.preferredEnvironment;
+    requestedEnvironment ?? license.preferredEnvironment;
   let effectiveApiKey = license.azureApiKey;
 
   if (!license.apimSubscriptionId || license.apimStatus !== "active" || !effectiveApiKey) {
@@ -404,8 +440,10 @@ export async function POST(request: Request) {
 
   const baseUrl = getApimOpenAiBaseUrl();
   const resourceName = process.env.AZURE_APIM_SERVICE_NAME?.trim() || "nextgen";
-  const availableDeployments = buildAvailableDeployments(config);
-  const deployment = availableDeployments[0].deployment;
+  const availableDeployments = buildAvailableDeployments();
+  const deployment =
+    availableDeployments.find((item) => item.deployment === AIPILOT_PRIMARY_DEPLOYMENT)
+      ?.deployment || availableDeployments[0].deployment;
   const tool = buildToolDetails(selectedEnvironment);
 
   return Response.json({
@@ -438,7 +476,7 @@ export async function POST(request: Request) {
       availableDeployments,
       codex: {
         baseUrl,
-        configToml: buildCodexConfig(baseUrl, deployment),
+        configToml: buildAipilotCodexConfig({ baseUrl, model: deployment }),
       },
       opencode: {
         config: buildOpenCodeConfig(

@@ -1,4 +1,9 @@
 import { getApimOpenAiBaseUrl } from "./apim";
+import {
+  AIPILOT_PRIMARY_DEPLOYMENT,
+  buildAipilotCodexConfig,
+  buildAipilotMachineEnvOneLiner,
+} from "./aipilot-apim-settings";
 
 function psQuote(value: string) {
   return value.replace(/`/g, "``").replace(/"/g, '`"');
@@ -10,8 +15,12 @@ export function buildClientPowerShellInstaller(input: {
   baseUrl?: string;
 }) {
   const apiKey = psQuote(input.apiKey);
-  const model = psQuote(input.model || "gpt-5.4-1");
+  const model = psQuote(input.model || AIPILOT_PRIMARY_DEPLOYMENT);
   const baseUrl = psQuote(input.baseUrl || getApimOpenAiBaseUrl());
+  const configToml = buildAipilotCodexConfig({
+    baseUrl: input.baseUrl || getApimOpenAiBaseUrl(),
+    model: input.model || AIPILOT_PRIMARY_DEPLOYMENT,
+  });
 
   return `$ApiKey = "${apiKey}"
 $BaseUrl = "${baseUrl}"
@@ -24,35 +33,15 @@ $Model = "${model}"
 $configDir = "$env:USERPROFILE\\.codex"
 New-Item -Force -Path $configDir -ItemType Directory | Out-Null
 
-@"
-model = "$Model"
-model_provider = "azure"
-model_reasoning_effort = "medium"
-profile = "azure-medium"
-
-[model_providers.azure]
-name = "AIPilot AI"
-base_url = "$BaseUrl"
-env_key = "AZURE_OPENAI_API_KEY"
-wire_api = "responses"
-
-[profiles.azure-medium]
-model_provider = "azure"
-model = "$Model"
-model_reasoning_effort = "medium"
-
-[profiles.azure-high]
-model_provider = "azure"
-model = "$Model"
-model_reasoning_effort = "high"
-
-[profiles.azure-xhigh]
-model_provider = "azure"
-model = "$Model"
-model_reasoning_effort = "xhigh"
-"@ | Out-File "$configDir\\config.toml" -Encoding UTF8
+$ConfigToml = @'
+${configToml}
+'@
+$ConfigToml = $ConfigToml.Replace("CLIENT_USERNAME", $env:USERNAME)
+$ConfigToml | Out-File "$configDir\\config.toml" -Encoding UTF8
 
 Write-Host "AIPilot configured with APIM. Restart your terminal or PC before using Codex."
 Write-Host "New APIM keys can take 15-20 seconds to work on the first Codex call."
+Write-Host "Machine env one-liner:"
+Write-Host '${buildAipilotMachineEnvOneLiner(input.apiKey).replace(/'/g, "''")}'
 `;
 }

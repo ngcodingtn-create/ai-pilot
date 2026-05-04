@@ -128,7 +128,7 @@ cat > "$PROJECT_ROOT/opencode.json" <<EOF
       "npm": "@ai-sdk/openai-compatible",
       "name": "Azure OpenAI Chat Completions",
       "options": {
-        "baseURL": "https://admin-3342-resource.openai.azure.com/openai/v1",
+        "baseURL": "https://nextgen.azure-api.net/api/openai/v1",
         "apiKey": "$AZURE_OPENAI_API_KEY"
       },
       "models": {
