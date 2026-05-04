@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { getSql } from "./db";
 import { decryptString, encryptString } from "./crypto";
+import { deleteApimSubscription } from "./apim";
 
 export type LicenseTier = "starter" | "pro" | "max";
 export type LicenseEnvironment = "codex" | "vscode-codex" | "t3code" | "opencode";
@@ -454,6 +455,9 @@ export async function deleteLicenseById(id: string) {
     throw new Error("Missing license id");
   }
 
+  const existing = await findLicenseById(licenseId);
+  await deleteApimSubscription(existing?.apimSubscriptionId);
+
   const sql = getSql();
 
   if (!sql) {
@@ -562,13 +566,54 @@ export async function findLicenseByKey(licenseKey: string) {
   return row ? mapRowToLicenseRecord(row) : null;
 }
 
+async function clearLicenseApimCredentials(id: string) {
+  const licenseId = String(id ?? "").trim();
+  if (!licenseId) {
+    return;
+  }
+
+  const updatedAt = new Date().toISOString();
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalLicenseFile();
+    local.licenses = local.licenses.map((license) =>
+      license.id === licenseId
+        ? {
+            ...license,
+            azureApiKey: undefined,
+            apimSubscriptionId: undefined,
+            apimStatus: "cancelled",
+            updatedAt,
+          }
+        : license,
+    );
+    await writeLocalLicenseFile(local);
+    return;
+  }
+
+  await ensureLicenseTable();
+  await sql`
+    UPDATE license_keys
+    SET
+      azure_api_key = ${null},
+      azure_api_key_encrypted = false,
+      apim_subscription_id = ${null},
+      apim_status = ${"cancelled"},
+      updated_at = now()
+    WHERE id = ${licenseId}
+  `;
+}
+
 export async function disableLicenseByKey(licenseKey: string) {
   const existing = await findLicenseByKey(licenseKey);
   if (!existing) {
     return false;
   }
 
+  await deleteApimSubscription(existing.apimSubscriptionId);
   await updateLicenseStatus(existing.id, "disabled");
+  await clearLicenseApimCredentials(existing.id);
   return true;
 }
 
