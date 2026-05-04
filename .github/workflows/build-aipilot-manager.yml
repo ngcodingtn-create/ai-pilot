@@ -43,6 +43,10 @@ jobs:
       - name: Install manager dependencies
         run: npm ci
 
+      - name: Install Linux packaging dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm fakeroot dpkg libarchive-tools
+
       - name: Build packaged artifacts
         run: npm run ${{ matrix.script }}
 

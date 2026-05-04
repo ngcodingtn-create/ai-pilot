@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  publish:
-    name: Publish ${{ matrix.label }} manager
+  build:
+    name: Build ${{ matrix.label }} manager
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -55,8 +55,30 @@ jobs:
       - name: Install manager dependencies
         run: npm ci
 
+      - name: Install Linux packaging dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm fakeroot dpkg libarchive-tools
+
       - name: Build release artifacts
         run: npm run ${{ matrix.script }}
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aipilot-manager-${{ matrix.label }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish manager release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -64,4 +86,4 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
-          files: ${{ matrix.files }}
+          files: release-assets/*
