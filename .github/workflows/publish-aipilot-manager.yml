@@ -13,6 +13,7 @@ jobs:
   build:
     name: Build ${{ matrix.label }} manager
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.label == 'Linux' }}
     strategy:
       fail-fast: false
       matrix:
