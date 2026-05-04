@@ -215,7 +215,9 @@ export async function updateLicenseStatusAction(formData: FormData) {
   }
 
   const status = readStatus(formData.get("status"));
-  await syncApimStatusForLicense(licenseId, status);
+  if (status === "active") {
+    await syncApimStatusForLicense(licenseId, status);
+  }
   await updateLicenseStatus(licenseId, status);
   redirect("/admin?updated=1");
 }
@@ -225,7 +227,9 @@ export async function updateLicenseDetailsAction(formData: FormData) {
 
   const licenseId = String(formData.get("licenseId") ?? "");
   const status = readStatus(formData.get("status"));
-  await syncApimStatusForLicense(licenseId, status);
+  if (status === "active") {
+    await syncApimStatusForLicense(licenseId, status);
+  }
   await updateLicenseDetails(licenseId, {
     customerName: String(formData.get("customerName") ?? ""),
     customerEmail: String(formData.get("customerEmail") ?? "").trim() || undefined,

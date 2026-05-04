@@ -13,6 +13,7 @@ import {
   type LicenseTier,
 } from "./license-store";
 import {
+  buildApimSubscriptionId,
   createApimSubscription,
   deleteApimSubscription,
   setApimSubscriptionState,
@@ -1423,6 +1424,7 @@ export async function markClientLostById(clientId: string) {
   }
 
   await deleteApimSubscription(await findClientApimSubscriptionId(client));
+  await deleteApimSubscription(buildApimSubscriptionId(client.id));
   await deactivateClientLicenses(client.id, client.licenseKey);
 
   const now = new Date().toISOString();
@@ -1524,6 +1526,7 @@ export async function deletePipelineClientById(clientId: string) {
   await deleteApimSubscription(
     client.apimSubscriptionId ?? linkedLicense?.apimSubscriptionId,
   );
+  await deleteApimSubscription(buildApimSubscriptionId(client.id));
   if (linkedLicense) {
     await deleteLicenseById(linkedLicense.id);
   } else if (client.licenseKey) {

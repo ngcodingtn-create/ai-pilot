@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { getSql } from "./db";
 import { decryptString, encryptString } from "./crypto";
-import { deleteApimSubscription } from "./apim";
+import { buildApimSubscriptionId, deleteApimSubscription } from "./apim";
 
 export type LicenseTier = "starter" | "pro" | "max";
 export type LicenseEnvironment = "codex" | "vscode-codex" | "t3code" | "opencode";
@@ -331,16 +331,29 @@ export async function createLicense(input: CreateLicenseInput) {
 }
 
 export async function updateLicenseStatus(id: string, status: LicenseStatus) {
+  const licenseId = String(id ?? "").trim();
+  if (!licenseId) {
+    throw new Error("Missing license id");
+  }
+
+  if (status === "disabled") {
+    const existing = await findLicenseById(licenseId);
+    await deleteApimSubscription(existing?.apimSubscriptionId);
+    await deleteApimSubscription(buildApimSubscriptionId(licenseId));
+  }
+
   const sql = getSql();
 
   if (!sql) {
     const local = await readLocalLicenseFile();
     local.licenses = local.licenses.map((license) =>
-      license.id === id
+      license.id === licenseId
         ? {
             ...license,
             status,
-            apimStatus: status === "active" ? "active" : "suspended",
+            azureApiKey: status === "active" ? license.azureApiKey : undefined,
+            apimSubscriptionId: status === "active" ? license.apimSubscriptionId : undefined,
+            apimStatus: status === "active" ? "active" : "cancelled",
             updatedAt: new Date().toISOString(),
           }
         : license,
@@ -350,13 +363,28 @@ export async function updateLicenseStatus(id: string, status: LicenseStatus) {
   }
 
   await ensureLicenseTable();
+  if (status === "active") {
+    await sql`
+      UPDATE license_keys
+      SET
+        status = ${status},
+        apim_status = ${"active"},
+        updated_at = now()
+      WHERE id = ${licenseId}
+    `;
+    return;
+  }
+
   await sql`
     UPDATE license_keys
     SET
       status = ${status},
-      apim_status = ${status === "active" ? "active" : "suspended"},
+      azure_api_key = ${null},
+      azure_api_key_encrypted = false,
+      apim_subscription_id = ${null},
+      apim_status = ${"cancelled"},
       updated_at = now()
-    WHERE id = ${id}
+    WHERE id = ${licenseId}
   `;
 }
 
@@ -457,6 +485,7 @@ export async function deleteLicenseById(id: string) {
 
   const existing = await findLicenseById(licenseId);
   await deleteApimSubscription(existing?.apimSubscriptionId);
+  await deleteApimSubscription(buildApimSubscriptionId(licenseId));
 
   const sql = getSql();
 
@@ -486,6 +515,12 @@ export async function updateLicenseDetails(id: string, input: UpdateLicenseInput
     throw new Error("Customer name is required");
   }
 
+  if (input.status === "disabled") {
+    const existing = await findLicenseById(licenseId);
+    await deleteApimSubscription(existing?.apimSubscriptionId);
+    await deleteApimSubscription(buildApimSubscriptionId(licenseId));
+  }
+
   const updatedAt = new Date().toISOString();
   const sql = getSql();
 
@@ -500,7 +535,10 @@ export async function updateLicenseDetails(id: string, input: UpdateLicenseInput
             tier: input.tier,
             preferredEnvironment: input.preferredEnvironment,
             status: input.status,
-            apimStatus: input.status === "active" ? "active" : "suspended",
+            azureApiKey: input.status === "active" ? license.azureApiKey : undefined,
+            apimSubscriptionId:
+              input.status === "active" ? license.apimSubscriptionId : undefined,
+            apimStatus: input.status === "active" ? "active" : "cancelled",
             notes: input.notes?.trim() || undefined,
             updatedAt,
           }
@@ -511,6 +549,23 @@ export async function updateLicenseDetails(id: string, input: UpdateLicenseInput
   }
 
   await ensureLicenseTable();
+  if (input.status === "active") {
+    await sql`
+      UPDATE license_keys
+      SET
+        customer_name = ${customerName},
+        customer_email = ${input.customerEmail?.trim() || null},
+        tier = ${input.tier},
+        preferred_environment = ${input.preferredEnvironment},
+        status = ${input.status},
+        apim_status = ${"active"},
+        notes = ${input.notes?.trim() || null},
+        updated_at = now()
+      WHERE id = ${licenseId}
+    `;
+    return;
+  }
+
   await sql`
     UPDATE license_keys
     SET
@@ -519,7 +574,10 @@ export async function updateLicenseDetails(id: string, input: UpdateLicenseInput
       tier = ${input.tier},
       preferred_environment = ${input.preferredEnvironment},
       status = ${input.status},
-      apim_status = ${input.status === "active" ? "active" : "suspended"},
+      azure_api_key = ${null},
+      azure_api_key_encrypted = false,
+      apim_subscription_id = ${null},
+      apim_status = ${"cancelled"},
       notes = ${input.notes?.trim() || null},
       updated_at = now()
     WHERE id = ${licenseId}
@@ -566,54 +624,13 @@ export async function findLicenseByKey(licenseKey: string) {
   return row ? mapRowToLicenseRecord(row) : null;
 }
 
-async function clearLicenseApimCredentials(id: string) {
-  const licenseId = String(id ?? "").trim();
-  if (!licenseId) {
-    return;
-  }
-
-  const updatedAt = new Date().toISOString();
-  const sql = getSql();
-
-  if (!sql) {
-    const local = await readLocalLicenseFile();
-    local.licenses = local.licenses.map((license) =>
-      license.id === licenseId
-        ? {
-            ...license,
-            azureApiKey: undefined,
-            apimSubscriptionId: undefined,
-            apimStatus: "cancelled",
-            updatedAt,
-          }
-        : license,
-    );
-    await writeLocalLicenseFile(local);
-    return;
-  }
-
-  await ensureLicenseTable();
-  await sql`
-    UPDATE license_keys
-    SET
-      azure_api_key = ${null},
-      azure_api_key_encrypted = false,
-      apim_subscription_id = ${null},
-      apim_status = ${"cancelled"},
-      updated_at = now()
-    WHERE id = ${licenseId}
-  `;
-}
-
 export async function disableLicenseByKey(licenseKey: string) {
   const existing = await findLicenseByKey(licenseKey);
   if (!existing) {
     return false;
   }
 
-  await deleteApimSubscription(existing.apimSubscriptionId);
   await updateLicenseStatus(existing.id, "disabled");
-  await clearLicenseApimCredentials(existing.id);
   return true;
 }
 
@@ -624,7 +641,12 @@ export async function validateLicenseKey(licenseKey: string) {
   }
 
   const record = await findLicenseByKey(normalized);
-  if (!record || record.status !== "active") {
+  if (!record) {
+    return { valid: false as const, reason: "not-found" as const };
+  }
+
+  if (record.status !== "active") {
+    await updateLicenseStatus(record.id, "disabled");
     return { valid: false as const, reason: "not-found" as const };
   }
 

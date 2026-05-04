@@ -332,21 +332,22 @@ async function resolveManagerLicense(
   let license = await findLicenseByKey(licenseKey);
   const lifecycle = await findLifecycleLicenseByKey(license?.licenseKey ?? licenseKey);
 
+  if (license && license.status !== "active") {
+    await updateLicenseStatus(license.id, "disabled");
+    return {
+      license: null,
+      lifecycle,
+      error: "License not found or inactive.",
+      status: 404,
+    };
+  }
+
   if (lifecycleIsInactive(lifecycle)) {
     return {
       license: null,
       lifecycle,
       error: inactiveLifecycleMessage(lifecycle),
       status: 403,
-    };
-  }
-
-  if (license?.status === "disabled" && lifecycle?.license?.isActive) {
-    await updateLicenseStatus(license.id, "active");
-    license = {
-      ...license,
-      status: "active",
-      apimStatus: "active",
     };
   }
 
