@@ -1,5 +1,4 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { buildClientPowerShellInstaller } from "@/lib/client-installer";
 import { getPipelineClientById } from "@/lib/client-pipeline-store";
 
 type RouteContext = {
@@ -13,18 +12,23 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   const client = await getPipelineClientById(id);
-  if (!client?.apimKey) {
-    return Response.json({ error: "No APIM key for this client" }, { status: 404 });
+  if (!client?.licenseKey) {
+    return Response.json({ error: "No license key for this client" }, { status: 404 });
   }
 
   return new Response(
-    buildClientPowerShellInstaller({
-      apiKey: client.apimKey,
-    }),
+    [
+      `Client: ${client.name || client.phone || client.id}`,
+      "",
+      "AIPilot license key:",
+      client.licenseKey,
+      "",
+      "Send only this license key to the customer. AIPilot Manager exchanges it for the private APIM configuration automatically after validation.",
+    ].join("\n"),
     {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Content-Disposition": `attachment; filename="aipilot-${client.id}.ps1"`,
+        "Content-Disposition": `attachment; filename="aipilot-license-${client.id}.txt"`,
         "Cache-Control": "no-store",
       },
     },

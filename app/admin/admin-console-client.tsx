@@ -80,7 +80,6 @@ export type AdminConsoleProps = {
     lost?: boolean;
     requestAccepted?: boolean;
     licenseKey?: string;
-    apimKey?: string;
     customer?: string;
     whatsapp?: string;
   };
@@ -1023,11 +1022,11 @@ function ClientDetailSheet({
             </p>
             {client.apimKey ? (
               <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-amber-100/85">
-                {APIM_PROPAGATION_NOTE}
+                Interne admin uniquement. Le client reçoit sa clé de licence; le manager récupère cette clé APIM automatiquement. {APIM_PROPAGATION_NOTE}
               </p>
             ) : null}
             {client.apimKey ? (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3">
                 <button
                   type="button"
                   onClick={async () => {
@@ -1039,12 +1038,6 @@ function ClientDetailSheet({
                 >
                   {copiedApim ? "Clé copiée" : "Copier clé APIM"}
                 </button>
-                <a
-                  href={`/api/admin/clients/${client.id}/installer`}
-                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white"
-                >
-                  Installer PS1
-                </a>
               </div>
             ) : null}
           </div>
@@ -1183,7 +1176,7 @@ function SettingsSheet({
             defaultChecked={config.includeApiKeyInInstaller}
             disabled
           />
-          Injection de clé dans les installateurs publics désactivée. Les clients reçoivent uniquement leur clé APIM.
+          Injection de clé dans les installateurs publics désactivée. Les clients reçoivent uniquement leur clé de licence; le manager récupère l’accès APIM automatiquement.
         </label>
         <textarea
           name="managerTutorialLinks"
@@ -1695,22 +1688,21 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
   const [copied, setCopied] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const licenseKey = flash?.licenseKey;
-  const credential = flash?.apimKey || licenseKey;
   const customer = flash?.customer || "Client";
   const whatsapp = flash?.whatsapp;
   const canShowLicenseReady = Boolean(
-    credential && !flash?.paidConverted && (flash?.trialCreated || flash?.requestAccepted),
+    licenseKey && !flash?.paidConverted && (flash?.trialCreated || flash?.requestAccepted),
   );
   const whatsappUrl =
-    whatsapp && credential
+    whatsapp && licenseKey
       ? buildWhatsAppUrl(
           whatsapp,
-          buildInstallMessage(customer, credential),
+          buildInstallMessage(customer, licenseKey),
         )
       : null;
 
-  if (!canShowLicenseReady || !credential || dismissed) return null;
-  const readyCredential = credential;
+  if (!canShowLicenseReady || !licenseKey || dismissed) return null;
+  const readyLicenseKey = licenseKey;
 
   function dismissAndCleanUrl() {
     setDismissed(true);
@@ -1718,7 +1710,7 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
   }
 
   async function copyLicense() {
-    await navigator.clipboard.writeText(readyCredential);
+    await navigator.clipboard.writeText(readyLicenseKey);
     setCopied(true);
     window.setTimeout(dismissAndCleanUrl, 550);
   }
@@ -1730,7 +1722,7 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
           <Check className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-emerald-100">Accès APIM prêt à envoyer</p>
+          <p className="font-semibold text-emerald-100">Licence prête à envoyer</p>
           <p className="mt-1 text-sm text-emerald-100/75">{customer}</p>
           {whatsapp ? (
             <p className="mt-1 text-sm text-emerald-100/75">{formatPhone(whatsapp)}</p>
@@ -1739,11 +1731,11 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
       </div>
       <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-[#02150f] p-3">
         <p className="break-all font-mono text-sm font-semibold text-emerald-100">
-          {readyCredential}
+          {readyLicenseKey}
         </p>
       </div>
-      <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-amber-100/85">
-        {APIM_PROPAGATION_NOTE}
+      <p className="mt-3 rounded-2xl border border-emerald-300/15 bg-emerald-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-emerald-100/85">
+        Envoyez uniquement cette licence. AIPilot Manager configure automatiquement l’API, APIM et l’endpoint après validation.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <button
@@ -1754,7 +1746,7 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
           {copied ? "Copiée" : "Copier la clé"}
         </button>
         <a
-          href={whatsappUrl ?? buildLooseWhatsAppUrl(whatsapp ?? "", customer, readyCredential)}
+          href={whatsappUrl ?? buildLooseWhatsAppUrl(whatsapp ?? "", customer, readyLicenseKey)}
           target="_blank"
           rel="noreferrer"
           onClick={dismissAndCleanUrl}
@@ -2010,15 +2002,12 @@ function buildQuickWhatsAppUrl(whatsappNumber: string, message: string) {
     : `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
-function buildInstallMessage(customerName: string, apimKey: string) {
+function buildInstallMessage(customerName: string, licenseKey: string) {
   return [
-    `Bonjour ${customerName}, voici votre accès AIPilot.`,
+    `Bonjour ${customerName}, voici votre clé de licence AIPilot.`,
     "",
-    `Clé APIM: ${apimKey}`,
-    "Endpoint: https://nextgen.azure-api.net/openai",
-    "Model: gpt-5.4-1",
+    licenseKey,
     "",
-    "Utilisez cette clé comme AZURE_OPENAI_API_KEY. La vraie clé Azure reste sécurisée côté AIPilot.",
-    APIM_PROPAGATION_NOTE,
+    "Ouvrez AIPilot Manager, collez cette licence, puis le manager configure automatiquement votre accès.",
   ].join("\n");
 }
