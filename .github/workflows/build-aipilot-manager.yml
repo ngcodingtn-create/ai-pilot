@@ -18,13 +18,20 @@ jobs:
         include:
           - os: windows-latest
             script: dist:win
+            args: ""
             artifact: aipilot-manager-windows
           - os: ubuntu-latest
             script: dist:linux
+            args: ""
             artifact: aipilot-manager-linux
+          - os: macos-13
+            script: dist:mac
+            args: "-- --x64"
+            artifact: aipilot-manager-macos-x64
           - os: macos-latest
             script: dist:mac
-            artifact: aipilot-manager-macos
+            args: "-- --arm64"
+            artifact: aipilot-manager-macos-arm64
 
     defaults:
       run:
@@ -49,7 +56,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm fakeroot dpkg libarchive-tools
 
       - name: Build packaged artifacts
-        run: npm run ${{ matrix.script }}
+        run: npm run ${{ matrix.script }} ${{ matrix.args }}
 
       - name: Upload manager artifacts
         uses: actions/upload-artifact@v4

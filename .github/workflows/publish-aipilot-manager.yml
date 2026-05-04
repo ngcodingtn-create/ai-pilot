@@ -21,6 +21,7 @@ jobs:
           - label: Windows
             os: windows-latest
             script: dist:win
+            args: ""
             files: |
               manager-app/dist/*Manager-Setup-*.exe
               manager-app/dist/*Manager-Setup-*.exe.blockmap
@@ -28,12 +29,21 @@ jobs:
           - label: Linux
             os: ubuntu-latest
             script: dist:linux
+            args: ""
             files: |
               manager-app/dist/*.AppImage
               manager-app/dist/*.deb
-          - label: macOS
+          - label: macOS x64
+            os: macos-13
+            script: dist:mac
+            args: "-- --x64"
+            files: |
+              manager-app/dist/*.dmg
+              manager-app/dist/*.zip
+          - label: macOS arm64
             os: macos-latest
             script: dist:mac
+            args: "-- --arm64"
             files: |
               manager-app/dist/*.dmg
               manager-app/dist/*.zip
@@ -61,7 +71,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm fakeroot dpkg libarchive-tools
 
       - name: Build release artifacts
-        run: npm run ${{ matrix.script }}
+        run: npm run ${{ matrix.script }} ${{ matrix.args }}
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
