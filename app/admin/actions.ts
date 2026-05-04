@@ -33,6 +33,7 @@ import {
   deletePipelineClientByPhone,
   getPipelineClientById,
   getPipelineClientByLicenseKey,
+  markPipelineClientContacted,
   markClientLostById,
   markClientPaid,
   recordFacebookEvent,
@@ -41,7 +42,7 @@ import {
 import { setApimSubscriptionState } from "@/lib/apim";
 import { deleteMarketingEventsForIdentity } from "@/lib/marketing-event-store";
 import { deleteTrialLeadsByPhone } from "@/lib/trial-leads-store";
-import { normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
+import { buildWhatsAppUrl, normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 
 function readTier(value: FormDataEntryValue | null): LicenseTier {
   return value === "starter" || value === "max" ? value : "pro";
@@ -405,6 +406,22 @@ export async function markPipelineClientLostAction(formData: FormData) {
 
   await markClientLostById(clientId);
   redirect("/admin?section=pipeline&lost=1");
+}
+
+export async function markPipelineClientContactedAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const clientId = String(formData.get("clientId") ?? "").trim();
+  if (!clientId) {
+    throw new Error("Missing client id");
+  }
+
+  const client = await markPipelineClientContacted(clientId);
+  const whatsappUrl = client
+    ? buildWhatsAppUrl(client.phone, "hey")
+    : null;
+
+  redirect(whatsappUrl ?? "/admin?section=pipeline&contacted=1");
 }
 
 export async function deletePipelineClientAction(formData: FormData) {

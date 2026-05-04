@@ -54,6 +54,7 @@ export type PipelineClientRecord = {
   apimTier?: string;
   apimKey?: string;
   paymentDate?: string;
+  lastContactedAt?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -118,6 +119,7 @@ type ClientRow = {
   apim_tier?: string | null;
   apim_key?: string | null;
   payment_date?: string | Date | null;
+  last_contacted_at?: string | Date | null;
   created_at: string | Date;
   updated_at: string | Date;
 };
@@ -233,9 +235,22 @@ function mapClientRow(row: ClientRow): PipelineClientRecord {
     apimTier: row.apim_tier ?? undefined,
     apimKey: row.apim_key ?? undefined,
     paymentDate: toIso(row.payment_date),
+    lastContactedAt: toIso(row.last_contacted_at),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
+}
+
+function contactSortTime(client: PipelineClientRecord) {
+  return new Date(client.lastContactedAt ?? client.updatedAt ?? client.createdAt).getTime();
+}
+
+function sortClientsByContactTime(clients: PipelineClientRecord[]) {
+  return [...clients].sort((left, right) => {
+    if (left.lastContactedAt && !right.lastContactedAt) return -1;
+    if (!left.lastContactedAt && right.lastContactedAt) return 1;
+    return contactSortTime(right) - contactSortTime(left);
+  });
 }
 
 async function attachLicenseSecretToClient(client: PipelineClientRecord) {
@@ -324,6 +339,7 @@ async function findMatchingSqlClientByPhone(phone: string) {
       apim_status,
       apim_tier,
       payment_date,
+      last_contacted_at,
       created_at,
       updated_at
     FROM clients
@@ -443,6 +459,7 @@ export async function ensurePipelineTables() {
       apim_status text,
       apim_tier text,
       payment_date timestamptz,
+      last_contacted_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     )
@@ -460,6 +477,7 @@ export async function ensurePipelineTables() {
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_status text`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_tier text`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS payment_date timestamptz`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS last_contacted_at timestamptz`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS fb_events (
@@ -490,11 +508,7 @@ export async function listPipelineClients() {
   const sql = getSql();
   if (!sql) {
     const local = await readLocalPipelineFile();
-    return Promise.all(
-      [...local.clients]
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .map(attachLicenseSecretToClient),
-    );
+    return Promise.all(sortClientsByContactTime(local.clients).map(attachLicenseSecretToClient));
   }
 
   await syncLegacyTrialLeadsIntoPipeline();
@@ -530,10 +544,11 @@ export async function listPipelineClients() {
       apim_status,
       apim_tier,
       payment_date,
+      last_contacted_at,
       created_at,
       updated_at
     FROM clients
-    ORDER BY created_at DESC
+    ORDER BY last_contacted_at DESC NULLS LAST, updated_at DESC, created_at DESC
   `;
 
   return Promise.all((rows as Array<ClientRow>).map(mapClientRow).map(attachLicenseSecretToClient));
@@ -580,6 +595,7 @@ export async function getPipelineClientById(id: string) {
       apim_status,
       apim_tier,
       payment_date,
+      last_contacted_at,
       created_at,
       updated_at
     FROM clients
@@ -637,11 +653,84 @@ export async function getPipelineClientByLicenseKey(licenseKey: string) {
       apim_status,
       apim_tier,
       payment_date,
+      last_contacted_at,
       created_at,
       updated_at
     FROM clients
     WHERE license_key = ${normalized}
     LIMIT 1
+  `;
+
+  const row = (rows as Array<ClientRow>)[0];
+  return row ? attachLicenseSecretToClient(mapClientRow(row)) : null;
+}
+
+export async function markPipelineClientContacted(clientId: string) {
+  const id = String(clientId ?? "").trim();
+  if (!id) {
+    throw new Error("Missing client id");
+  }
+
+  const now = new Date().toISOString();
+  const sql = getSql();
+
+  if (!sql) {
+    const local = await readLocalPipelineFile();
+    let updated: PipelineClientRecord | null = null;
+    local.clients = local.clients.map((client) => {
+      if (client.id !== id) {
+        return client;
+      }
+
+      updated = {
+        ...client,
+        lastContactedAt: now,
+        updatedAt: now,
+      };
+      return updated;
+    });
+    await writeLocalPipelineFile(local);
+    return updated ? attachLicenseSecretToClient(updated) : null;
+  }
+
+  await ensurePipelineTables();
+  const rows = await sql`
+    UPDATE clients
+    SET last_contacted_at = now(), updated_at = now()
+    WHERE id = ${id}
+    RETURNING
+      id,
+      name,
+      phone,
+      email,
+      fbp,
+      fbc,
+      ip,
+      user_agent,
+      ad_source,
+      fbclid,
+      utm_source,
+      utm_campaign,
+      utm_medium,
+      utm_content,
+      utm_term,
+      landing_url,
+      referrer,
+      status,
+      lead_at,
+      trial_at,
+      trial_ends_at,
+      paid_at,
+      license_key,
+      license_type,
+      license_expires_at,
+      apim_subscription_id,
+      apim_status,
+      apim_tier,
+      payment_date,
+      last_contacted_at,
+      created_at,
+      updated_at
   `;
 
   const row = (rows as Array<ClientRow>)[0];
@@ -832,6 +921,7 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
         apim_status,
         apim_tier,
         payment_date,
+        last_contacted_at,
         created_at,
         updated_at
     `;
@@ -889,6 +979,7 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
       apim_status,
       apim_tier,
       payment_date,
+      last_contacted_at,
       created_at,
       updated_at
   `;

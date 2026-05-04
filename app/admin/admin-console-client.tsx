@@ -47,6 +47,7 @@ import {
   deleteSubscriptionAction,
   logoutAdmin,
   markPipelineClientLostAction,
+  markPipelineClientContactedAction,
   saveAdminConfig,
   updateLicenseDetailsAction,
 } from "./actions";
@@ -1086,7 +1087,6 @@ function ClientDetailSheet({
   onClose: () => void;
 }) {
   if (!client) return null;
-  const goWhatsappUrl = buildQuickWhatsAppUrl(client.phone, "hey");
 
   return (
     <Sheet open={open} onClose={onClose} title="Client pipeline">
@@ -1098,17 +1098,21 @@ function ClientDetailSheet({
           <ReadOnlyRow label="Source" value={client.utmSource || client.adSource || "—"} />
           <ReadOnlyRow label="Campagne" value={client.utmCampaign || "—"} />
           <ReadOnlyRow label="Licence" value={client.licenseKey || "Aucune"} />
-          {client.apimKey ? <AdminInstallerPanel apiKey={client.apimKey} /> : null}
+          <ReadOnlyRow
+            label="Dernier contact"
+            value={client.lastContactedAt ? formatDateTime(client.lastContactedAt) : "Jamais"}
+          />
         </FormSection>
-        <a
-          href={goWhatsappUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 text-sm font-semibold text-emerald-100"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Go WhatsApp
-        </a>
+        <form action={markPipelineClientContactedAction}>
+          <input type="hidden" name="clientId" value={client.id} />
+          <PendingButton
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 text-sm font-semibold text-emerald-100"
+            pendingLabel="Ouverture..."
+          >
+            <MessageCircle className="h-4 w-4" />
+            Go WhatsApp
+          </PendingButton>
+        </form>
         <div className="grid gap-3 sm:grid-cols-2">
           {client.status === "lead" || client.status === "expired" ? (
             <form action={activatePipelineTrialAction}>
@@ -2044,15 +2048,6 @@ function buildLooseWhatsAppUrl(
     : `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
-function buildQuickWhatsAppUrl(whatsappNumber: string, message: string) {
-  const normalized = normalizeTunisiaWhatsappNumber(whatsappNumber);
-  const digits = String(whatsappNumber ?? "").replace(/[^\d]/g, "");
-  const phone = normalized?.waId || digits || "";
-
-  return phone
-    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`;
-}
 
 function buildInstallMessage(customerName: string, licenseKey: string) {
   return [
