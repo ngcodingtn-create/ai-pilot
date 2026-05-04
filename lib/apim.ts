@@ -208,6 +208,12 @@ export async function deleteApimSubscription(subscriptionId: string | undefined)
   if (!subscriptionId) return false;
 
   await apimFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ properties: { state: "cancelled" } }),
+    expected: [200, 202, 204, 404],
+  });
+
+  await apimFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
     method: "DELETE",
     expected: [200, 202, 204, 404],
   });

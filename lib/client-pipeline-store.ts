@@ -458,6 +458,7 @@ export async function ensurePipelineTables() {
       apim_subscription_id text,
       apim_status text,
       apim_tier text,
+      apim_key text,
       payment_date timestamptz,
       last_contacted_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
@@ -476,6 +477,7 @@ export async function ensurePipelineTables() {
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_subscription_id text`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_status text`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_tier text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_key text`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS payment_date timestamptz`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS last_contacted_at timestamptz`;
 
@@ -1473,6 +1475,7 @@ export async function markClientLostById(clientId: string) {
       license_expires_at = ${null},
       apim_subscription_id = ${null},
       apim_status = ${"cancelled"},
+      apim_key = ${null},
       updated_at = now()
     WHERE id = ${client.id}
   `;
