@@ -1,6 +1,6 @@
 "use client";
 
-import { type ButtonHTMLAttributes, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useMemo, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import {
   Activity,
@@ -47,8 +47,8 @@ import {
   deleteSubscriptionAction,
   logoutAdmin,
   markPipelineClientLostAction,
-  markPipelineClientContactedAction,
   saveAdminConfig,
+  touchPipelineClientContactAction,
   updateLicenseDetailsAction,
 } from "./actions";
 
@@ -132,11 +132,36 @@ export default function AdminConsole({
   const [sheet, setSheet] = useState<SheetMode>("none");
   const [selectedLicense, setSelectedLicense] = useState<LicenseRecord | null>(null);
   const [selectedClient, setSelectedClient] = useState<PipelineClientRecord | null>(null);
+  const [clientPatches, setClientPatches] = useState<Record<string, Partial<PipelineClientRecord>>>({});
+  const [removedClientIds, setRemovedClientIds] = useState<string[]>([]);
+  const [, startClientSync] = useTransition();
 
-  const stats = useMemo(() => buildStats(licenses, requests, pipelineClients), [
+  const clientRows = useMemo(
+    () =>
+      sortPipelineClientsForUi(
+        pipelineClients
+          .filter((client) => !removedClientIds.includes(client.id))
+          .map((client) =>
+            clientPatches[client.id]
+              ? {
+                  ...client,
+                  ...clientPatches[client.id],
+                }
+              : client,
+          ),
+      ),
+    [clientPatches, pipelineClients, removedClientIds],
+  );
+
+  const selectedClientView = useMemo(
+    () => (selectedClient ? clientRows.find((client) => client.id === selectedClient.id) ?? selectedClient : null),
+    [clientRows, selectedClient],
+  );
+
+  const stats = useMemo(() => buildStats(licenses, requests, clientRows), [
     licenses,
     requests,
-    pipelineClients,
+    clientRows,
   ]);
 
   const filteredSubscriptions = useMemo(
@@ -150,8 +175,8 @@ export default function AdminConsole({
   );
 
   const filteredClients = useMemo(
-    () => pipelineClients.filter((client) => matchesClient(client, query, pipelineStatus)),
-    [pipelineClients, query, pipelineStatus],
+    () => clientRows.filter((client) => matchesClient(client, query, pipelineStatus)),
+    [clientRows, query, pipelineStatus],
   );
 
   const globalResults = useMemo(() => {
@@ -171,6 +196,57 @@ export default function AdminConsole({
   function openClient(client: PipelineClientRecord) {
     setSelectedClient(client);
     setSheet("client");
+  }
+
+  function patchClient(clientId: string, patch: Partial<PipelineClientRecord>) {
+    const updatedAt = new Date().toISOString();
+    const optimisticPatch = { ...patch, updatedAt };
+
+    setClientPatches((current) => ({
+      ...current,
+      [clientId]: {
+        ...current[clientId],
+        ...optimisticPatch,
+      },
+    }));
+    setSelectedClient((current) =>
+      current?.id === clientId
+        ? {
+            ...current,
+            ...optimisticPatch,
+          }
+        : current,
+    );
+  }
+
+  function removeClient(clientId: string) {
+    setRemovedClientIds((current) => (current.includes(clientId) ? current : [...current, clientId]));
+    setClientPatches((current) => {
+      const next = { ...current };
+      delete next[clientId];
+      return next;
+    });
+    setSelectedClient((current) => (current?.id === clientId ? null : current));
+    setSheet("none");
+  }
+
+  function contactClient(client: PipelineClientRecord) {
+    const now = new Date().toISOString();
+    patchClient(client.id, { lastContactedAt: now });
+
+    const whatsappUrl = buildPipelineWhatsAppUrl(client.phone);
+    const opened = window.open(whatsappUrl, "_blank");
+    if (opened) {
+      opened.opener = null;
+    } else {
+      window.location.href = whatsappUrl;
+    }
+
+    const formData = new FormData();
+    formData.set("clientId", client.id);
+    startClientSync(() => {
+      void touchPipelineClientContactAction(formData).catch(() => {});
+    });
   }
 
   return (
@@ -246,9 +322,12 @@ export default function AdminConsole({
       />
 
       <ClientDetailSheet
-        client={selectedClient}
+        client={selectedClientView}
         open={sheet === "client"}
         onClose={() => setSheet("none")}
+        onContact={contactClient}
+        onPatch={patchClient}
+        onRemove={removeClient}
       />
 
       <MoreSheet
@@ -1081,12 +1160,57 @@ function ClientDetailSheet({
   client,
   open,
   onClose,
+  onContact,
+  onPatch,
+  onRemove,
 }: {
   client: PipelineClientRecord | null;
   open: boolean;
   onClose: () => void;
+  onContact: (client: PipelineClientRecord) => void;
+  onPatch: (clientId: string, patch: Partial<PipelineClientRecord>) => void;
+  onRemove: (clientId: string) => void;
 }) {
   if (!client) return null;
+
+  const markTrialOptimistic = () => {
+    const now = new Date().toISOString();
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    onPatch(client.id, {
+      status: "trial",
+      trialAt: now,
+      trialEndsAt,
+      licenseType: "trial",
+      licenseKey: client.licenseKey ?? "Création...",
+      licenseExpiresAt: trialEndsAt,
+    });
+  };
+
+  const markPaidOptimistic = () => {
+    const now = new Date().toISOString();
+    onPatch(client.id, {
+      status: "paid",
+      paidAt: now,
+      paymentDate: now,
+      licenseType: "paid",
+      licenseExpiresAt: undefined,
+      apimStatus: "active",
+    });
+  };
+
+  const markLostOptimistic = () => {
+    onPatch(client.id, {
+      status: "lost",
+      trialAt: undefined,
+      trialEndsAt: undefined,
+      paidAt: undefined,
+      licenseKey: undefined,
+      licenseType: undefined,
+      licenseExpiresAt: undefined,
+      apimKey: undefined,
+      apimStatus: "cancelled",
+    });
+  };
 
   return (
     <Sheet open={open} onClose={onClose} title="Client pipeline">
@@ -1103,19 +1227,17 @@ function ClientDetailSheet({
             value={client.lastContactedAt ? formatDateTime(client.lastContactedAt) : "Jamais"}
           />
         </FormSection>
-        <form action={markPipelineClientContactedAction}>
-          <input type="hidden" name="clientId" value={client.id} />
-          <PendingButton
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 text-sm font-semibold text-emerald-100"
-            pendingLabel="Ouverture..."
-          >
-            <MessageCircle className="h-4 w-4" />
-            Go WhatsApp
-          </PendingButton>
-        </form>
+        <button
+          type="button"
+          onClick={() => onContact(client)}
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15 active:scale-[0.99]"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Go WhatsApp
+        </button>
         <div className="grid gap-3 sm:grid-cols-2">
           {client.status === "lead" || client.status === "expired" ? (
-            <form action={activatePipelineTrialAction}>
+            <form action={activatePipelineTrialAction} onSubmit={markTrialOptimistic}>
               <input type="hidden" name="clientId" value={client.id} />
               <input type="hidden" name="preferredEnvironment" value="opencode" />
               <input type="hidden" name="tier" value="pro" />
@@ -1128,7 +1250,7 @@ function ClientDetailSheet({
             </form>
           ) : null}
           {client.status === "trial" ? (
-            <form action={convertPipelineClientToPaidAction}>
+            <form action={convertPipelineClientToPaidAction} onSubmit={markPaidOptimistic}>
               <input type="hidden" name="clientId" value={client.id} />
               <input type="hidden" name="preferredEnvironment" value="opencode" />
               <input type="hidden" name="tier" value="pro" />
@@ -1141,7 +1263,7 @@ function ClientDetailSheet({
             </form>
           ) : null}
           {client.status === "trial" ? (
-            <form action={markPipelineClientLostAction}>
+            <form action={markPipelineClientLostAction} onSubmit={markLostOptimistic}>
               <input type="hidden" name="clientId" value={client.id} />
               <PendingButton
                 className="h-12 w-full rounded-2xl border border-rose-400/35 bg-rose-500/10 text-sm font-semibold text-rose-100"
@@ -1162,7 +1284,7 @@ function ClientDetailSheet({
             </div>
           ) : null}
         </div>
-        <form action={deletePipelineClientAction}>
+        <form action={deletePipelineClientAction} onSubmit={() => onRemove(client.id)}>
           <input type="hidden" name="clientId" value={client.id} />
           <PendingButton
             className="h-12 w-full rounded-2xl border border-rose-400/35 bg-rose-500/10 text-sm font-semibold text-rose-100"
@@ -1875,6 +1997,18 @@ function buildStats(
   };
 }
 
+function sortPipelineClientsForUi(clients: PipelineClientRecord[]) {
+  return [...clients].sort((left, right) => {
+    const leftContact = timestamp(left.lastContactedAt);
+    const rightContact = timestamp(right.lastContactedAt);
+    if (leftContact !== rightContact) return rightContact - leftContact;
+    return (
+      timestamp(right.updatedAt || right.createdAt || right.leadAt) -
+      timestamp(left.updatedAt || left.createdAt || left.leadAt)
+    );
+  });
+}
+
 function filterLicenses(
   licenses: LicenseRecord[],
   query: string,
@@ -1974,6 +2108,12 @@ function percent(value: number, total: number) {
   return Number(((value / total) * 100).toFixed(1));
 }
 
+function timestamp(value?: string) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function planLabel(tier: LicenseRecord["tier"]) {
   if (tier === "starter") return "Starter";
   if (tier === "max") return "Max";
@@ -2048,6 +2188,16 @@ function buildLooseWhatsAppUrl(
     : `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
+function buildPipelineWhatsAppUrl(whatsappNumber: string) {
+  const message = "hey";
+  const normalized = normalizeTunisiaWhatsappNumber(whatsappNumber);
+  const digits = String(whatsappNumber ?? "").replace(/[^\d]/g, "");
+  const phone = normalized?.waId || digits || "";
+
+  return phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
 
 function buildInstallMessage(customerName: string, licenseKey: string) {
   return [

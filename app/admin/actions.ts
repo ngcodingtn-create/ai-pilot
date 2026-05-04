@@ -428,6 +428,17 @@ export async function markPipelineClientContactedAction(formData: FormData) {
   redirect(whatsappUrl ?? "/admin?section=pipeline&contacted=1");
 }
 
+export async function touchPipelineClientContactAction(formData: FormData) {
+  await requireAdminAuth();
+
+  const clientId = String(formData.get("clientId") ?? "").trim();
+  if (!clientId) {
+    throw new Error("Missing client id");
+  }
+
+  await markPipelineClientContacted(clientId);
+}
+
 export async function deletePipelineClientAction(formData: FormData) {
   await requireAdminAuth();
 
