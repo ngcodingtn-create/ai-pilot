@@ -24,7 +24,7 @@ jobs:
             script: dist:linux
             args: ""
             artifact: aipilot-manager-linux
-          - os: macos-13
+          - os: macos-latest
             script: dist:mac
             args: "-- --x64"
             artifact: aipilot-manager-macos-x64

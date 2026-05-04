@@ -34,7 +34,7 @@ jobs:
               manager-app/dist/*.AppImage
               manager-app/dist/*.deb
           - label: macOS x64
-            os: macos-13
+            os: macos-latest
             script: dist:mac
             args: "-- --x64"
             files: |
