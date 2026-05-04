@@ -15,6 +15,7 @@ const state = {
 };
 
 const UI_STORAGE_KEY = "aipilot-manager-ui";
+const LAST_AUTO_CONFIG_VERSION_KEY = "aipilot-manager-last-auto-config-version";
 
 const elements = {
   appShell: document.querySelector(".app-shell"),
@@ -1045,6 +1046,31 @@ async function runManagerAction(action) {
   }
 }
 
+async function autoRefreshConfigForCurrentVersion() {
+  if (!state.manifest || !state.defaults?.version) return;
+
+  const currentVersion = state.defaults.version;
+  const lastVersion = localStorage.getItem(LAST_AUTO_CONFIG_VERSION_KEY);
+  if (lastVersion === currentVersion) {
+    return;
+  }
+
+  appendActivity(
+    "Nouvelle version détectée: synchronisation de la clé APIM individuelle...",
+    "live",
+  );
+  await runManagerAction("refresh-config");
+  localStorage.setItem(LAST_AUTO_CONFIG_VERSION_KEY, currentVersion);
+  appendActivity(
+    "Clé APIM individuelle appliquée. Redémarrage du manager...",
+    "success",
+  );
+
+  if (state.defaults?.packaged) {
+    await window.aipilotManager.restartApp();
+  }
+}
+
 async function connectSession({ autoDiagnose = true } = {}) {
   const backendUrl = state.defaults.backendUrl;
   const licenseKey = normalizeLicenseKey(elements.configLicenseKey.value);
@@ -1319,6 +1345,7 @@ async function bootstrap() {
     setBusy(true, "connect");
     try {
       await connectSession({ autoDiagnose: true });
+      await autoRefreshConfigForCurrentVersion();
     } catch (error) {
       appendActivity(error instanceof Error ? error.message : "Impossible de restaurer la session.", "error");
     } finally {

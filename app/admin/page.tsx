@@ -92,6 +92,10 @@ export default async function AdminPage({
         lost: params.lost === "1",
         requestAccepted: params.requestAccepted === "1",
         licenseKey: params.paidConverted === "1" ? undefined : params.licenseKey,
+        apimKey:
+          params.paidConverted === "1"
+            ? undefined
+            : flashClient?.apimKey || flashLicense?.azureApiKey,
         customer:
           params.customer ||
           flashClient?.name ||

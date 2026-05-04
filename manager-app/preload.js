@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld("aipilotManager", {
   minimizeWindow: () => ipcRenderer.invoke("manager:window-minimize"),
   toggleMaximizeWindow: () => ipcRenderer.invoke("manager:window-toggle-maximize"),
   closeWindow: () => ipcRenderer.invoke("manager:window-close"),
+  restartApp: () => ipcRenderer.invoke("manager:restart-app"),
   onActionLog: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on("manager:action-log", listener);

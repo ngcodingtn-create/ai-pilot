@@ -1,5 +1,10 @@
 import { getStoredConfig } from "@/lib/config-store";
-import { findLicenseByKey } from "@/lib/license-store";
+import { createApimSubscription, getApimOpenAiBaseUrl } from "@/lib/apim";
+import { findLifecycleLicenseByKey } from "@/lib/client-pipeline-store";
+import {
+  findLicenseByKey,
+  setLicenseApimCredentials,
+} from "@/lib/license-store";
 
 type EnvironmentKey = "codex" | "vscode-codex" | "t3code" | "opencode";
 
@@ -39,16 +44,7 @@ function normalizeEnvironment(value: unknown): EnvironmentKey | undefined {
   return undefined;
 }
 
-function buildAzureBaseUrl(resourceName: string) {
-  return `https://${resourceName}.openai.azure.com/openai/v1`;
-}
-
-function buildCodexConfig(
-  resourceName: string,
-  deployment: string,
-) {
-  const baseUrl = buildAzureBaseUrl(resourceName);
-
+function buildCodexConfig(baseUrl: string, deployment: string) {
   return `model = "${deployment}"
 model_provider = "azure"
 model_reasoning_effort = "medium"
@@ -78,7 +74,7 @@ model_reasoning_effort = "xhigh"
 }
 
 function buildOpenCodeConfig(
-  resourceName: string,
+  baseUrl: string,
   apiKey: string,
   deployment: string,
   availableDeployments: AvailableDeployment[],
@@ -115,13 +111,14 @@ function buildOpenCodeConfig(
     model: `azure/${deployment}`,
     provider: {
       azure: {
-        npm: "@ai-sdk/azure",
+        npm: "@ai-sdk/openai-compatible",
+        name: "AIPilot AI",
         options: {
-          resourceName,
+          baseURL: baseUrl,
           apiKey,
         },
         models,
-        env: ["AZURE_RESOURCE_NAME", "AZURE_OPENAI_API_KEY"],
+        env: ["AIPILOT_OPENAI_BASE_URL", "AZURE_OPENAI_API_KEY"],
       },
     },
   };
@@ -329,7 +326,7 @@ export async function POST(request: Request) {
     | null;
 
   const licenseKey = String(payload?.licenseKey ?? "");
-  const license = await findLicenseByKey(licenseKey);
+  let license = await findLicenseByKey(licenseKey);
 
   if (!license || license.status !== "active") {
     return Response.json(
@@ -338,22 +335,75 @@ export async function POST(request: Request) {
     );
   }
 
+  const lifecycle = await findLifecycleLicenseByKey(license.licenseKey);
+  if (lifecycle?.license) {
+    const expired =
+      lifecycle.license.expiresAt &&
+      new Date(lifecycle.license.expiresAt).getTime() <= Date.now();
+    const revoked = !lifecycle.license.isActive;
+
+    if (expired || revoked) {
+      return Response.json(
+        {
+          error:
+            lifecycle.license.type === "trial"
+              ? "Trial license expired or inactive."
+              : "Paid license inactive.",
+        },
+        { status: 403 },
+      );
+    }
+  }
+
   const config = await getStoredConfig();
   const selectedEnvironment =
     normalizeEnvironment(payload?.environment) ?? license.preferredEnvironment;
-  const effectiveApiKey = license.azureApiKey ?? config.azureApiKey;
+  let effectiveApiKey = license.azureApiKey;
+
+  if (!license.apimSubscriptionId || license.apimStatus !== "active" || !effectiveApiKey) {
+    try {
+      const provisioned = await createApimSubscription({
+        clientId: license.id,
+        displayName: `${license.customerName} - ${license.tier}`,
+      });
+      await setLicenseApimCredentials({
+        id: license.id,
+        apimKey: provisioned.primaryKey,
+        apimSubscriptionId: provisioned.subscriptionId,
+        apimStatus: provisioned.state,
+      });
+      license = {
+        ...license,
+        azureApiKey: provisioned.primaryKey,
+        apimSubscriptionId: provisioned.subscriptionId,
+        apimStatus: provisioned.state,
+      };
+      effectiveApiKey = provisioned.primaryKey;
+    } catch (error) {
+      return Response.json(
+        {
+          error:
+            error instanceof Error
+              ? `Unable to provision APIM key for this license: ${error.message}`
+              : "Unable to provision APIM key for this license.",
+        },
+        { status: 409 },
+      );
+    }
+  }
 
   if (!effectiveApiKey) {
     return Response.json(
       {
         error:
-          "No Azure API key is available for this license. Configure a per-license or global key in admin.",
+          "No APIM key is available for this license. Create or reactivate the client's trial/paid access from admin.",
       },
       { status: 409 },
     );
   }
 
-  const resourceName = config.azureResourceName;
+  const baseUrl = getApimOpenAiBaseUrl();
+  const resourceName = process.env.AZURE_APIM_SERVICE_NAME?.trim() || "nextgen";
   const availableDeployments = buildAvailableDeployments(config);
   const deployment = availableDeployments[0].deployment;
   const tool = buildToolDetails(selectedEnvironment);
@@ -382,16 +432,17 @@ export async function POST(request: Request) {
     azure: {
       apiKey: effectiveApiKey,
       resourceName,
+      baseUrl,
       deployment,
       selectedModelLabel: availableDeployments[0].label,
       availableDeployments,
       codex: {
-        baseUrl: buildAzureBaseUrl(resourceName),
-        configToml: buildCodexConfig(resourceName, deployment),
+        baseUrl,
+        configToml: buildCodexConfig(baseUrl, deployment),
       },
       opencode: {
         config: buildOpenCodeConfig(
-          resourceName,
+          baseUrl,
           effectiveApiKey,
           deployment,
           availableDeployments,

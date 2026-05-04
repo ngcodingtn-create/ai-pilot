@@ -8,9 +8,16 @@ import {
   deleteLicenseById,
   disableLicenseByKey,
   findLicenseByKey,
+  updateLicenseStatus,
   type LicenseEnvironment,
   type LicenseTier,
 } from "./license-store";
+import {
+  createApimSubscription,
+  deleteApimSubscription,
+  setApimSubscriptionState,
+  type ApimSubscriptionState,
+} from "./apim";
 
 export type ClientStatus = "lead" | "trial" | "paid" | "expired" | "cancelled" | "lost";
 export type ClientLicenseType = "trial" | "paid";
@@ -42,6 +49,11 @@ export type PipelineClientRecord = {
   licenseKey?: string;
   licenseType?: ClientLicenseType;
   licenseExpiresAt?: string;
+  apimSubscriptionId?: string;
+  apimStatus?: ApimSubscriptionState;
+  apimTier?: string;
+  apimKey?: string;
+  paymentDate?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -101,6 +113,11 @@ type ClientRow = {
   license_key: string | null;
   license_type: ClientLicenseType | null;
   license_expires_at: string | Date | null;
+  apim_subscription_id?: string | null;
+  apim_status?: ApimSubscriptionState | null;
+  apim_tier?: string | null;
+  apim_key?: string | null;
+  payment_date?: string | Date | null;
   created_at: string | Date;
   updated_at: string | Date;
 };
@@ -211,8 +228,27 @@ function mapClientRow(row: ClientRow): PipelineClientRecord {
     licenseKey: row.license_key ?? undefined,
     licenseType: row.license_type ?? undefined,
     licenseExpiresAt: toIso(row.license_expires_at),
+    apimSubscriptionId: row.apim_subscription_id ?? undefined,
+    apimStatus: row.apim_status ?? undefined,
+    apimTier: row.apim_tier ?? undefined,
+    apimKey: row.apim_key ?? undefined,
+    paymentDate: toIso(row.payment_date),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+async function attachLicenseSecretToClient(client: PipelineClientRecord) {
+  if (!client.licenseKey) {
+    return client;
+  }
+
+  const license = await findLicenseByKey(client.licenseKey);
+  return {
+    ...client,
+    apimKey: license?.azureApiKey,
+    apimSubscriptionId: client.apimSubscriptionId ?? license?.apimSubscriptionId,
+    apimStatus: client.apimStatus ?? license?.apimStatus,
   };
 }
 
@@ -284,6 +320,10 @@ async function findMatchingSqlClientByPhone(phone: string) {
       license_key,
       license_type,
       license_expires_at,
+      apim_subscription_id,
+      apim_status,
+      apim_tier,
+      payment_date,
       created_at,
       updated_at
     FROM clients
@@ -399,6 +439,10 @@ export async function ensurePipelineTables() {
       license_key text,
       license_type text,
       license_expires_at timestamptz,
+      apim_subscription_id text,
+      apim_status text,
+      apim_tier text,
+      payment_date timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     )
@@ -412,6 +456,10 @@ export async function ensurePipelineTables() {
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS utm_term text`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS landing_url text`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS referrer text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_subscription_id text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_status text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS apim_tier text`;
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS payment_date timestamptz`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS fb_events (
@@ -442,7 +490,11 @@ export async function listPipelineClients() {
   const sql = getSql();
   if (!sql) {
     const local = await readLocalPipelineFile();
-    return [...local.clients].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return Promise.all(
+      [...local.clients]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(attachLicenseSecretToClient),
+    );
   }
 
   await syncLegacyTrialLeadsIntoPipeline();
@@ -474,20 +526,25 @@ export async function listPipelineClients() {
       license_key,
       license_type,
       license_expires_at,
+      apim_subscription_id,
+      apim_status,
+      apim_tier,
+      payment_date,
       created_at,
       updated_at
     FROM clients
     ORDER BY created_at DESC
   `;
 
-  return (rows as Array<ClientRow>).map(mapClientRow);
+  return Promise.all((rows as Array<ClientRow>).map(mapClientRow).map(attachLicenseSecretToClient));
 }
 
 export async function getPipelineClientById(id: string) {
   const sql = getSql();
   if (!sql) {
     const local = await readLocalPipelineFile();
-    return local.clients.find((client) => client.id === id) ?? null;
+    const client = local.clients.find((client) => client.id === id) ?? null;
+    return client ? attachLicenseSecretToClient(client) : null;
   }
 
   await syncLegacyTrialLeadsIntoPipeline();
@@ -519,6 +576,10 @@ export async function getPipelineClientById(id: string) {
       license_key,
       license_type,
       license_expires_at,
+      apim_subscription_id,
+      apim_status,
+      apim_tier,
+      payment_date,
       created_at,
       updated_at
     FROM clients
@@ -527,7 +588,7 @@ export async function getPipelineClientById(id: string) {
   `;
 
   const row = (rows as Array<ClientRow>)[0];
-  return row ? mapClientRow(row) : null;
+  return row ? attachLicenseSecretToClient(mapClientRow(row)) : null;
 }
 
 export async function getPipelineClientByLicenseKey(licenseKey: string) {
@@ -539,7 +600,8 @@ export async function getPipelineClientByLicenseKey(licenseKey: string) {
   const sql = getSql();
   if (!sql) {
     const local = await readLocalPipelineFile();
-    return local.clients.find((client) => client.licenseKey === normalized) ?? null;
+    const client = local.clients.find((client) => client.licenseKey === normalized) ?? null;
+    return client ? attachLicenseSecretToClient(client) : null;
   }
 
   await syncLegacyTrialLeadsIntoPipeline();
@@ -571,6 +633,10 @@ export async function getPipelineClientByLicenseKey(licenseKey: string) {
       license_key,
       license_type,
       license_expires_at,
+      apim_subscription_id,
+      apim_status,
+      apim_tier,
+      payment_date,
       created_at,
       updated_at
     FROM clients
@@ -579,7 +645,7 @@ export async function getPipelineClientByLicenseKey(licenseKey: string) {
   `;
 
   const row = (rows as Array<ClientRow>)[0];
-  return row ? mapClientRow(row) : null;
+  return row ? attachLicenseSecretToClient(mapClientRow(row)) : null;
 }
 
 export async function getPipelineClientByPhone(phone: string) {
@@ -762,6 +828,10 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
         license_key,
         license_type,
         license_expires_at,
+        apim_subscription_id,
+        apim_status,
+        apim_tier,
+        payment_date,
         created_at,
         updated_at
     `;
@@ -815,6 +885,10 @@ export async function upsertLeadClient(input: UpsertLeadInput) {
       license_key,
       license_type,
       license_expires_at,
+      apim_subscription_id,
+      apim_status,
+      apim_tier,
+      payment_date,
       created_at,
       updated_at
   `;
@@ -944,6 +1018,35 @@ async function listLifecycleLicensesForClient(clientId: string) {
   return (rows as Array<PipelineLicenseRow>).map(mapLicenseRow);
 }
 
+async function provisionApimForClient(client: PipelineClientRecord) {
+  if (client.apimSubscriptionId && client.apimKey) {
+    await setApimSubscriptionState(client.apimSubscriptionId, "active");
+    return {
+      subscriptionId: client.apimSubscriptionId,
+      primaryKey: client.apimKey,
+      state: "active" as const,
+    };
+  }
+
+  return createApimSubscription({
+    clientId: client.id,
+    displayName: client.name?.trim() || client.phone,
+  });
+}
+
+async function findClientApimSubscriptionId(client: PipelineClientRecord) {
+  if (client.apimSubscriptionId) {
+    return client.apimSubscriptionId;
+  }
+
+  if (!client.licenseKey) {
+    return undefined;
+  }
+
+  const license = await findLicenseByKey(client.licenseKey);
+  return license?.apimSubscriptionId;
+}
+
 export async function activateTrialForClient(input: ActivateTrialOptions) {
   const client = await getPipelineClientById(input.clientId);
   if (!client) {
@@ -1017,10 +1120,14 @@ export async function activateTrialForClient(input: ActivateTrialOptions) {
   const expiresAt = trialIsActive
     ? getTrialExpiry(input.trialHours ?? DEFAULT_TRIAL_HOURS).toISOString()
     : undefined;
+  const apimSubscription = await provisionApimForClient(client);
 
   const installLicense = await createLicense({
     customerName: client.name?.trim() || client.phone,
     customerEmail: client.email,
+    azureApiKey: apimSubscription.primaryKey,
+    apimSubscriptionId: apimSubscription.subscriptionId,
+    apimStatus: apimSubscription.state,
     tier,
     preferredEnvironment,
     status: trialIsActive ? "active" : "disabled",
@@ -1054,6 +1161,9 @@ export async function activateTrialForClient(input: ActivateTrialOptions) {
             licenseKey: installLicense.licenseKey,
             licenseType: "trial",
             licenseExpiresAt: expiresAt,
+            apimSubscriptionId: apimSubscription.subscriptionId,
+            apimStatus: trialIsActive ? "active" : "suspended",
+            apimTier: "aipilot-pro",
             updatedAt: now,
           }
         : record,
@@ -1093,15 +1203,25 @@ export async function activateTrialForClient(input: ActivateTrialOptions) {
         license_key = ${installLicense.licenseKey},
         license_type = ${"trial"},
         license_expires_at = ${expiresAt ?? null},
+        apim_subscription_id = ${apimSubscription.subscriptionId},
+        apim_status = ${trialIsActive ? "active" : "suspended"},
+        apim_tier = ${"aipilot-pro"},
         updated_at = now()
       WHERE id = ${client.id}
     `;
+  }
+
+  if (!trialIsActive) {
+    await setApimSubscriptionState(apimSubscription.subscriptionId, "suspended");
+    await updateLicenseStatus(installLicense.id, "disabled");
   }
 
   return {
     clientId: client.id,
     licenseId: installLicense.id,
     licenseKey: installLicense.licenseKey,
+    apimSubscriptionId: apimSubscription.subscriptionId,
+    apimKey: apimSubscription.primaryKey,
     expiresAt,
     preferredEnvironment,
     tier,
@@ -1140,6 +1260,16 @@ export async function markClientPaid(input: { clientId: string }) {
 
   const now = new Date().toISOString();
   const sql = getSql();
+  const apimSubscriptionId = await findClientApimSubscriptionId(client);
+  if (apimSubscriptionId) {
+    await setApimSubscriptionState(apimSubscriptionId, "active");
+  }
+  if (client.licenseKey) {
+    const linkedLicense = await findLicenseByKey(client.licenseKey);
+    if (linkedLicense) {
+      await updateLicenseStatus(linkedLicense.id, "active");
+    }
+  }
 
   if (!sql) {
     const local = await readLocalPipelineFile();
@@ -1154,6 +1284,9 @@ export async function markClientPaid(input: { clientId: string }) {
             ...record,
             status: "paid",
             paidAt: now,
+            paymentDate: now,
+            apimStatus: "active",
+            apimSubscriptionId: apimSubscriptionId ?? record.apimSubscriptionId,
             licenseType: record.licenseKey ? "paid" : record.licenseType,
             licenseExpiresAt: undefined,
             updatedAt: now,
@@ -1176,9 +1309,12 @@ export async function markClientPaid(input: { clientId: string }) {
   await sql`
     UPDATE clients
     SET
-      status = ${"paid"},
-      paid_at = ${now},
-      license_type = CASE WHEN license_key IS NULL THEN license_type ELSE ${"paid"} END,
+        status = ${"paid"},
+        paid_at = ${now},
+        payment_date = ${now},
+        apim_status = ${"active"},
+        apim_subscription_id = COALESCE(${apimSubscriptionId ?? null}, apim_subscription_id),
+        license_type = CASE WHEN license_key IS NULL THEN license_type ELSE ${"paid"} END,
       license_expires_at = ${null},
       updated_at = now()
     WHERE id = ${client.id}
@@ -1193,6 +1329,7 @@ export async function markClientLostById(clientId: string) {
     throw new Error("Client introuvable");
   }
 
+  await deleteApimSubscription(await findClientApimSubscriptionId(client));
   await deactivateClientLicenses(client.id, client.licenseKey);
 
   const now = new Date().toISOString();
@@ -1216,6 +1353,9 @@ export async function markClientLostById(clientId: string) {
             licenseKey: undefined,
             licenseType: undefined,
             licenseExpiresAt: undefined,
+            apimSubscriptionId: undefined,
+            apimStatus: "cancelled",
+            apimKey: undefined,
             updatedAt: now,
           }
         : record,
@@ -1240,6 +1380,8 @@ export async function markClientLostById(clientId: string) {
       license_key = ${null},
       license_type = ${null},
       license_expires_at = ${null},
+      apim_subscription_id = ${null},
+      apim_status = ${"cancelled"},
       updated_at = now()
     WHERE id = ${client.id}
   `;
@@ -1285,6 +1427,9 @@ export async function deletePipelineClientById(clientId: string) {
   }
 
   const linkedLicense = client.licenseKey ? await findLicenseByKey(client.licenseKey) : null;
+  await deleteApimSubscription(
+    client.apimSubscriptionId ?? linkedLicense?.apimSubscriptionId,
+  );
   if (linkedLicense) {
     await deleteLicenseById(linkedLicense.id);
   } else if (client.licenseKey) {
@@ -1347,10 +1492,14 @@ export async function convertClientToPaid(input: {
   const preferredEnvironment = input.preferredEnvironment ?? "codex";
   const tier = input.tier ?? "pro";
   const now = new Date().toISOString();
+  const apimSubscription = await provisionApimForClient(client);
 
   const installLicense = await createLicense({
     customerName: client.name?.trim() || client.phone,
     customerEmail: client.email,
+    azureApiKey: apimSubscription.primaryKey,
+    apimSubscriptionId: apimSubscription.subscriptionId,
+    apimStatus: apimSubscription.state,
     tier,
     preferredEnvironment,
     notes: `Lifecycle client ${client.id} — paid`,
@@ -1379,6 +1528,10 @@ export async function convertClientToPaid(input: {
             licenseKey: installLicense.licenseKey,
             licenseType: "paid",
             licenseExpiresAt: undefined,
+            apimSubscriptionId: apimSubscription.subscriptionId,
+            apimStatus: "active",
+            apimTier: "aipilot-pro",
+            paymentDate: now,
             updatedAt: now,
           }
         : record,
@@ -1417,6 +1570,10 @@ export async function convertClientToPaid(input: {
         license_key = ${installLicense.licenseKey},
         license_type = ${"paid"},
         license_expires_at = ${null},
+        apim_subscription_id = ${apimSubscription.subscriptionId},
+        apim_status = ${"active"},
+        apim_tier = ${"aipilot-pro"},
+        payment_date = ${now},
         updated_at = now()
       WHERE id = ${client.id}
     `;
@@ -1425,6 +1582,8 @@ export async function convertClientToPaid(input: {
   return {
     clientId: client.id,
     licenseKey: installLicense.licenseKey,
+    apimSubscriptionId: apimSubscription.subscriptionId,
+    apimKey: apimSubscription.primaryKey,
     preferredEnvironment,
     tier,
   };

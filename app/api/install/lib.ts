@@ -14,9 +14,9 @@ export async function serveInstallScript(relativePath: string) {
   content = replaceAll(content, /admin-3342-resource/g, config.azureResourceName);
   content = replaceAll(content, /gpt-5\.4-1/g, config.azureDefaultDeployment);
 
-  const keyReplacement = config.includeApiKeyInInstaller && config.azureApiKey
-    ? config.azureApiKey
-    : "";
+  // Per-client APIM keys are delivered from authenticated admin flows only.
+  // Never expose the stored raw Azure OpenAI key through public installers.
+  const keyReplacement = "";
 
   content = replaceAll(
     content,

@@ -15,6 +15,7 @@ import {
   Home,
   KeyRound,
   LayoutGrid,
+  MessageCircle,
   MoreHorizontal,
   PackagePlus,
   Search,
@@ -49,6 +50,9 @@ type RequestStatusFilter = "pending" | "accepted" | "all";
 type PipelineStatusFilter = ClientStatus | "all";
 type SheetMode = "none" | "add" | "subscription" | "client" | "more" | "settings";
 
+const APIM_PROPAGATION_NOTE =
+  "Note production: une nouvelle clé APIM peut prendre 15 à 20 secondes avant le premier appel Codex.";
+
 type TrackingStatus = {
   pixelId: string;
   hasCapiToken: boolean;
@@ -76,6 +80,7 @@ export type AdminConsoleProps = {
     lost?: boolean;
     requestAccepted?: boolean;
     licenseKey?: string;
+    apimKey?: string;
     customer?: string;
     whatsapp?: string;
   };
@@ -839,7 +844,9 @@ function SubscriptionDetailSheet({
   onClose: () => void;
 }) {
   const [detailTab, setDetailTab] = useState<"details" | "billing" | "history">("details");
+  const [copiedApim, setCopiedApim] = useState(false);
   if (!license) return null;
+  const apimCredential = license.azureApiKey;
 
   return (
     <Sheet open={open} onClose={onClose} title="Modifier subscription" compact>
@@ -910,8 +917,42 @@ function SubscriptionDetailSheet({
                 ]}
               />
               <div className="rounded-2xl border border-white/10 bg-[#06141f] p-4">
-                <p className="text-xs text-slate-500">Clé de licence</p>
+                <p className="text-xs text-slate-500">Clé licence interne</p>
                 <p className="mt-2 break-all font-mono text-sm text-slate-200">{license.licenseKey}</p>
+              </div>
+              <div className="rounded-2xl border border-[#0a84ff]/20 bg-[#06141f] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-slate-500">APIM</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-200">
+                      {license.apimStatus === "active" ? "Active" : license.apimStatus || "Non provisionné"}
+                    </p>
+                  </div>
+                  <Pill tone={license.apimStatus === "active" ? "emerald" : "amber"}>
+                    {license.apimSubscriptionId ? "Per-user key" : "Aucune clé"}
+                  </Pill>
+                </div>
+                <p className="mt-3 break-all font-mono text-sm text-slate-200">
+                  {maskSecret(apimCredential)}
+                </p>
+                {apimCredential ? (
+                  <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-amber-100/85">
+                    {APIM_PROPAGATION_NOTE}
+                  </p>
+                ) : null}
+                {apimCredential ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(apimCredential);
+                      setCopiedApim(true);
+                      window.setTimeout(() => setCopiedApim(false), 900);
+                    }}
+                    className="mt-3 h-11 w-full rounded-2xl border border-[#0a84ff]/30 bg-[#0a84ff]/10 text-sm font-semibold text-[#9fd0ff]"
+                  >
+                    {copiedApim ? "Clé APIM copiée" : "Copier clé APIM"}
+                  </button>
+                ) : null}
               </div>
             </FormSection>
           </>
@@ -959,7 +1000,9 @@ function ClientDetailSheet({
   open: boolean;
   onClose: () => void;
 }) {
+  const [copiedApim, setCopiedApim] = useState(false);
   if (!client) return null;
+  const goWhatsappUrl = buildQuickWhatsAppUrl(client.phone, "hey");
 
   return (
     <Sheet open={open} onClose={onClose} title="Client pipeline">
@@ -971,7 +1014,50 @@ function ClientDetailSheet({
           <ReadOnlyRow label="Source" value={client.utmSource || client.adSource || "—"} />
           <ReadOnlyRow label="Campagne" value={client.utmCampaign || "—"} />
           <ReadOnlyRow label="Licence" value={client.licenseKey || "Aucune"} />
+          <ReadOnlyRow label="APIM" value={client.apimStatus || "Non provisionné"} />
+          <ReadOnlyRow label="Subscription" value={client.apimSubscriptionId || "—"} />
+          <div className="rounded-2xl border border-[#0a84ff]/20 bg-[#06141f] p-4">
+            <p className="text-xs text-slate-500">Clé APIM client</p>
+            <p className="mt-2 break-all font-mono text-sm text-slate-200">
+              {maskSecret(client.apimKey)}
+            </p>
+            {client.apimKey ? (
+              <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-amber-100/85">
+                {APIM_PROPAGATION_NOTE}
+              </p>
+            ) : null}
+            {client.apimKey ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(client.apimKey || "");
+                    setCopiedApim(true);
+                    window.setTimeout(() => setCopiedApim(false), 900);
+                  }}
+                  className="h-11 rounded-2xl border border-[#0a84ff]/30 bg-[#0a84ff]/10 text-sm font-semibold text-[#9fd0ff]"
+                >
+                  {copiedApim ? "Clé copiée" : "Copier clé APIM"}
+                </button>
+                <a
+                  href={`/api/admin/clients/${client.id}/installer`}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#0a84ff] text-sm font-semibold text-white"
+                >
+                  Installer PS1
+                </a>
+              </div>
+            ) : null}
+          </div>
         </FormSection>
+        <a
+          href={goWhatsappUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 text-sm font-semibold text-emerald-100"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Go WhatsApp
+        </a>
         <div className="grid gap-3 sm:grid-cols-2">
           {client.status === "lead" || client.status === "expired" ? (
             <form action={activatePipelineTrialAction}>
@@ -1095,8 +1181,9 @@ function SettingsSheet({
             type="checkbox"
             name="includeApiKeyInInstaller"
             defaultChecked={config.includeApiKeyInInstaller}
+            disabled
           />
-          Inclure la clé API dans les installateurs publics
+          Injection de clé dans les installateurs publics désactivée. Les clients reçoivent uniquement leur clé APIM.
         </label>
         <textarea
           name="managerTutorialLinks"
@@ -1608,21 +1695,22 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
   const [copied, setCopied] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const licenseKey = flash?.licenseKey;
+  const credential = flash?.apimKey || licenseKey;
   const customer = flash?.customer || "Client";
   const whatsapp = flash?.whatsapp;
   const canShowLicenseReady = Boolean(
-    licenseKey && !flash?.paidConverted && (flash?.trialCreated || flash?.requestAccepted),
+    credential && !flash?.paidConverted && (flash?.trialCreated || flash?.requestAccepted),
   );
   const whatsappUrl =
-    whatsapp && licenseKey
+    whatsapp && credential
       ? buildWhatsAppUrl(
           whatsapp,
-          `Bonjour ${customer}, voici votre clé de licence AIPilot : ${licenseKey}`,
+          buildInstallMessage(customer, credential),
         )
       : null;
 
-  if (!canShowLicenseReady || !licenseKey || dismissed) return null;
-  const readyLicenseKey = licenseKey;
+  if (!canShowLicenseReady || !credential || dismissed) return null;
+  const readyCredential = credential;
 
   function dismissAndCleanUrl() {
     setDismissed(true);
@@ -1630,7 +1718,7 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
   }
 
   async function copyLicense() {
-    await navigator.clipboard.writeText(readyLicenseKey);
+    await navigator.clipboard.writeText(readyCredential);
     setCopied(true);
     window.setTimeout(dismissAndCleanUrl, 550);
   }
@@ -1642,7 +1730,7 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
           <Check className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-emerald-100">Licence prête à envoyer</p>
+          <p className="font-semibold text-emerald-100">Accès APIM prêt à envoyer</p>
           <p className="mt-1 text-sm text-emerald-100/75">{customer}</p>
           {whatsapp ? (
             <p className="mt-1 text-sm text-emerald-100/75">{formatPhone(whatsapp)}</p>
@@ -1651,9 +1739,12 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
       </div>
       <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-[#02150f] p-3">
         <p className="break-all font-mono text-sm font-semibold text-emerald-100">
-          {readyLicenseKey}
+          {readyCredential}
         </p>
       </div>
+      <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-amber-100/85">
+        {APIM_PROPAGATION_NOTE}
+      </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <button
           type="button"
@@ -1663,7 +1754,7 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
           {copied ? "Copiée" : "Copier la clé"}
         </button>
         <a
-          href={whatsappUrl ?? buildLooseWhatsAppUrl(whatsapp ?? "", customer, readyLicenseKey)}
+          href={whatsappUrl ?? buildLooseWhatsAppUrl(whatsapp ?? "", customer, readyCredential)}
           target="_blank"
           rel="noreferrer"
           onClick={dismissAndCleanUrl}
@@ -1861,6 +1952,12 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
+function maskSecret(value?: string) {
+  if (!value) return "Non disponible";
+  if (value.length <= 12) return "••••";
+  return `${value.slice(0, 6)}••••••${value.slice(-4)}`;
+}
+
 function pipelineDate(client: PipelineClientRecord) {
   if (client.status === "paid" && client.paidAt) return `Paid le ${shortDate(client.paidAt)}`;
   if (client.status === "trial" && client.trialEndsAt) {
@@ -1881,7 +1978,7 @@ function buildAdminWhatsAppUrl(
   customerName: string,
 ) {
   const message = licenseKey
-    ? `Bonjour ${customerName}, voici votre clé de licence AIPilot : ${licenseKey}`
+    ? buildInstallMessage(customerName, licenseKey)
     : `Bonjour ${customerName}, votre demande AIPilot est bien reçue.`;
   return buildWhatsAppUrl(whatsappNumber, message);
 }
@@ -1892,7 +1989,7 @@ function buildLooseWhatsAppUrl(
   licenseKey?: string,
 ) {
   const message = licenseKey
-    ? `Bonjour ${customerName}, voici votre clé de licence AIPilot : ${licenseKey}`
+    ? buildInstallMessage(customerName, licenseKey)
     : `Bonjour ${customerName}, votre demande AIPilot est bien reçue.`;
   const normalized = normalizeTunisiaWhatsappNumber(whatsappNumber);
   const digits = String(whatsappNumber ?? "").replace(/[^\d]/g, "");
@@ -1901,4 +1998,27 @@ function buildLooseWhatsAppUrl(
   return phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
     : `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
+
+function buildQuickWhatsAppUrl(whatsappNumber: string, message: string) {
+  const normalized = normalizeTunisiaWhatsappNumber(whatsappNumber);
+  const digits = String(whatsappNumber ?? "").replace(/[^\d]/g, "");
+  const phone = normalized?.waId || digits || "";
+
+  return phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
+
+function buildInstallMessage(customerName: string, apimKey: string) {
+  return [
+    `Bonjour ${customerName}, voici votre accès AIPilot.`,
+    "",
+    `Clé APIM: ${apimKey}`,
+    "Endpoint: https://nextgen.azure-api.net/openai",
+    "Model: gpt-5.4-1",
+    "",
+    "Utilisez cette clé comme AZURE_OPENAI_API_KEY. La vraie clé Azure reste sécurisée côté AIPilot.",
+    APIM_PROPAGATION_NOTE,
+  ].join("\n");
 }

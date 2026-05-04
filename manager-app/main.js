@@ -1349,13 +1349,14 @@ function buildOpenCodeRuntimeConfig(manifest) {
     model: `azure/${manifest.azure.deployment}`,
     provider: {
       azure: {
-        npm: "@ai-sdk/azure",
+        npm: "@ai-sdk/openai-compatible",
+        name: "AIPilot AI",
         options: {
-          resourceName: manifest.azure.resourceName,
+          baseURL: manifest.azure.baseUrl,
           apiKey: manifest.azure.apiKey,
         },
         models,
-        env: ["AZURE_RESOURCE_NAME", "AZURE_OPENAI_API_KEY"],
+        env: ["AIPILOT_OPENAI_BASE_URL", "AZURE_OPENAI_API_KEY"],
       },
     },
   };
@@ -1476,6 +1477,7 @@ async function configureCodex(manifest, logs) {
       AZURE_OPENAI_API_KEY: manifest.azure.apiKey,
       AZURE_RESOURCE_NAME: manifest.azure.resourceName,
       AZURE_OPENAI_DEPLOYMENT: manifest.azure.deployment,
+      AIPILOT_OPENAI_BASE_URL: manifest.azure.baseUrl,
     },
     logs,
   );
@@ -1655,6 +1657,7 @@ async function configureOpenCode(manifest, projectRoot, logs) {
       AZURE_OPENAI_API_KEY: manifest.azure.apiKey,
       AZURE_RESOURCE_NAME: manifest.azure.resourceName,
       AZURE_OPENAI_DEPLOYMENT: manifest.azure.deployment,
+      AIPILOT_OPENAI_BASE_URL: manifest.azure.baseUrl,
     },
     logs,
   );
@@ -2068,10 +2071,10 @@ async function buildDiagnostics(manifest, projectRoot) {
   }
 
   checks.push({
-    label: "Variables Azure",
+    label: "Variables APIM",
     ok:
       Boolean(process.env.AZURE_OPENAI_API_KEY) &&
-      Boolean(process.env.AZURE_RESOURCE_NAME) &&
+      Boolean(process.env.AIPILOT_OPENAI_BASE_URL || process.env.AZURE_RESOURCE_NAME) &&
       Boolean(process.env.AZURE_OPENAI_DEPLOYMENT),
     optional: false,
     details: process.env.AZURE_OPENAI_API_KEY ? "Présentes" : "Absentes",
@@ -2216,6 +2219,24 @@ async function executeManagerAction(action, payload, event) {
     return {
       logs,
       diagnostics: await buildDiagnostics(manifest, projectRoot),
+    };
+  }
+
+  if (action === "refresh-config") {
+    logSink.push("Synchronisation automatique de la clé APIM et de la configuration locale...");
+    const configurationResult = await configureTool(manifest, projectRoot, logSink);
+    const verifiedConfigPath = await ensureManagedConfiguration(manifest, projectRoot, logSink);
+    logSink.push("Configuration AIPilot actualisée avec la clé APIM individuelle.");
+    logSink.push(`Configuration prête: ${verifiedConfigPath}`);
+    if (process.platform === "win32") {
+      logSink.push(
+        "Windows: fermez puis rouvrez Codex, OpenCode ou T3 Code pour utiliser la nouvelle clé APIM.",
+      );
+    }
+    return {
+      logs,
+      diagnostics: await buildDiagnostics(manifest, projectRoot),
+      restartRecommended: Boolean(configurationResult?.restartRecommended),
     };
   }
 
@@ -2431,6 +2452,12 @@ ipcMain.handle("manager:window-close", async () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.close();
   }
+  return { ok: true };
+});
+
+ipcMain.handle("manager:restart-app", async () => {
+  app.relaunch();
+  app.exit(0);
   return { ok: true };
 });
 
