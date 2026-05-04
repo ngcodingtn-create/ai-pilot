@@ -57,8 +57,6 @@ type RequestStatusFilter = "pending" | "accepted" | "all";
 type PipelineStatusFilter = ClientStatus | "all";
 type SheetMode = "none" | "add" | "subscription" | "client" | "more" | "settings";
 
-const APIM_PROPAGATION_NOTE =
-  "Note production: une nouvelle clé APIM peut prendre 15 à 20 secondes avant le premier appel Codex.";
 const ADMIN_MODEL_BADGES = AIPILOT_DEPLOYMENTS.slice(0, 3);
 
 type TrackingStatus = {
@@ -346,26 +344,6 @@ function DashboardScreen({
         </div>
       </GlassPanel>
 
-      <GlassPanel className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">APIM Connected</h2>
-            <p className="mt-1 break-all text-sm text-slate-400">{AIPILOT_APIM_OPENAI_BASE_URL}</p>
-          </div>
-          <Pill tone="emerald">Endpoint actif</Pill>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {ADMIN_MODEL_BADGES.map((model) => (
-            <span
-              key={model.deployment}
-              className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-xs font-semibold text-slate-200"
-            >
-              {model.deployment}
-              {model.recommended ? " · recommandé" : ""}
-            </span>
-          ))}
-        </div>
-      </GlassPanel>
     </section>
   );
 }
@@ -872,7 +850,7 @@ function SubscriptionDetailSheet({
   onClose: () => void;
 }) {
   const [detailTab, setDetailTab] = useState<"details" | "billing" | "history">("details");
-  const [copiedApim, setCopiedApim] = useState(false);
+  const [copiedLicense, setCopiedLicense] = useState(false);
   if (!license) return null;
   const apimCredential = license.azureApiKey;
 
@@ -945,44 +923,28 @@ function SubscriptionDetailSheet({
                 ]}
               />
               <div className="rounded-2xl border border-white/10 bg-[#06141f] p-4">
-                <p className="text-xs text-slate-500">Clé licence interne</p>
-                <p className="mt-2 break-all font-mono text-sm text-slate-200">{license.licenseKey}</p>
-              </div>
-              <div className="rounded-2xl border border-[#0a84ff]/20 bg-[#06141f] p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs text-slate-500">APIM</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-200">
-                      {license.apimStatus === "active" ? "Active" : license.apimStatus || "Non provisionné"}
-                    </p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">Licence client</p>
+                    <p className="mt-2 break-all font-mono text-sm text-slate-200">{license.licenseKey}</p>
                   </div>
-                  <Pill tone={license.apimStatus === "active" ? "emerald" : "amber"}>
-                    {license.apimSubscriptionId ? "Per-user key" : "Aucune clé"}
-                  </Pill>
-                </div>
-                <p className="mt-3 break-all font-mono text-sm text-slate-200">
-                  {maskSecret(apimCredential)}
-                </p>
-                {apimCredential ? (
-                  <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-amber-100/85">
-                    {APIM_PROPAGATION_NOTE}
-                  </p>
-                ) : null}
-                {apimCredential ? (
                   <button
                     type="button"
                     onClick={async () => {
-                      await navigator.clipboard.writeText(apimCredential);
-                      setCopiedApim(true);
-                      window.setTimeout(() => setCopiedApim(false), 900);
+                      await navigator.clipboard.writeText(license.licenseKey);
+                      setCopiedLicense(true);
+                      window.setTimeout(() => setCopiedLicense(false), 900);
                     }}
-                    className="mt-3 h-11 w-full rounded-2xl border border-[#0a84ff]/30 bg-[#0a84ff]/10 text-sm font-semibold text-[#9fd0ff]"
+                    className="h-10 shrink-0 rounded-xl border border-[#0a84ff]/30 bg-[#0a84ff]/10 px-3 text-xs font-semibold text-[#9fd0ff]"
                   >
-                    {copiedApim ? "Clé APIM copiée" : "Copier clé APIM"}
+                    {copiedLicense ? "Copiée" : "Copier"}
                   </button>
-                ) : null}
-                {apimCredential ? <AdminInstallerPanel apiKey={apimCredential} /> : null}
+                </div>
+                <p className="mt-3 text-xs leading-5 text-slate-500">
+                  Envoyez uniquement cette licence au client. Le manager récupère l’accès IA automatiquement.
+                </p>
               </div>
+              {apimCredential ? <AdminInstallerPanel apiKey={apimCredential} /> : null}
             </FormSection>
           </>
         ) : null}
@@ -1027,6 +989,7 @@ function AdminInstallerPanel({ apiKey }: { apiKey: string }) {
     model: AIPILOT_PRIMARY_DEPLOYMENT,
   });
   const powerShell = buildAipilotMachineEnvOneLiner(apiKey);
+  const previewPowerShell = buildAipilotMachineEnvOneLiner("CLE_IA_CLIENT");
 
   async function copyValue(label: string, value: string) {
     await navigator.clipboard.writeText(value);
@@ -1035,17 +998,17 @@ function AdminInstallerPanel({ apiKey }: { apiKey: string }) {
   }
 
   return (
-    <div className="mt-4 space-y-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-3">
+    <div className="space-y-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
-            APIM Connected
+            Configuration IA
           </p>
-          <p className="mt-1 break-all text-xs text-emerald-100/80">
-            {AIPILOT_APIM_OPENAI_BASE_URL}
+          <p className="mt-1 text-xs leading-5 text-emerald-100/80">
+            À copier seulement pour une réparation manuelle. Le client reçoit la licence.
           </p>
         </div>
-        <Pill tone="emerald">api-key</Pill>
+        <Pill tone="emerald">Prêt</Pill>
       </div>
       <div className="flex flex-wrap gap-2">
         {ADMIN_MODEL_BADGES.map((model) => (
@@ -1058,8 +1021,9 @@ function AdminInstallerPanel({ apiKey }: { apiKey: string }) {
         ))}
       </div>
       <InstallerSnippet
-        title="PowerShell Machine"
+        title="Variables IA Windows"
         value={powerShell}
+        displayValue={previewPowerShell}
         copied={copied === "powershell"}
         onCopy={() => copyValue("powershell", powerShell)}
       />
@@ -1077,12 +1041,14 @@ function AdminInstallerPanel({ apiKey }: { apiKey: string }) {
 function InstallerSnippet({
   title,
   value,
+  displayValue,
   copied,
   onCopy,
   tall = false,
 }: {
   title: string;
   value: string;
+  displayValue?: string;
   copied: boolean;
   onCopy: () => void;
   tall?: boolean;
@@ -1104,7 +1070,7 @@ function InstallerSnippet({
           tall ? "max-h-72" : "max-h-28"
         }`}
       >
-        {value}
+        {displayValue ?? value}
       </pre>
     </div>
   );
@@ -1119,7 +1085,6 @@ function ClientDetailSheet({
   open: boolean;
   onClose: () => void;
 }) {
-  const [copiedApim, setCopiedApim] = useState(false);
   if (!client) return null;
   const goWhatsappUrl = buildQuickWhatsAppUrl(client.phone, "hey");
 
@@ -1133,35 +1098,7 @@ function ClientDetailSheet({
           <ReadOnlyRow label="Source" value={client.utmSource || client.adSource || "—"} />
           <ReadOnlyRow label="Campagne" value={client.utmCampaign || "—"} />
           <ReadOnlyRow label="Licence" value={client.licenseKey || "Aucune"} />
-          <ReadOnlyRow label="APIM" value={client.apimStatus || "Non provisionné"} />
-          <ReadOnlyRow label="Subscription" value={client.apimSubscriptionId || "—"} />
-          <div className="rounded-2xl border border-[#0a84ff]/20 bg-[#06141f] p-4">
-            <p className="text-xs text-slate-500">Clé APIM client</p>
-            <p className="mt-2 break-all font-mono text-sm text-slate-200">
-              {maskSecret(client.apimKey)}
-            </p>
-            {client.apimKey ? (
-              <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-amber-100/85">
-                Interne admin uniquement. Le client reçoit sa clé de licence; le manager récupère cette clé APIM automatiquement. {APIM_PROPAGATION_NOTE}
-              </p>
-            ) : null}
-            {client.apimKey ? (
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(client.apimKey || "");
-                    setCopiedApim(true);
-                    window.setTimeout(() => setCopiedApim(false), 900);
-                  }}
-                  className="h-11 rounded-2xl border border-[#0a84ff]/30 bg-[#0a84ff]/10 text-sm font-semibold text-[#9fd0ff]"
-                >
-                  {copiedApim ? "Clé copiée" : "Copier clé APIM"}
-                </button>
-                <AdminInstallerPanel apiKey={client.apimKey} />
-              </div>
-            ) : null}
-          </div>
+          {client.apimKey ? <AdminInstallerPanel apiKey={client.apimKey} /> : null}
         </FormSection>
         <a
           href={goWhatsappUrl}
@@ -1297,7 +1234,7 @@ function SettingsSheet({
             defaultChecked={config.includeApiKeyInInstaller}
             disabled
           />
-          Injection de clé dans les installateurs publics désactivée. Les clients reçoivent uniquement leur clé de licence; le manager récupère l’accès APIM automatiquement.
+          Injection de clé dans les installateurs publics désactivée. Les clients reçoivent uniquement leur clé de licence; le manager récupère l’accès IA automatiquement.
         </label>
         <textarea
           name="managerTutorialLinks"
@@ -1856,7 +1793,7 @@ function LicenseReadyCard({ flash }: { flash?: AdminConsoleProps["flash"] }) {
         </p>
       </div>
       <p className="mt-3 rounded-2xl border border-emerald-300/15 bg-emerald-300/10 px-3 py-2 text-xs font-medium leading-relaxed text-emerald-100/85">
-        Envoyez uniquement cette licence. AIPilot Manager configure automatiquement l’API, APIM et l’endpoint après validation.
+        Envoyez uniquement cette licence. AIPilot Manager configure automatiquement l’accès IA après validation.
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <button
@@ -2063,12 +2000,6 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function maskSecret(value?: string) {
-  if (!value) return "Non disponible";
-  if (value.length <= 12) return "••••";
-  return `${value.slice(0, 6)}••••••${value.slice(-4)}`;
 }
 
 function pipelineDate(client: PipelineClientRecord) {
