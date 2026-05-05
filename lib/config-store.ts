@@ -72,6 +72,8 @@ const LOCAL_OPENCODE_CONFIG_PATH = path.resolve(
   LOCAL_OPENCODE_CONFIG_RELATIVE_PATH,
 );
 
+let ensureConfigTablePromise: Promise<void> | null = null;
+
 async function readLocalConfigFile(): Promise<LocalConfigFile> {
   try {
     const raw = await readFile(LOCAL_CONFIG_PATH, "utf8");
@@ -148,7 +150,7 @@ async function saveLocalConfig(config: StoredConfig) {
   await writeLocalConfigFile(next);
 }
 
-export async function ensureConfigTable() {
+async function ensureConfigTableNow() {
   const sql = getSql();
   if (!sql) return;
 
@@ -160,6 +162,18 @@ export async function ensureConfigTable() {
       updated_at timestamptz NOT NULL DEFAULT now()
     )
   `;
+}
+
+export async function ensureConfigTable() {
+  const sql = getSql();
+  if (!sql) return;
+
+  ensureConfigTablePromise ??= ensureConfigTableNow().catch((error) => {
+    ensureConfigTablePromise = null;
+    throw error;
+  });
+
+  return ensureConfigTablePromise;
 }
 
 async function setValue(key: string, value: string, encrypted = false) {

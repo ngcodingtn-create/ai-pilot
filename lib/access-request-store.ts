@@ -46,6 +46,8 @@ const LOCAL_ACCESS_REQUEST_PATH = path.resolve(
   LOCAL_ACCESS_REQUEST_RELATIVE_PATH,
 );
 
+let ensureAccessRequestTablePromise: Promise<void> | null = null;
+
 function buildId() {
   return randomBytes(12).toString("hex");
 }
@@ -111,7 +113,7 @@ async function writeLocalAccessRequestFile(payload: LocalAccessRequestFile) {
   );
 }
 
-export async function ensureAccessRequestTable() {
+async function ensureAccessRequestTableNow() {
   const sql = getSql();
   if (!sql) {
     return;
@@ -132,6 +134,30 @@ export async function ensureAccessRequestTable() {
       generated_license_id text
     )
   `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS access_requests_created_at_idx
+    ON access_requests (created_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS access_requests_status_updated_at_idx
+    ON access_requests (status, updated_at DESC)
+  `;
+}
+
+export async function ensureAccessRequestTable() {
+  const sql = getSql();
+  if (!sql) {
+    return;
+  }
+
+  ensureAccessRequestTablePromise ??= ensureAccessRequestTableNow().catch((error) => {
+    ensureAccessRequestTablePromise = null;
+    throw error;
+  });
+
+  return ensureAccessRequestTablePromise;
 }
 
 export async function createAccessRequest(input: {

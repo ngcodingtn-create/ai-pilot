@@ -1,5 +1,8 @@
 import { neon } from "@neondatabase/serverless";
 
+let cachedDatabaseUrl = "";
+let cachedSql: ReturnType<typeof neon> | null = null;
+
 export function getSql() {
   const url = process.env.DATABASE_URL;
 
@@ -7,5 +10,11 @@ export function getSql() {
     return null;
   }
 
-  return neon(url);
+  if (cachedSql && cachedDatabaseUrl === url) {
+    return cachedSql;
+  }
+
+  cachedDatabaseUrl = url;
+  cachedSql = neon(url);
+  return cachedSql;
 }

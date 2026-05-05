@@ -43,6 +43,8 @@ const LOCAL_MARKETING_EVENTS_PATH = path.resolve(
   ".opencode/marketing-events.json",
 );
 
+let ensureMarketingEventsTablePromise: Promise<void> | null = null;
+
 function buildId() {
   return randomBytes(12).toString("hex");
 }
@@ -115,7 +117,7 @@ function mapMarketingEventRow(row: MarketingEventRow): MarketingEventRecord {
   };
 }
 
-export async function ensureMarketingEventsTable() {
+async function ensureMarketingEventsTableNow() {
   const sql = getSql();
   if (!sql) {
     return;
@@ -135,6 +137,30 @@ export async function ensureMarketingEventsTable() {
       created_at timestamptz NOT NULL DEFAULT now()
     )
   `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS marketing_events_created_at_idx
+    ON marketing_events (created_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS marketing_events_client_phone_idx
+    ON marketing_events (client_id, phone)
+  `;
+}
+
+export async function ensureMarketingEventsTable() {
+  const sql = getSql();
+  if (!sql) {
+    return;
+  }
+
+  ensureMarketingEventsTablePromise ??= ensureMarketingEventsTableNow().catch((error) => {
+    ensureMarketingEventsTablePromise = null;
+    throw error;
+  });
+
+  return ensureMarketingEventsTablePromise;
 }
 
 export async function recordMarketingEvent(input: {

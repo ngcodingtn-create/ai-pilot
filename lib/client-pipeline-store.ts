@@ -2,12 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { getSql } from "./db";
-import { normalizeTunisiaWhatsappNumber } from "./whatsapp";
 import {
   createLicense,
   deleteLicenseById,
   disableLicenseByKey,
   findLicenseByKey,
+  listLicenseKeys,
   updateLicenseStatus,
   type LicenseEnvironment,
   type LicenseTier,
@@ -143,13 +143,6 @@ type LocalPipelineFile = {
   fbEvents: FbEventRecord[];
 };
 
-type TrialLeadLegacyRow = {
-  id: string;
-  name: string;
-  whatsapp_number: string;
-  created_at: string | Date;
-};
-
 type UpsertLeadInput = {
   name?: string;
   phone: string;
@@ -172,6 +165,9 @@ type UpsertLeadInput = {
 const LOCAL_PIPELINE_RELATIVE_PATH = ".opencode/client-pipeline.json";
 const LOCAL_PIPELINE_PATH = path.resolve(process.cwd(), LOCAL_PIPELINE_RELATIVE_PATH);
 const DEFAULT_TRIAL_HOURS = 24;
+
+let ensurePipelineTablesPromise: Promise<void> | null = null;
+let legacyTrialLeadSyncPromise: Promise<void> | null = null;
 
 function buildId() {
   return randomBytes(12).toString("hex");
@@ -268,6 +264,35 @@ async function attachLicenseSecretToClient(client: PipelineClientRecord) {
   };
 }
 
+async function attachLicenseSecretsToClients(clients: PipelineClientRecord[]) {
+  const licenseKeys = new Set(
+    clients
+      .map((client) => client.licenseKey)
+      .filter((licenseKey): licenseKey is string => Boolean(licenseKey)),
+  );
+
+  if (licenseKeys.size === 0) {
+    return clients;
+  }
+
+  const licenses = await listLicenseKeys();
+  const licensesByKey = new Map(licenses.map((license) => [license.licenseKey, license]));
+
+  return clients.map((client) => {
+    if (!client.licenseKey) {
+      return client;
+    }
+
+    const license = licensesByKey.get(client.licenseKey);
+    return {
+      ...client,
+      apimKey: license?.azureApiKey,
+      apimSubscriptionId: client.apimSubscriptionId ?? license?.apimSubscriptionId,
+      apimStatus: client.apimStatus ?? license?.apimStatus,
+    };
+  });
+}
+
 function mapLicenseRow(row: PipelineLicenseRow): PipelineLicenseRecord {
   return {
     id: row.id,
@@ -355,7 +380,7 @@ async function findMatchingSqlClientByPhone(phone: string) {
   return row ? mapClientRow(row) : null;
 }
 
-async function syncLegacyTrialLeadsIntoPipeline() {
+async function syncLegacyTrialLeadsIntoPipelineNow() {
   const sql = getSql();
   if (!sql) {
     return;
@@ -375,46 +400,42 @@ async function syncLegacyTrialLeadsIntoPipeline() {
     )
   `;
 
-  const rows = await sql`
-    SELECT id, name, whatsapp_number, created_at
+  await sql`
+    INSERT INTO clients (
+      id,
+      name,
+      phone,
+      status,
+      lead_at,
+      created_at,
+      updated_at
+    )
+    SELECT
+      ${"lead_"} || lower(id),
+      name,
+      regexp_replace(whatsapp_number, '[^0-9]', '', 'g'),
+      ${"lead"},
+      created_at,
+      created_at,
+      created_at
     FROM trial_leads
-    ORDER BY created_at ASC
+    WHERE length(regexp_replace(whatsapp_number, '[^0-9]', '', 'g')) >= 8
+    ON CONFLICT DO NOTHING
   `;
+}
 
-  for (const row of rows as Array<TrialLeadLegacyRow>) {
-    const normalized = normalizeTunisiaWhatsappNumber(row.whatsapp_number);
-    if (!normalized) {
-      continue;
-    }
-
-    const existing = await findMatchingSqlClientByPhone(normalized.waId);
-    if (existing) {
-      continue;
-    }
-
-    const createdAt = new Date(row.created_at).toISOString();
-    await sql`
-      INSERT INTO clients (
-        id,
-        name,
-        phone,
-        status,
-        lead_at,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        ${`lead_${row.id.toLowerCase()}`},
-        ${row.name},
-        ${normalized.waId},
-        ${"lead"},
-        ${createdAt},
-        ${createdAt},
-        ${createdAt}
-      )
-      ON CONFLICT (phone) DO NOTHING
-    `;
+async function syncLegacyTrialLeadsIntoPipeline() {
+  const sql = getSql();
+  if (!sql) {
+    return;
   }
+
+  legacyTrialLeadSyncPromise ??= syncLegacyTrialLeadsIntoPipelineNow().catch((error) => {
+    legacyTrialLeadSyncPromise = null;
+    throw error;
+  });
+
+  return legacyTrialLeadSyncPromise;
 }
 
 function getTrialExpiry(hours = DEFAULT_TRIAL_HOURS) {
@@ -423,7 +444,7 @@ function getTrialExpiry(hours = DEFAULT_TRIAL_HOURS) {
   return expiry;
 }
 
-export async function ensurePipelineTables() {
+async function ensurePipelineTablesNow() {
   const sql = getSql();
   if (!sql) {
     return;
@@ -505,13 +526,47 @@ export async function ensurePipelineTables() {
       revoked_at timestamptz
     )
   `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS clients_contact_sort_idx
+    ON clients (last_contacted_at DESC, updated_at DESC, created_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS clients_license_key_idx
+    ON clients (license_key)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS fb_events_sent_at_idx
+    ON fb_events (sent_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS pipeline_licenses_client_id_idx
+    ON licenses (client_id)
+  `;
+}
+
+export async function ensurePipelineTables() {
+  const sql = getSql();
+  if (!sql) {
+    return;
+  }
+
+  ensurePipelineTablesPromise ??= ensurePipelineTablesNow().catch((error) => {
+    ensurePipelineTablesPromise = null;
+    throw error;
+  });
+
+  return ensurePipelineTablesPromise;
 }
 
 export async function listPipelineClients() {
   const sql = getSql();
   if (!sql) {
     const local = await readLocalPipelineFile();
-    return Promise.all(sortClientsByContactTime(local.clients).map(attachLicenseSecretToClient));
+    return attachLicenseSecretsToClients(sortClientsByContactTime(local.clients));
   }
 
   await syncLegacyTrialLeadsIntoPipeline();
@@ -554,7 +609,7 @@ export async function listPipelineClients() {
     ORDER BY last_contacted_at DESC NULLS LAST, updated_at DESC, created_at DESC
   `;
 
-  return Promise.all((rows as Array<ClientRow>).map(mapClientRow).map(attachLicenseSecretToClient));
+  return attachLicenseSecretsToClients((rows as Array<ClientRow>).map(mapClientRow));
 }
 
 export async function getPipelineClientById(id: string) {
@@ -1805,10 +1860,10 @@ export async function expireTrialClients() {
     await disableLicenseByKey(key);
   }
 
+  const clientUpdateResult = clientsResult as unknown as { count?: unknown };
   const expired =
-    !Array.isArray(clientsResult) &&
-    typeof (clientsResult as { count?: unknown }).count === "number"
-      ? ((clientsResult as { count: number }).count ?? 0)
+    !Array.isArray(clientsResult) && typeof clientUpdateResult.count === "number"
+      ? clientUpdateResult.count
       : Array.isArray(clientsResult)
         ? clientsResult.length
         : 0;

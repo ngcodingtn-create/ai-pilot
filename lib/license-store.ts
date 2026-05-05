@@ -74,6 +74,8 @@ const LICENSE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const LOCAL_LICENSE_RELATIVE_PATH = ".opencode/license-keys.json";
 const LOCAL_LICENSE_PATH = path.resolve(process.cwd(), LOCAL_LICENSE_RELATIVE_PATH);
 
+let ensureLicenseTablePromise: Promise<void> | null = null;
+
 function normalizeLicenseKey(raw: string) {
   const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
   const groups = clean.match(/.{1,4}/g);
@@ -141,7 +143,7 @@ function mapRowToLicenseRecord(
   };
 }
 
-export async function ensureLicenseTable() {
+async function ensureLicenseTableNow() {
   const sql = getSql();
   if (!sql) {
     return;
@@ -186,6 +188,25 @@ export async function ensureLicenseTable() {
     ALTER TABLE license_keys
     ADD COLUMN IF NOT EXISTS apim_status text
   `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS license_keys_created_at_idx
+    ON license_keys (created_at DESC)
+  `;
+}
+
+export async function ensureLicenseTable() {
+  const sql = getSql();
+  if (!sql) {
+    return;
+  }
+
+  ensureLicenseTablePromise ??= ensureLicenseTableNow().catch((error) => {
+    ensureLicenseTablePromise = null;
+    throw error;
+  });
+
+  return ensureLicenseTablePromise;
 }
 
 export async function listLicenseKeys() {

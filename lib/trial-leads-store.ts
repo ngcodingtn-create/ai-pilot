@@ -49,6 +49,8 @@ const LOCAL_TRIAL_LEADS_PATH = path.resolve(
   ".opencode/trial-leads.json",
 );
 
+let ensureTrialLeadsTablePromise: Promise<void> | null = null;
+
 function buildId() {
   return randomBytes(4).toString("hex").toUpperCase();
 }
@@ -94,7 +96,7 @@ async function writeLocalTrialLeads(payload: LocalTrialLeadsFile) {
   await writeFile(LOCAL_TRIAL_LEADS_PATH, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
-export async function ensureTrialLeadsTable() {
+async function ensureTrialLeadsTableNow() {
   const sql = getSql();
   if (!sql) {
     return;
@@ -127,6 +129,25 @@ export async function ensureTrialLeadsTable() {
   await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS landing_url text`;
   await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS referrer text`;
   await sql`ALTER TABLE trial_leads ADD COLUMN IF NOT EXISTS event_id text`;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS trial_leads_created_at_idx
+    ON trial_leads (created_at DESC)
+  `;
+}
+
+export async function ensureTrialLeadsTable() {
+  const sql = getSql();
+  if (!sql) {
+    return;
+  }
+
+  ensureTrialLeadsTablePromise ??= ensureTrialLeadsTableNow().catch((error) => {
+    ensureTrialLeadsTablePromise = null;
+    throw error;
+  });
+
+  return ensureTrialLeadsTablePromise;
 }
 
 export async function createTrialLead(input: {
