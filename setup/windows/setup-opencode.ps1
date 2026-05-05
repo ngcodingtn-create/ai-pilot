@@ -2,6 +2,7 @@ param(
   [string]$AzureResourceName = "admin-3342-resource",
   [string]$AzureApiKey = "",
   [string]$AzureDeployment = "gpt-5.4-1",
+  [string]$AipilotOpenAiBaseUrl = "https://nextgen.azure-api.net/api/openai/v1",
   [string]$ProjectRoot = "",
   [switch]$PromptProjectRoot,
   [switch]$SkipSmokeTests
@@ -101,10 +102,12 @@ Step "Set Azure environment variables (current session + persistent user vars)"
 $env:AZURE_RESOURCE_NAME = $AzureResourceName
 $env:AZURE_OPENAI_API_KEY = $AzureApiKey
 $env:AZURE_OPENAI_DEPLOYMENT = $AzureDeployment
+$env:AIPILOT_OPENAI_BASE_URL = $AipilotOpenAiBaseUrl
 
 setx AZURE_RESOURCE_NAME $AzureResourceName | Out-Null
 setx AZURE_OPENAI_API_KEY $AzureApiKey | Out-Null
 setx AZURE_OPENAI_DEPLOYMENT $AzureDeployment | Out-Null
+setx AIPILOT_OPENAI_BASE_URL $AipilotOpenAiBaseUrl | Out-Null
 
 Step "Install or update skill repositories"
 New-Item -ItemType Directory -Force -Path $ExternalSkillsDir | Out-Null
@@ -135,8 +138,10 @@ $ProjectConfig = @"
   },
   "provider": {
     "azure": {
+      "npm": "@ai-sdk/openai",
+      "name": "AIPilot AI",
       "options": {
-        "resourceName": "$AzureResourceName",
+        "baseURL": "$AipilotOpenAiBaseUrl",
         "apiKey": "$AzureApiKey"
       },
       "models": {
@@ -162,21 +167,7 @@ $ProjectConfig = @"
           }
         }
       },
-      "env": ["AZURE_RESOURCE_NAME", "AZURE_OPENAI_API_KEY"]
-    },
-    "azure-chat": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Azure OpenAI Chat Completions",
-      "options": {
-        "baseURL": "https://nextgen.azure-api.net/api/openai/v1",
-        "apiKey": "$AzureApiKey"
-      },
-      "models": {
-        "Kimi-K2.6": {
-          "id": "Kimi-K2.6",
-          "name": "Kimi-K2.6 (Chat Completions)"
-        }
-      }
+      "env": ["AIPILOT_OPENAI_BASE_URL", "AZURE_OPENAI_API_KEY"]
     }
   }
 }
@@ -205,7 +196,6 @@ if (-not $SkipSmokeTests) {
     opencode run "Reply with exactly: OK" -m azure/gpt-5.4-1
     opencode run "Reply with exactly: OK" -m azure/gpt-5.3-codex
     opencode run "Reply with exactly: OK" -m azure/gpt-5.4-pro
-    opencode run "Reply with exactly: OK" -m azure-chat/Kimi-K2.6
   }
   finally {
     Pop-Location
@@ -217,7 +207,6 @@ Write-Host "Use one of these commands in project root:" -ForegroundColor Green
 Write-Host "  opencode -m azure/gpt-5.4-1"
 Write-Host "  opencode -m azure/gpt-5.3-codex"
 Write-Host "  opencode -m azure/gpt-5.4-pro"
-Write-Host "  opencode -m azure-chat/Kimi-K2.6"
 Write-Host "VS Code tip: open this folder in VS Code, open the integrated terminal, and run: opencode" -ForegroundColor Cyan
 Write-Host "The OpenCode VS Code extension installs automatically the first time you do that." -ForegroundColor Cyan
 Write-Host "Note: restart terminal once to load persistent vars from setx." -ForegroundColor Yellow

@@ -4,6 +4,7 @@ set -euo pipefail
 AZURE_RESOURCE_NAME="${AZURE_RESOURCE_NAME:-admin-3342-resource}"
 AZURE_OPENAI_API_KEY="${AZURE_OPENAI_API_KEY:-}"
 AZURE_OPENAI_DEPLOYMENT="${AZURE_OPENAI_DEPLOYMENT:-gpt-5.4-1}"
+AIPILOT_OPENAI_BASE_URL="${AIPILOT_OPENAI_BASE_URL:-https://nextgen.azure-api.net/api/openai/v1}"
 SKIP_SMOKE_TESTS="${SKIP_SMOKE_TESTS:-0}"
 
 step() {
@@ -79,6 +80,7 @@ step "Export Azure environment variables"
 export AZURE_RESOURCE_NAME
 export AZURE_OPENAI_API_KEY
 export AZURE_OPENAI_DEPLOYMENT
+export AIPILOT_OPENAI_BASE_URL
 
 SHELL_RC="$HOME/.bashrc"
 if [[ "${SHELL:-}" == *"zsh"* ]]; then
@@ -89,6 +91,7 @@ touch "$SHELL_RC"
 grep -q "AZURE_RESOURCE_NAME=$AZURE_RESOURCE_NAME" "$SHELL_RC" || echo "export AZURE_RESOURCE_NAME=$AZURE_RESOURCE_NAME" >> "$SHELL_RC"
 grep -q "AZURE_OPENAI_API_KEY=$AZURE_OPENAI_API_KEY" "$SHELL_RC" || echo "export AZURE_OPENAI_API_KEY=$AZURE_OPENAI_API_KEY" >> "$SHELL_RC"
 grep -q "AZURE_OPENAI_DEPLOYMENT=$AZURE_OPENAI_DEPLOYMENT" "$SHELL_RC" || echo "export AZURE_OPENAI_DEPLOYMENT=$AZURE_OPENAI_DEPLOYMENT" >> "$SHELL_RC"
+grep -q "AIPILOT_OPENAI_BASE_URL=$AIPILOT_OPENAI_BASE_URL" "$SHELL_RC" || echo "export AIPILOT_OPENAI_BASE_URL=$AIPILOT_OPENAI_BASE_URL" >> "$SHELL_RC"
 
 step "Install or update skill repositories"
 mkdir -p "$EXTERNAL_SKILLS_DIR"
@@ -120,8 +123,10 @@ cat > "$PROJECT_ROOT/opencode.json" <<EOF
   },
   "provider": {
     "azure": {
+      "npm": "@ai-sdk/openai",
+      "name": "AIPilot AI",
       "options": {
-        "resourceName": "$AZURE_RESOURCE_NAME",
+        "baseURL": "$AIPILOT_OPENAI_BASE_URL",
         "apiKey": "$AZURE_OPENAI_API_KEY"
       },
       "models": {
@@ -147,21 +152,7 @@ cat > "$PROJECT_ROOT/opencode.json" <<EOF
           }
         }
       },
-      "env": ["AZURE_RESOURCE_NAME", "AZURE_OPENAI_API_KEY"]
-    },
-    "azure-chat": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Azure OpenAI Chat Completions",
-      "options": {
-        "baseURL": "https://nextgen.azure-api.net/api/openai/v1",
-        "apiKey": "$AZURE_OPENAI_API_KEY"
-      },
-      "models": {
-        "Kimi-K2.6": {
-          "id": "Kimi-K2.6",
-          "name": "Kimi-K2.6 (Chat Completions)"
-        }
-      }
+      "env": ["AIPILOT_OPENAI_BASE_URL", "AZURE_OPENAI_API_KEY"]
     }
   }
 }
@@ -187,7 +178,6 @@ if [[ "$SKIP_SMOKE_TESTS" != "1" ]]; then
     opencode run "Reply with exactly: OK" -m azure/gpt-5.4-1
     opencode run "Reply with exactly: OK" -m azure/gpt-5.3-codex
     opencode run "Reply with exactly: OK" -m azure/gpt-5.4-pro
-    opencode run "Reply with exactly: OK" -m azure-chat/Kimi-K2.6
   )
 fi
 
@@ -196,7 +186,6 @@ echo "Use one of these commands in project root:"
 echo "  opencode -m azure/gpt-5.4-1"
 echo "  opencode -m azure/gpt-5.3-codex"
 echo "  opencode -m azure/gpt-5.4-pro"
-echo "  opencode -m azure-chat/Kimi-K2.6"
 echo "VS Code tip: open this folder in VS Code, open the integrated terminal, and run: opencode"
 echo "The OpenCode VS Code extension installs automatically the first time you do that."
 echo "Open a new terminal to load vars from $SHELL_RC"

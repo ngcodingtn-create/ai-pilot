@@ -1351,7 +1351,7 @@ function buildOpenCodeRuntimeConfig(manifest) {
     model: `azure/${manifest.azure.deployment}`,
     provider: {
       azure: {
-        npm: "@ai-sdk/openai-compatible",
+        npm: "@ai-sdk/openai",
         name: "AIPilot AI",
         options: {
           baseURL: manifest.azure.baseUrl,

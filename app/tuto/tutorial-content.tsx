@@ -437,7 +437,7 @@ function buildOpenCodeConfig() {
   "model": "azure/${defaultDeployment}",
   "provider": {
     "azure": {
-      "npm": "@ai-sdk/openai-compatible",
+      "npm": "@ai-sdk/openai",
       "name": "AIPilot AI",
       "options": {
         "baseURL": "${AIPILOT_APIM_OPENAI_BASE_URL}",

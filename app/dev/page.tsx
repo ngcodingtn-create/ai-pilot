@@ -80,9 +80,6 @@ export default async function DevPage() {
               <li>
                 - Niveau de raisonnement pour tous les déploiements Azure GPT: <InlineCode>xhigh</InlineCode>
               </li>
-              <li>
-                - Chemin Kimi: <InlineCode>azure-chat/Kimi-K2.6</InlineCode>
-              </li>
             </ul>
           </Panel>
 
