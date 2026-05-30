@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require("electron")
 const { autoUpdater } = require("electron-updater");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
+const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
 
@@ -190,16 +191,60 @@ function productionSafeBackendUrl(value) {
   return normalized;
 }
 
+async function isBackendReachable(value, timeoutMs = 350) {
+  const normalized = normalizeBackendUrl(value);
+  if (!normalized) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    const port = Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80));
+
+    return await new Promise((resolve) => {
+      let settled = false;
+      const socket = net.createConnection({ host: parsed.hostname, port });
+
+      const finish = (result) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        socket.destroy();
+        resolve(result);
+      };
+
+      socket.setTimeout(timeoutMs);
+      socket.once("connect", () => finish(true));
+      socket.once("timeout", () => finish(false));
+      socket.once("error", () => finish(false));
+    });
+  } catch {
+    return false;
+  }
+}
+
 async function getEffectiveDefaults() {
   const saved = await loadPersistedState();
   const explicitBackendUrl =
     productionSafeBackendUrl(readCliArg("--backend-url")) ||
     productionSafeBackendUrl(process.env.AIPILOT_MANAGER_BACKEND_URL);
   const savedBackendUrl = productionSafeBackendUrl(saved.backendUrl);
-  const backendUrl =
+  let backendUrl =
     explicitBackendUrl ||
     (app.isPackaged ? savedBackendUrl : savedBackendUrl.startsWith(LOCAL_BACKEND_URL) ? savedBackendUrl : "") ||
     (app.isPackaged ? PRODUCTION_BACKEND_URL : LOCAL_BACKEND_URL);
+
+  // In local Electron runs, fall back to the hosted portal if the local Next server is not running.
+  if (!app.isPackaged && !explicitBackendUrl && isLocalBackendUrl(backendUrl)) {
+    const localBackendAvailable = await isBackendReachable(backendUrl);
+    if (!localBackendAvailable) {
+      backendUrl =
+        (savedBackendUrl && !isLocalBackendUrl(savedBackendUrl) ? savedBackendUrl : "") ||
+        PRODUCTION_BACKEND_URL;
+    }
+  }
 
   const licenseKey =
     DEFAULT_LICENSE_KEY || String(saved.licenseKey ?? "");
@@ -520,6 +565,10 @@ function getCodexConfigPath() {
   return path.join(getCodexHome(), "config.toml");
 }
 
+function getCodexProfilePath(profileName) {
+  return path.join(getCodexHome(), `${profileName}.config.toml`);
+}
+
 function getCodexLauncherSelectionPath() {
   return path.join(getCodexHome(), "aipilot-launcher.json");
 }
@@ -560,6 +609,18 @@ function getVsCodeExtensionsRoots() {
   return [
     path.join(os.homedir(), ".vscode", "extensions"),
     path.join(os.homedir(), ".vscode-insiders", "extensions"),
+  ];
+}
+
+function getVsCodeUserSettingsPaths() {
+  if (process.platform !== "win32") {
+    return [];
+  }
+
+  const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+  return [
+    path.join(appData, "Code", "User", "settings.json"),
+    path.join(appData, "Code - Insiders", "User", "settings.json"),
   ];
 }
 
@@ -664,6 +725,57 @@ function applyCodexSelectionToConfigToml(configToml, model) {
   }
 
   return next;
+}
+
+function tomlEscape(value) {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function buildManagedCodexBaseConfig(manifest) {
+  const model = String(manifest?.azure?.deployment || "").trim();
+  const baseUrl = String(manifest?.azure?.baseUrl || "").trim();
+  const windowsUser = os.userInfo().username || path.basename(os.homedir());
+  const lines = [
+    `model = "${tomlEscape(model)}"`,
+    'model_provider = "azure"',
+    'model_reasoning_effort = "medium"',
+    "",
+    "[model_providers.azure]",
+    'name = "AIPilot AI"',
+    `base_url = "${tomlEscape(baseUrl)}"`,
+    'env_key = "AZURE_OPENAI_API_KEY"',
+    'wire_api = "responses"',
+    "",
+  ];
+
+  if (process.platform === "win32") {
+    lines.push(
+      "[windows]",
+      'sandbox = "unelevated"',
+      "",
+      `[projects.'c:\\users\\${windowsUser.toLowerCase()}\\.codex']`,
+      'trust_level = "trusted"',
+      "",
+    );
+  }
+
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+function buildManagedCodexProfileConfig(manifest, effort) {
+  const model = String(manifest?.azure?.deployment || "").trim();
+  const lines = [
+    'model_provider = "azure"',
+    `model = "${tomlEscape(model)}"`,
+    `model_reasoning_effort = "${tomlEscape(effort)}"`,
+    "",
+  ];
+
+  if (process.platform === "win32") {
+    lines.push("[windows]", 'sandbox = "unelevated"', "");
+  }
+
+  return `${lines.join("\n").trimEnd()}\n`;
 }
 
 function cloneJson(value) {
@@ -1315,6 +1427,92 @@ async function setUserEnvironmentVariables(vars, logs) {
   return false;
 }
 
+async function updateJsonFile(filePath, updater) {
+  let current = {};
+
+  try {
+    current = JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      current = {};
+    }
+  }
+
+  const next = updater(current && typeof current === "object" && !Array.isArray(current) ? current : {});
+  await writeFileWithDirs(filePath, `${JSON.stringify(next, null, 4)}\n`);
+}
+
+async function configureVsCodeCodexWindowsIntegration(logs) {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  if (await commandExists("code")) {
+    try {
+      logs.push("Installation ou mise à jour de l'extension VS Code WSL pour éviter le sandbox natif Windows de Codex...");
+      await runCommand("code", ["--install-extension", "ms-vscode-remote.remote-wsl"], {
+        cwd: os.homedir(),
+        timeoutMs: 180000,
+        timeoutMessage:
+          "L'installation de l'extension VS Code WSL prend trop de temps. Installez-la manuellement si besoin.",
+      });
+    } catch (error) {
+      logs.push(
+        `Impossible d'installer automatiquement l'extension VS Code WSL: ${
+          error instanceof Error ? error.message : "erreur inconnue"
+        }`,
+      );
+    }
+  }
+
+  for (const settingsPath of getVsCodeUserSettingsPaths()) {
+    try {
+      await updateJsonFile(settingsPath, (settings) => ({
+        ...settings,
+        "chatgpt.runCodexInWindowsSubsystemForLinux": true,
+      }));
+      logs.push(`Mode WSL Codex activé dans ${settingsPath}`);
+    } catch (error) {
+      logs.push(
+        `Impossible d'activer le mode WSL Codex dans ${settingsPath}: ${
+          error instanceof Error ? error.message : "erreur inconnue"
+        }`,
+      );
+    }
+  }
+
+  if (await commandExists("winget")) {
+    try {
+      logs.push("Vérification/installation du package WSL pour VS Code Codex...");
+      await runCommand(
+        "winget",
+        [
+          "install",
+          "--id",
+          "Microsoft.WSL",
+          "-e",
+          "--accept-package-agreements",
+          "--accept-source-agreements",
+          "--disable-interactivity",
+        ],
+        {
+          cwd: os.homedir(),
+          timeoutMs: 600000,
+          timeoutMessage:
+            "L'installation automatique de WSL prend trop de temps. Redémarrez puis installez WSL manuellement si nécessaire.",
+        },
+      );
+      logs.push("Package WSL disponible. Fermez puis rouvrez VS Code pour que l'extension Codex recharge son mode d'exécution.");
+    } catch (error) {
+      logs.push(
+        `WSL n'a pas pu être installé automatiquement. Le réglage VS Code reste appliqué; installez WSL manuellement si Codex continue à utiliser le sandbox natif Windows. ${
+          error instanceof Error ? error.message : ""
+        }`.trim(),
+      );
+    }
+  }
+}
+
 function buildOpenCodeRuntimeConfig(manifest) {
   const deployments = Array.isArray(manifest?.azure?.availableDeployments)
     ? manifest.azure.availableDeployments
@@ -1366,10 +1564,11 @@ function buildOpenCodeRuntimeConfig(manifest) {
 
 async function configureCodex(manifest, logs) {
   const configPath = getCodexConfigPath();
-  const resolvedConfigToml = resolveCodexConfigToml(manifest);
+  const resolvedConfigToml = buildManagedCodexBaseConfig(manifest);
   const selectedModel = manifest?.azure?.deployment;
   logs.push(`Écriture de la configuration Codex dans ${configPath}`);
   await writeFileWithDirs(configPath, resolvedConfigToml);
+  await writeManagedCodexProfileConfigs(manifest, logs);
   await normalizeCodexConfigToml(
     manifest,
     logs,
@@ -1498,12 +1697,26 @@ function buildCodexVsCodeAuth(apiKey) {
 }
 
 function resolveCodexConfigToml(manifest) {
-  const windowsUser = os.userInfo().username || path.basename(os.homedir());
-  return String(manifest?.azure?.codex?.configToml ?? "")
-    .replaceAll("CLIENT_USERNAME", windowsUser);
+  return buildManagedCodexBaseConfig(manifest);
+}
+
+async function writeManagedCodexProfileConfigs(manifest, logs) {
+  const profiles = [
+    ["azure-medium", "medium"],
+    ["azure-high", "high"],
+    ["azure-xhigh", "xhigh"],
+  ];
+
+  for (const [profileName, effort] of profiles) {
+    const profilePath = getCodexProfilePath(profileName);
+    await writeFileWithDirs(profilePath, buildManagedCodexProfileConfig(manifest, effort));
+  }
+
+  logs.push("Profils Codex 0.134+ écrits dans des fichiers séparés (azure-medium/high/xhigh). ");
 }
 
 async function configureVsCodeCodex(manifest, logs) {
+  await configureVsCodeCodexWindowsIntegration(logs);
   const configResult = await configureCodex(manifest, logs);
   const authPath = getCodexAuthPath();
   logs.push(`Écriture du fichier auth.json Codex VS Code dans ${authPath}`);

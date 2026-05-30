@@ -2,6 +2,7 @@ import { getApimOpenAiBaseUrl } from "./apim";
 import {
   AIPILOT_PRIMARY_DEPLOYMENT,
   buildAipilotCodexConfig,
+  buildAipilotCodexProfileConfig,
   buildAipilotMachineEnvOneLiner,
 } from "./aipilot-apim-settings";
 
@@ -21,6 +22,18 @@ export function buildClientPowerShellInstaller(input: {
     baseUrl: input.baseUrl || getApimOpenAiBaseUrl(),
     model: input.model || AIPILOT_PRIMARY_DEPLOYMENT,
   });
+  const mediumProfileToml = buildAipilotCodexProfileConfig({
+    model: input.model || AIPILOT_PRIMARY_DEPLOYMENT,
+    reasoningEffort: "medium",
+  });
+  const highProfileToml = buildAipilotCodexProfileConfig({
+    model: input.model || AIPILOT_PRIMARY_DEPLOYMENT,
+    reasoningEffort: "high",
+  });
+  const xhighProfileToml = buildAipilotCodexProfileConfig({
+    model: input.model || AIPILOT_PRIMARY_DEPLOYMENT,
+    reasoningEffort: "xhigh",
+  });
 
   return `$ApiKey = "${apiKey}"
 $BaseUrl = "${baseUrl}"
@@ -38,6 +51,16 @@ ${configToml}
 '@
 $ConfigToml = $ConfigToml.Replace("CLIENT_USERNAME", $env:USERNAME)
 $ConfigToml | Out-File "$configDir\\config.toml" -Encoding UTF8
+
+@'
+${mediumProfileToml}
+'@ | Out-File "$configDir\\azure-medium.config.toml" -Encoding UTF8
+@'
+${highProfileToml}
+'@ | Out-File "$configDir\\azure-high.config.toml" -Encoding UTF8
+@'
+${xhighProfileToml}
+'@ | Out-File "$configDir\\azure-xhigh.config.toml" -Encoding UTF8
 
 Write-Host "AIPilot configured with APIM. Restart your terminal or PC before using Codex."
 Write-Host "New APIM keys can take 15-20 seconds to work on the first Codex call."

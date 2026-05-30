@@ -75,7 +75,6 @@ export function buildAipilotCodexConfig(input: {
   return `model = "${tomlString(model)}"
 model_provider = "azure"
 model_reasoning_effort = "medium"
-profile = "azure-medium"
 
 [model_providers.azure]
 name = "AIPilot AI"
@@ -83,32 +82,26 @@ base_url = "${tomlString(baseUrl)}"
 env_key = "AZURE_OPENAI_API_KEY"
 wire_api = "responses"
 
-[profiles.azure-medium]
-model_provider = "azure"
-model = "${tomlString(model)}"
-model_reasoning_effort = "medium"
-
-[profiles.azure-medium.windows]
-sandbox = "elevated"
-
-[profiles.azure-high]
-model_provider = "azure"
-model = "${tomlString(model)}"
-model_reasoning_effort = "high"
-
-[profiles.azure-xhigh]
-model_provider = "azure"
-model = "${tomlString(model)}"
-model_reasoning_effort = "xhigh"
-
 [windows]
-sandbox = "elevated"
+sandbox = "unelevated"
 
 [projects.'c:\\users\\${windowsUser}\\.codex']
 trust_level = "trusted"
+`;
+}
 
-[projects.'c:\\']
-trust_level = "trusted"
+export function buildAipilotCodexProfileConfig(input: {
+  model?: string;
+  reasoningEffort: "medium" | "high" | "xhigh";
+}) {
+  const model = input.model || AIPILOT_PRIMARY_DEPLOYMENT;
+
+  return `model_provider = "azure"
+model = "${tomlString(model)}"
+model_reasoning_effort = "${input.reasoningEffort}"
+
+[windows]
+sandbox = "unelevated"
 `;
 }
 
