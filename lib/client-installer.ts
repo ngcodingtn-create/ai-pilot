@@ -1,9 +1,9 @@
-import { getApimOpenAiBaseUrl } from "./apim";
 import {
   AIPILOT_PRIMARY_DEPLOYMENT,
   buildAipilotCodexConfig,
   buildAipilotCodexProfileConfig,
   buildAipilotMachineEnvOneLiner,
+  getAipilotAzureOpenAiBaseUrl,
 } from "./aipilot-apim-settings";
 
 function psQuote(value: string) {
@@ -17,9 +17,9 @@ export function buildClientPowerShellInstaller(input: {
 }) {
   const apiKey = psQuote(input.apiKey);
   const model = psQuote(input.model || AIPILOT_PRIMARY_DEPLOYMENT);
-  const baseUrl = psQuote(input.baseUrl || getApimOpenAiBaseUrl());
+  const baseUrl = psQuote(input.baseUrl || getAipilotAzureOpenAiBaseUrl());
   const configToml = buildAipilotCodexConfig({
-    baseUrl: input.baseUrl || getApimOpenAiBaseUrl(),
+    baseUrl: input.baseUrl || getAipilotAzureOpenAiBaseUrl(),
     model: input.model || AIPILOT_PRIMARY_DEPLOYMENT,
   });
   const mediumProfileToml = buildAipilotCodexProfileConfig({
@@ -62,8 +62,7 @@ ${highProfileToml}
 ${xhighProfileToml}
 '@ | Out-File "$configDir\\azure-xhigh.config.toml" -Encoding UTF8
 
-Write-Host "AIPilot configured with APIM. Restart your terminal or PC before using Codex."
-Write-Host "New APIM keys can take 15-20 seconds to work on the first Codex call."
+Write-Host "AIPilot configured. Restart your terminal or PC before using Codex."
 Write-Host "Machine env one-liner:"
 Write-Host '${buildAipilotMachineEnvOneLiner(input.apiKey).replace(/'/g, "''")}'
 `;

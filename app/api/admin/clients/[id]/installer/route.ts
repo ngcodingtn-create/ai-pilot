@@ -2,10 +2,10 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { buildClientPowerShellInstaller } from "@/lib/client-installer";
 import { getPipelineClientById } from "@/lib/client-pipeline-store";
 import {
-  AIPILOT_APIM_OPENAI_BASE_URL,
   AIPILOT_PRIMARY_DEPLOYMENT,
   buildAipilotCodexConfig,
   buildAipilotMachineEnvOneLiner,
+  getAipilotAzureOpenAiBaseUrl,
 } from "@/lib/aipilot-apim-settings";
 
 type RouteContext = {
@@ -19,30 +19,39 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   const client = await getPipelineClientById(id);
-  if (!client?.apimKey) {
-    return Response.json({ error: "No APIM key for this client" }, { status: 404 });
+  if (!client) {
+    return Response.json({ error: "Client not found" }, { status: 404 });
+  }
+
+  const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
+  const baseUrl = getAipilotAzureOpenAiBaseUrl();
+  if (!apiKey || !baseUrl) {
+    return Response.json(
+      { error: "AZURE_OPENAI_API_KEY / AZURE_OPENAI_BASE_URL is not configured on the server" },
+      { status: 500 },
+    );
   }
 
   return new Response(
     [
       `Client: ${client.name || client.phone || client.id}`,
       "",
-      "APIM endpoint:",
-      AIPILOT_APIM_OPENAI_BASE_URL,
+      "Azure endpoint:",
+      baseUrl,
       "",
       "PowerShell one-liner:",
-      buildAipilotMachineEnvOneLiner(client.apimKey),
+      buildAipilotMachineEnvOneLiner(apiKey),
       "",
       "config.toml:",
       buildAipilotCodexConfig({
-        baseUrl: AIPILOT_APIM_OPENAI_BASE_URL,
+        baseUrl,
         model: AIPILOT_PRIMARY_DEPLOYMENT,
       }),
       "",
       "Full PowerShell installer:",
       buildClientPowerShellInstaller({
-        apiKey: client.apimKey,
-        baseUrl: AIPILOT_APIM_OPENAI_BASE_URL,
+        apiKey,
+        baseUrl,
         model: AIPILOT_PRIMARY_DEPLOYMENT,
       }),
     ].join("\n"),

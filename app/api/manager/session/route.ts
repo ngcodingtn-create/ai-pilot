@@ -1,10 +1,8 @@
 import { getStoredConfig } from "@/lib/config-store";
-import { createApimSubscription, getApimOpenAiBaseUrl } from "@/lib/apim";
 import { findLifecycleLicenseByKey } from "@/lib/client-pipeline-store";
 import {
   createLicense,
   findLicenseByKey,
-  setLicenseApimCredentials,
   updateLicenseStatus,
   type LicenseRecord,
 } from "@/lib/license-store";
@@ -12,6 +10,7 @@ import {
   AIPILOT_DEPLOYMENTS,
   AIPILOT_PRIMARY_DEPLOYMENT,
   buildAipilotCodexConfig,
+  getAipilotAzureOpenAiBaseUrl,
 } from "@/lib/aipilot-apim-settings";
 
 type EnvironmentKey = "codex" | "vscode-codex" | "t3code" | "opencode";
@@ -390,57 +389,35 @@ export async function POST(request: Request) {
     );
   }
 
-  let license: LicenseRecord = resolved.license;
+  const license: LicenseRecord = resolved.license;
 
   const config = await getStoredConfig();
   const selectedEnvironment =
     requestedEnvironment ?? license.preferredEnvironment;
-  let effectiveApiKey = license.azureApiKey;
 
-  if (!license.apimSubscriptionId || license.apimStatus !== "active" || !effectiveApiKey) {
-    try {
-      const provisioned = await createApimSubscription({
-        clientId: license.id,
-        displayName: `${license.customerName} - ${license.tier}`,
-      });
-      await setLicenseApimCredentials({
-        id: license.id,
-        apimKey: provisioned.primaryKey,
-        apimSubscriptionId: provisioned.subscriptionId,
-        apimStatus: provisioned.state,
-      });
-      license = {
-        ...license,
-        azureApiKey: provisioned.primaryKey,
-        apimSubscriptionId: provisioned.subscriptionId,
-        apimStatus: provisioned.state,
-      };
-      effectiveApiKey = provisioned.primaryKey;
-    } catch (error) {
-      return Response.json(
-        {
-          error:
-            error instanceof Error
-              ? `Unable to provision APIM key for this license: ${error.message}`
-              : "Unable to provision APIM key for this license.",
-        },
-        { status: 409 },
-      );
-    }
-  }
-
+  const effectiveApiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
   if (!effectiveApiKey) {
     return Response.json(
-      {
-        error:
-          "No APIM key is available for this license. Create or reactivate the client's trial/paid access from admin.",
-      },
-      { status: 409 },
+      { error: "AZURE_OPENAI_API_KEY is not configured on the server." },
+      { status: 500 },
     );
   }
 
-  const baseUrl = getApimOpenAiBaseUrl();
-  const resourceName = process.env.AZURE_APIM_SERVICE_NAME?.trim() || "nextgen";
+  const baseUrl = getAipilotAzureOpenAiBaseUrl();
+  if (!baseUrl) {
+    return Response.json(
+      { error: "AZURE_OPENAI_BASE_URL is not configured on the server." },
+      { status: 500 },
+    );
+  }
+
+  const resourceName = (() => {
+    try {
+      return new URL(baseUrl).hostname.split(".")[0] || "aipilot";
+    } catch {
+      return "aipilot";
+    }
+  })();
   const availableDeployments = buildAvailableDeployments();
   const deployment =
     availableDeployments.find((item) => item.deployment === AIPILOT_PRIMARY_DEPLOYMENT)

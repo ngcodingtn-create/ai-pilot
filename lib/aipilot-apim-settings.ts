@@ -3,40 +3,20 @@ export const AIPILOT_APIM_API_SUFFIX = "api/openai/v1";
 export const AIPILOT_APIM_OPENAI_BASE_URL =
   `${AIPILOT_APIM_GATEWAY_URL}/${AIPILOT_APIM_API_SUFFIX}`;
 
-export const AIPILOT_PRIMARY_DEPLOYMENT = "gpt-5.4-1";
+export const AIPILOT_PRIMARY_DEPLOYMENT = "gpt-5.5";
 
 export const AIPILOT_DEPLOYMENTS = [
   {
-    id: "gpt-5.4",
-    label: "GPT-5.4 stable",
-    deployment: "gpt-5.4-1",
+    id: "gpt-5.5",
+    label: "GPT-5.5",
+    deployment: "gpt-5.5",
     recommended: true,
   },
-  {
-    id: "gpt-5.5",
-    label: "GPT-5.5 premium",
-    deployment: "gpt-5.5-1",
-    recommended: false,
-  },
-  {
-    id: "gpt-5.3-codex",
-    label: "GPT-5.3 Codex",
-    deployment: "gpt-5.3-codex",
-    recommended: false,
-  },
-  {
-    id: "gpt-5.4-2",
-    label: "GPT-5.4 secondary",
-    deployment: "gpt-5.4-2",
-    recommended: false,
-  },
-  {
-    id: "gpt-5.4-pro",
-    label: "GPT-5.4 Pro",
-    deployment: "gpt-5.4-pro",
-    recommended: false,
-  },
 ] as const;
+
+export function getAipilotAzureOpenAiBaseUrl() {
+  return process.env.AZURE_OPENAI_BASE_URL?.trim().replace(/\/+$/, "") || "";
+}
 
 const LEGACY_APIM_BASE_URLS = new Set([
   "https://nextgen.azure-api.net/openai",
