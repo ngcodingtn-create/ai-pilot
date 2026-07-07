@@ -32,14 +32,12 @@ import {
   deletePipelineClientById,
   deletePipelineClientByPhone,
   getPipelineClientById,
-  getPipelineClientByLicenseKey,
   markPipelineClientContacted,
   markClientLostById,
   markClientPaid,
   recordFacebookEvent,
   upsertLeadClient,
 } from "@/lib/client-pipeline-store";
-import { setApimSubscriptionState } from "@/lib/apim";
 import { deleteMarketingEventsForIdentity } from "@/lib/marketing-event-store";
 import { deleteTrialLeadsByPhone } from "@/lib/trial-leads-store";
 import { buildWhatsAppUrl, normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
@@ -60,21 +58,6 @@ function readStatus(value: FormDataEntryValue | null): LicenseStatus {
 
 function readQuickStage(value: FormDataEntryValue | null) {
   return value === "trial" || value === "paid" || value === "done" ? value : "lead";
-}
-
-async function syncApimStatusForLicense(licenseId: string, status: LicenseStatus) {
-  const license = await findLicenseById(licenseId);
-  if (!license) {
-    return;
-  }
-
-  const client = await getPipelineClientByLicenseKey(license.licenseKey);
-  const subscriptionId = client?.apimSubscriptionId ?? license.apimSubscriptionId;
-  if (!subscriptionId) {
-    return;
-  }
-
-  await setApimSubscriptionState(subscriptionId, status === "active" ? "active" : "suspended");
 }
 
 export async function loginAdmin(formData: FormData) {
@@ -215,9 +198,6 @@ export async function updateLicenseStatusAction(formData: FormData) {
   }
 
   const status = readStatus(formData.get("status"));
-  if (status === "active") {
-    await syncApimStatusForLicense(licenseId, status);
-  }
   await updateLicenseStatus(licenseId, status);
   redirect("/admin?updated=1");
 }
@@ -227,9 +207,6 @@ export async function updateLicenseDetailsAction(formData: FormData) {
 
   const licenseId = String(formData.get("licenseId") ?? "");
   const status = readStatus(formData.get("status"));
-  if (status === "active") {
-    await syncApimStatusForLicense(licenseId, status);
-  }
   await updateLicenseDetails(licenseId, {
     customerName: String(formData.get("customerName") ?? ""),
     customerEmail: String(formData.get("customerEmail") ?? "").trim() || undefined,

@@ -31,13 +31,6 @@ import type { LicenseRecord } from "@/lib/license-store";
 import type { ClientStatus, PipelineClientRecord } from "@/lib/client-pipeline-store";
 import { buildWhatsAppUrl, normalizeTunisiaWhatsappNumber } from "@/lib/whatsapp";
 import {
-  AIPILOT_APIM_OPENAI_BASE_URL,
-  AIPILOT_DEPLOYMENTS,
-  AIPILOT_PRIMARY_DEPLOYMENT,
-  buildAipilotCodexConfig,
-  buildAipilotMachineEnvOneLiner,
-} from "@/lib/aipilot-apim-settings";
-import {
   acceptAccessRequestAction,
   activatePipelineTrialAction,
   convertPipelineClientToPaidAction,
@@ -57,8 +50,6 @@ type SubscriptionTab = "active" | "disabled" | "expired";
 type RequestStatusFilter = "pending" | "accepted" | "all";
 type PipelineStatusFilter = ClientStatus | "all";
 type SheetMode = "none" | "add" | "subscription" | "client" | "more" | "settings";
-
-const ADMIN_MODEL_BADGES = AIPILOT_DEPLOYMENTS.slice(0, 3);
 
 type TrackingStatus = {
   pixelId: string;
@@ -932,7 +923,6 @@ function SubscriptionDetailSheet({
   const [detailTab, setDetailTab] = useState<"details" | "billing" | "history">("details");
   const [copiedLicense, setCopiedLicense] = useState(false);
   if (!license) return null;
-  const apimCredential = license.azureApiKey;
 
   return (
     <Sheet open={open} onClose={onClose} title="Modifier subscription" compact>
@@ -1024,7 +1014,6 @@ function SubscriptionDetailSheet({
                   Envoyez uniquement cette licence au client. Le manager récupère l’accès IA automatiquement.
                 </p>
               </div>
-              {apimCredential ? <AdminInstallerPanel apiKey={apimCredential} /> : null}
             </FormSection>
           </>
         ) : null}
@@ -1059,100 +1048,6 @@ function SubscriptionDetailSheet({
         </div>
       </form>
     </Sheet>
-  );
-}
-
-function AdminInstallerPanel({ apiKey }: { apiKey: string }) {
-  const [copied, setCopied] = useState("");
-  const configToml = buildAipilotCodexConfig({
-    baseUrl: AIPILOT_APIM_OPENAI_BASE_URL,
-    model: AIPILOT_PRIMARY_DEPLOYMENT,
-  });
-  const powerShell = buildAipilotMachineEnvOneLiner(apiKey);
-  const previewPowerShell = buildAipilotMachineEnvOneLiner("CLE_IA_CLIENT");
-
-  async function copyValue(label: string, value: string) {
-    await navigator.clipboard.writeText(value);
-    setCopied(label);
-    window.setTimeout(() => setCopied(""), 1000);
-  }
-
-  return (
-    <div className="space-y-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
-            Configuration IA
-          </p>
-          <p className="mt-1 text-xs leading-5 text-emerald-100/80">
-            À copier seulement pour une réparation manuelle. Le client reçoit la licence.
-          </p>
-        </div>
-        <Pill tone="emerald">Prêt</Pill>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {ADMIN_MODEL_BADGES.map((model) => (
-          <span
-            key={model.deployment}
-            className="rounded-full border border-emerald-300/15 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-50"
-          >
-            {model.deployment}
-          </span>
-        ))}
-      </div>
-      <InstallerSnippet
-        title="Variables IA Windows"
-        value={powerShell}
-        displayValue={previewPowerShell}
-        copied={copied === "powershell"}
-        onCopy={() => copyValue("powershell", powerShell)}
-      />
-      <InstallerSnippet
-        title="config.toml"
-        value={configToml}
-        copied={copied === "config"}
-        onCopy={() => copyValue("config", configToml)}
-        tall
-      />
-    </div>
-  );
-}
-
-function InstallerSnippet({
-  title,
-  value,
-  displayValue,
-  copied,
-  onCopy,
-  tall = false,
-}: {
-  title: string;
-  value: string;
-  displayValue?: string;
-  copied: boolean;
-  onCopy: () => void;
-  tall?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-[#020b12] p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold text-slate-300">{title}</p>
-        <button
-          type="button"
-          onClick={onCopy}
-          className="rounded-xl border border-[#0a84ff]/30 bg-[#0a84ff]/10 px-3 py-1.5 text-xs font-semibold text-[#9fd0ff]"
-        >
-          {copied ? "Copié" : "Copy"}
-        </button>
-      </div>
-      <pre
-        className={`overflow-auto whitespace-pre-wrap break-words rounded-xl bg-black/25 p-3 font-mono text-[11px] leading-5 text-slate-200 ${
-          tall ? "max-h-72" : "max-h-28"
-        }`}
-      >
-        {displayValue ?? value}
-      </pre>
-    </div>
   );
 }
 
@@ -1194,7 +1089,6 @@ function ClientDetailSheet({
       paymentDate: now,
       licenseType: "paid",
       licenseExpiresAt: undefined,
-      apimStatus: "active",
     });
   };
 
@@ -1207,8 +1101,6 @@ function ClientDetailSheet({
       licenseKey: undefined,
       licenseType: undefined,
       licenseExpiresAt: undefined,
-      apimKey: undefined,
-      apimStatus: "cancelled",
     });
   };
 
