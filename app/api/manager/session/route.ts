@@ -216,13 +216,13 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       label: "Codex app",
       projectRootRecommended: false,
       notes: [
-        "Installez d'abord l'app desktop Codex officielle. Ensuite AIPilot vérifie sa présence, répare Codex CLI, écrit ~/.codex/config.toml et injecte la configuration Azure.",
+        "Installez d'abord l'app ChatGPT officielle (elle contient désormais Codex depuis juillet 2026). Ensuite AIPilot vérifie sa présence, répare Codex CLI, écrit ~/.codex/config.toml et injecte la configuration Azure.",
         "Si vous voyez `404 The API deployment for this resource does not exist`, vérifiez dans l'admin AIPilot que le champ de déploiement contient le nom exact du déploiement Azure AI Foundry, pas juste un nom de modèle supposé.",
         "Le changement de modèle se fait ici dans AIPilot Manager: le bon déploiement Azure est écrit dans ~/.codex/config.toml, puis Codex app est relancée.",
         "Pour Codex dans VS Code, installez l'extension officielle, vérifiez ~/.codex/auth.json, puis ouvrez votre projet avec `code .`.",
         "Sur Windows, un terminal WSL2 reste recommandé si l'utilisateur veut un workflow CLI plus stable.",
       ],
-      officialAppUrl: "https://developers.openai.com/codex/app",
+      officialAppUrl: "https://chatgpt.com/download",
       officialCliUrl: "https://github.com/openai/codex/releases",
       officialIdeUrl: "https://developers.openai.com/codex/ide/features",
     };

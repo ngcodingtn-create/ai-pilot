@@ -833,7 +833,7 @@ async function closeDesktopProcessesForEnvironment(environment, logs) {
   }
 
   const byEnvironment = {
-    codex: ["Codex.exe"],
+    codex: ["Codex.exe", "ChatGPT.exe"],
     "vscode-codex": ["Code.exe"],
     t3code: ["t3code.exe", "T3 Code.exe"],
     opencode: ["OpenCode.exe"],
@@ -1195,7 +1195,7 @@ async function macApplicationExists(nameCandidates) {
 async function isDesktopAppInstalled(environment) {
   if (process.platform === "win32") {
     if (environment === "codex") {
-      return Boolean(await findWindowsStartApp(["Codex"]));
+      return Boolean(await findWindowsStartApp(["Codex", "ChatGPT"]));
     }
     if (environment === "vscode-codex") {
       return Boolean(await findWindowsStartApp(["Visual Studio Code", "VS Code"])) || (await commandExists("code"));
@@ -1208,7 +1208,7 @@ async function isDesktopAppInstalled(environment) {
 
   if (process.platform === "darwin") {
     if (environment === "codex") {
-      return macApplicationExists(["Codex"]);
+      return macApplicationExists(["Codex", "ChatGPT"]);
     }
     if (environment === "vscode-codex") {
       return macApplicationExists(["Visual Studio Code"]) || (await commandExists("code"));
@@ -2023,12 +2023,12 @@ async function installTool(manifest, logs) {
         ? "T3 Code"
         : manifest.tool.environment === "vscode-codex"
           ? "Visual Studio Code"
-          : "Codex app";
+          : "ChatGPT (Codex)";
     const downloadUrl =
       manifest.tool.officialAppUrl ||
       (manifest.tool.environment === "vscode-codex"
         ? "https://code.visualstudio.com/download"
-        : "https://developers.openai.com/codex/app/windows");
+        : "https://chatgpt.com/download");
     logs.push(`${appLabel} n'est pas détecté sur cette machine.`);
     throw new Error(
       `Installez d'abord l'app ${appLabel} officielle depuis ${downloadUrl}, ouvrez-la une première fois, puis relancez AIPilot Manager pour réparer le CLI et la configuration.`,
@@ -2085,7 +2085,7 @@ async function tryLaunchDesktopApp(environment, logs) {
   if (process.platform === "win32") {
     const startApp =
       environment === "codex"
-        ? await findWindowsStartApp(["Codex"])
+        ? await findWindowsStartApp(["Codex", "ChatGPT"])
         : environment === "t3code"
           ? await findWindowsStartApp(["T3 Code"])
           : await findWindowsStartApp(["OpenCode"]);
@@ -2100,7 +2100,7 @@ async function tryLaunchDesktopApp(environment, logs) {
   if (process.platform === "darwin") {
     const names =
       environment === "codex"
-        ? ["Codex"]
+        ? ["Codex", "ChatGPT"]
         : environment === "t3code"
           ? ["T3 Code"]
           : ["OpenCode"];
