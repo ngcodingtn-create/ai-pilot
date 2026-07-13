@@ -59,16 +59,11 @@ function buildOpenCodeConfig(
   availableDeployments: AvailableDeployment[],
 ) {
   const models = Object.fromEntries(
-    [
-      ...availableDeployments.map((item) => ({
+    availableDeployments
+      .map((item) => ({
         deployment: item.deployment,
         label: item.label,
-      })),
-      {
-        deployment: "gpt-5.3-codex",
-        label: "GPT-5.3 Codex",
-      },
-    ]
+      }))
       .filter(
         (item, index, list) =>
           list.findIndex((entry) => entry.deployment === item.deployment) === index,
@@ -240,7 +235,7 @@ function buildToolDetails(environment: EnvironmentKey): ToolDetails {
       notes: [
         "AIPilot prépare Codex CLI, écrit ~/.codex/config.toml, crée ~/.codex/auth.json pour Azure API Key, puis ouvre Visual Studio Code sur votre dossier projet.",
         "L’extension officielle Codex dans VS Code est installée ou réparée automatiquement si la commande `code` est disponible sur cette machine.",
-        "Le modèle Azure actif est piloté par AIPilot Manager: GPT-5.4 reste le défaut, et GPT-5.5 peut être appliqué avant l’ouverture de VS Code.",
+        "Le modèle Azure actif est piloté par AIPilot Manager: GPT-5.6 (gpt-5.6-sol) est écrit dans la configuration avant l’ouverture de VS Code.",
         "Si VS Code n’est pas encore installé, téléchargez-le d’abord depuis le site officiel puis relancez AIPilot Manager.",
       ],
       officialAppUrl: "https://code.visualstudio.com/download",

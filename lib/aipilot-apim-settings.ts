@@ -3,13 +3,13 @@ export const AIPILOT_APIM_API_SUFFIX = "api/openai/v1";
 export const AIPILOT_APIM_OPENAI_BASE_URL =
   `${AIPILOT_APIM_GATEWAY_URL}/${AIPILOT_APIM_API_SUFFIX}`;
 
-export const AIPILOT_PRIMARY_DEPLOYMENT = "gpt-5.5";
+export const AIPILOT_PRIMARY_DEPLOYMENT = "gpt-5.6-sol";
 
 export const AIPILOT_DEPLOYMENTS = [
   {
-    id: "gpt-5.5",
-    label: "GPT-5.5",
-    deployment: "gpt-5.5",
+    id: "gpt-5.6-sol",
+    label: "GPT-5.6",
+    deployment: "gpt-5.6-sol",
     recommended: true,
   },
 ] as const;

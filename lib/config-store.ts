@@ -51,8 +51,8 @@ type LocalOpenCodeRuntimeConfig = {
 
 const DEFAULTS: StoredConfig = {
   azureResourceName: process.env.NEXT_PUBLIC_AZURE_RESOURCE_NAME ?? "admin-3342-resource",
-  azureDefaultDeployment: process.env.NEXT_PUBLIC_DEFAULT_DEPLOYMENT ?? "gpt-5.4-1",
-  azureGpt55Deployment: process.env.NEXT_PUBLIC_GPT55_DEPLOYMENT ?? "gpt-5.5-1",
+  azureDefaultDeployment: process.env.NEXT_PUBLIC_DEFAULT_DEPLOYMENT ?? "gpt-5.6-sol",
+  azureGpt55Deployment: process.env.NEXT_PUBLIC_GPT55_DEPLOYMENT ?? "gpt-5.6-sol",
   includeApiKeyInInstaller: false,
   supportWhatsappNumber:
     process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER ?? "+216 29 293 037",

@@ -75,7 +75,7 @@ export default async function DevPage() {
                 - Déploiement par défaut: <InlineCode>{config.azureDefaultDeployment}</InlineCode>
               </li>
               <li>
-                - Déploiements additionnels: <InlineCode>gpt-5.3-codex</InlineCode> et <InlineCode>gpt-5.4-pro</InlineCode>
+                - Déploiement principal: <InlineCode>gpt-5.6-sol</InlineCode>
               </li>
               <li>
                 - Niveau de raisonnement pour tous les déploiements Azure GPT: <InlineCode>xhigh</InlineCode>

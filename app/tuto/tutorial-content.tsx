@@ -1,7 +1,7 @@
 import {
-  AIPILOT_APIM_OPENAI_BASE_URL,
   AIPILOT_DEPLOYMENTS,
   AIPILOT_PRIMARY_DEPLOYMENT,
+  getAipilotAzureOpenAiBaseUrl,
 } from "@/lib/aipilot-apim-settings";
 
 type TutorialPlatform = "windows" | "macos" | "linux";
@@ -12,8 +12,10 @@ type TutorialContentProps = {
 };
 
 const defaultDeployment = AIPILOT_PRIMARY_DEPLOYMENT;
-const alternativeDeployment = "gpt-5.5-1";
-const codexDeployment = "gpt-5.3-codex";
+const modelLabel = AIPILOT_DEPLOYMENTS[0]?.label ?? "GPT-5.6";
+const productionBaseUrl =
+  getAipilotAzureOpenAiBaseUrl() ||
+  "https://amien.cognitiveservices.azure.com/openai/v1";
 
 export function TutorialContent({
   platform,
@@ -38,19 +40,19 @@ export function TutorialContent({
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <FactCard
               title="Licence d’abord"
-              text="AIPilot Manager valide votre licence, puis récupère automatiquement la clé APIM individuelle liée à cette licence."
+              text="AIPilot Manager valide votre licence, puis récupère automatiquement la clé Azure AIPilot liée à cette licence."
             />
             <FactCard
-              title="APIM production"
-              text={`Tous les outils doivent passer par ${AIPILOT_APIM_OPENAI_BASE_URL}, pas par un endpoint Azure direct ni localhost.`}
+              title="Endpoint de production"
+              text={`Tous les outils doivent passer par ${productionBaseUrl}, pas par un endpoint Azure direct ni localhost.`}
             />
             <FactCard
               title="Prompt pour une IA"
-              text="Le prompt ci-dessous explique le nouveau flux APIM/licence si vous devez réparer une machine manuellement."
+              text="Le prompt ci-dessous explique le flux licence/clé Azure AIPilot si vous devez réparer une machine manuellement."
             />
             <FactCard
-              title="Déploiements supportés"
-              text={`Par défaut: ${defaultDeployment}. Premium: ${alternativeDeployment}. Codex: ${codexDeployment}.`}
+              title="Modèle de production"
+              text={`Un seul modèle en production: ${modelLabel} = ${defaultDeployment}.`}
             />
           </div>
         </section>
@@ -103,7 +105,7 @@ export function TutorialContent({
                 "Votre clé de licence AIPilot au format XXXX-XXXX-XXXX-XXXX.",
                 "Le lien ou fichier d’installation AIPilot Manager adapté à votre système.",
                 "Les consignes de support si une réparation manuelle est nécessaire.",
-                "La clé APIM individuelle n’est pas copiée à la main: le manager la récupère depuis le backend après validation de la licence.",
+                "La clé Azure AIPilot n’est pas copiée à la main: le manager la récupère depuis le backend après validation de la licence.",
               ]}
             />
             <Subhead>Valeurs de production attendues</Subhead>
@@ -113,14 +115,14 @@ export function TutorialContent({
               </li>
               <li>
                 - <InlineCode>AIPILOT_OPENAI_BASE_URL</InlineCode> ={" "}
-                <InlineCode>{AIPILOT_APIM_OPENAI_BASE_URL}</InlineCode>
+                <InlineCode>{productionBaseUrl}</InlineCode>
               </li>
               <li>
                 - <InlineCode>AZURE_OPENAI_DEPLOYMENT</InlineCode> ={" "}
                 <InlineCode>{defaultDeployment}</InlineCode> par défaut
               </li>
               <li>
-                - <InlineCode>AZURE_OPENAI_API_KEY</InlineCode> = clé APIM récupérée par AIPilot Manager
+                - <InlineCode>AZURE_OPENAI_API_KEY</InlineCode> = clé Azure récupérée par AIPilot Manager
               </li>
             </ul>
           </Panel>
@@ -131,8 +133,8 @@ export function TutorialContent({
             <p className="text-sm leading-7 text-slate-700">
               Codex App et T3 Code reposent sur le même fichier{" "}
               <InlineCode>{content.codexConfigPath}</InlineCode>. En production,
-              AIPilot Manager doit écrire ce fichier avec l’endpoint APIM, la clé
-              APIM de la licence et <InlineCode>{'wire_api = "responses"'}</InlineCode>.
+              AIPilot Manager doit écrire ce fichier avec l’endpoint Azure AIPilot,
+              la clé de la licence et <InlineCode>{'wire_api = "responses"'}</InlineCode>.
             </p>
             <Checklist
               items={content.codexChecklist}
@@ -146,7 +148,7 @@ export function TutorialContent({
                 </li>
               ))}
             </ul>
-            <Subhead>config.toml — production APIM</Subhead>
+            <Subhead>config.toml — production Azure</Subhead>
             <CodeBlock>{buildCodexConfig(content, defaultDeployment)}</CodeBlock>
           </Panel>
 
@@ -155,7 +157,7 @@ export function TutorialContent({
               Codex dans VS Code réutilise le même{" "}
               <InlineCode>{content.codexConfigPath}</InlineCode>. AIPilot Manager
               écrit aussi <InlineCode>{content.authJsonPath}</InlineCode> pour que
-              l’extension lise la clé APIM comme API key.
+              l’extension lise la clé Azure comme API key.
             </p>
             <Checklist items={content.vscodeChecklist} />
             <Subhead>auth.json</Subhead>
@@ -168,20 +170,16 @@ export function TutorialContent({
         <section className="grid gap-6 xl:grid-cols-2">
           <Panel title="OpenCode" eyebrow="Configuration manuelle">
             <p className="text-sm leading-7 text-slate-700">
-              OpenCode utilise l’API APIM via le provider compatible OpenAI. Le
-              fichier global et le fichier d’authentification doivent utiliser la
-              même clé APIM récupérée pour la licence.
+              OpenCode utilise l’endpoint Azure AIPilot via le provider compatible
+              OpenAI. Le fichier global et le fichier d’authentification doivent
+              utiliser la même clé Azure récupérée pour la licence.
             </p>
             <Checklist items={content.opencodeChecklist} />
             <Subhead>Mapping exact des modèles</Subhead>
             <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
               <li>
-                - <InlineCode>GPT-5.4</InlineCode> doit toujours écrire{" "}
+                - <InlineCode>{modelLabel}</InlineCode> doit toujours écrire{" "}
                 <InlineCode>azure/{defaultDeployment}</InlineCode>
-              </li>
-              <li>
-                - <InlineCode>GPT-5.5</InlineCode> doit toujours écrire{" "}
-                <InlineCode>azure/{alternativeDeployment}</InlineCode>
               </li>
             </ul>
             <Subhead>{content.opencodeConfigPath}</Subhead>
@@ -212,10 +210,10 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
         "Ce guide explique quoi donner à une IA pour qu’elle installe, configure et vérifie manuellement Codex App, Codex dans VS Code, T3 Code et OpenCode sur un Mac Intel ou Apple Silicon.",
       recommendedSteps: [
         "1. Récupérez votre licence AIPilot, puis installez AIPilot Manager.",
-        "2. Connectez la licence dans AIPilot Manager pour récupérer la clé APIM individuelle.",
+        "2. Connectez la licence dans AIPilot Manager pour récupérer la clé Azure AIPilot.",
         "3. Cliquez sur Réparer ou Installer/configurer pour écrire config.toml, auth.json et les variables d’environnement.",
         "4. Installez l’outil voulu: Codex App, VS Code, T3 Code ou OpenCode.",
-        "5. Lancez l’outil puis vérifiez qu’il utilise bien l’endpoint APIM et le bon déploiement.",
+        "5. Lancez l’outil puis vérifiez qu’il utilise bien l’endpoint Azure AIPilot et le bon déploiement.",
       ],
       codexConfigPath: "~/.codex/config.toml",
       authJsonPath: "~/.codex/auth.json",
@@ -225,12 +223,12 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
         "Installez l’application Codex officielle si vous voulez Codex App.",
         "Installez le CLI Codex avec npm si vous utilisez T3 Code ou Codex dans VS Code.",
         "Laissez AIPilot Manager écrire AZURE_OPENAI_API_KEY, AIPILOT_OPENAI_BASE_URL et AZURE_OPENAI_DEPLOYMENT.",
-        `Utilisez ${defaultDeployment} pour GPT-5.4, ou ${alternativeDeployment} pour GPT-5.5.`,
+        `Utilisez le déploiement ${defaultDeployment} (${modelLabel}).`,
         "Relancez complètement Codex ou T3 Code après chaque changement de config.toml.",
       ],
       vscodeChecklist: [
         "Installez l’extension officielle Codex dans VS Code.",
-        "Créez ~/.codex/auth.json avec auth_mode=apikey et la clé APIM de la licence.",
+        "Créez ~/.codex/auth.json avec auth_mode=apikey et la clé Azure de la licence.",
         "Gardez le même ~/.codex/config.toml que pour Codex App.",
         "Ouvrez VS Code depuis le terminal du projet pour garder la bonne session d’environnement.",
       ],
@@ -239,13 +237,13 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
         "Installez OpenCode CLI.",
         "Créez ~/.config/opencode/opencode.json.",
         "Créez ~/.local/share/opencode/auth.json.",
-        `Gardez model = "azure/${defaultDeployment}" pour GPT-5.4 puis passez à azure/${alternativeDeployment} pour GPT-5.5 si besoin.`,
+        `Gardez model = "azure/${defaultDeployment}" (${modelLabel}).`,
       ],
       finalChecks: [
-        `Le backend peut afficher la ressource historique ${azureResourceName}, mais les outils doivent appeler l’endpoint APIM.`,
-        `Le base_url doit être ${AIPILOT_APIM_OPENAI_BASE_URL}.`,
-        "La clé API utilisée par les outils doit être la clé APIM individuelle de la licence.",
-        "Le déploiement doit être exactement gpt-5.4-1 pour GPT-5.4, ou gpt-5.5-1 pour GPT-5.5, sans faute de frappe.",
+        `Le backend peut afficher la ressource historique ${azureResourceName}, mais les outils doivent appeler l’endpoint Azure AIPilot.`,
+        `Le base_url doit être ${productionBaseUrl}.`,
+        "La clé API utilisée par les outils doit être la clé Azure de la licence.",
+        `Le déploiement doit être exactement ${defaultDeployment} (${modelLabel}), sans faute de frappe.`,
         "Si un outil démarre mal, relancez AIPilot Manager puis utilisez Réparer.",
       ],
       aiPrompt: buildAiPrompt("macOS", azureResourceName),
@@ -257,12 +255,12 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
       platformLabel: "Linux",
       title: "Guide manuel AIPilot pour Linux",
       intro:
-        "Ce guide permet à une IA de configurer manuellement OpenCode, T3 Code et Codex dans VS Code sur Linux, en gardant la bonne ressource Azure et les bons déploiements AIPilot.",
+        "Ce guide permet à une IA de configurer manuellement OpenCode, T3 Code et Codex dans VS Code sur Linux, en gardant le bon endpoint Azure et le bon déploiement AIPilot.",
       recommendedSteps: [
         "1. Récupérez votre licence AIPilot et installez AIPilot Manager.",
-        "2. Connectez la licence pour que le backend fournisse la clé APIM individuelle.",
+        "2. Connectez la licence pour que le backend fournisse la clé Azure AIPilot.",
         "3. Installez Node.js, npm et les outils choisis. Git n’est pas obligatoire.",
-        "4. Laissez le manager écrire les variables et fichiers, ou recopiez les blocs APIM ci-dessous.",
+        "4. Laissez le manager écrire les variables et fichiers, ou recopiez les blocs Azure ci-dessous.",
         "5. Lancez l’outil, vérifiez le modèle actif et corrigez si nécessaire.",
       ],
       codexConfigPath: "~/.codex/config.toml",
@@ -273,7 +271,7 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
         "Sous Linux, utilisez surtout Codex CLI et VS Code Codex. Codex App n’est pas le parcours recommandé.",
         "Installez Codex CLI avec npm pour T3 Code et VS Code Codex.",
         "Exportez AZURE_OPENAI_API_KEY, AIPILOT_OPENAI_BASE_URL et AZURE_OPENAI_DEPLOYMENT si vous réparez sans manager.",
-        `Commencez avec ${defaultDeployment} pour GPT-5.4, puis passez à ${alternativeDeployment} pour GPT-5.5 si besoin.`,
+        `Utilisez le déploiement ${defaultDeployment} (${modelLabel}).`,
         "Relancez complètement l’outil après chaque changement de config.toml.",
       ],
       vscodeChecklist: [
@@ -290,11 +288,11 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
         "Lancez OpenCode dans le dossier projet voulu pour écrire la config locale si nécessaire.",
       ],
       finalChecks: [
-        `Le backend peut afficher la ressource historique ${azureResourceName}, mais la configuration outil doit utiliser APIM.`,
-        `Le base_url doit être ${AIPILOT_APIM_OPENAI_BASE_URL}.`,
-        "Le modèle OpenCode doit être azure/gpt-5.4-1 pour GPT-5.4, ou azure/gpt-5.5-1 pour GPT-5.5.",
-        "Le provider OpenCode doit déclarer les 3 modèles AIPilot si vous voulez aussi gpt-5.3-codex.",
-        "La clé API doit être la clé APIM individuelle de la licence.",
+        `Le backend peut afficher la ressource historique ${azureResourceName}, mais la configuration outil doit utiliser l’endpoint Azure AIPilot.`,
+        `Le base_url doit être ${productionBaseUrl}.`,
+        `Le modèle OpenCode doit être azure/${defaultDeployment} (${modelLabel}).`,
+        `Le provider OpenCode doit déclarer le modèle AIPilot ${defaultDeployment}.`,
+        "La clé API doit être la clé Azure de la licence.",
         "Si vous changez le modèle, redémarrez l’outil ou repassez par AIPilot Manager.",
       ],
       aiPrompt: buildAiPrompt("Linux", azureResourceName),
@@ -308,10 +306,10 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
       "Ce guide sert de référence complète pour donner à une IA toutes les étapes Windows afin qu’elle configure manuellement Codex App, Codex dans VS Code, T3 Code et OpenCode avec Azure AIPilot.",
     recommendedSteps: [
       "1. Collez la licence dans AIPilot Manager.",
-      "2. Le manager valide la licence et récupère automatiquement la clé APIM liée au client.",
+      "2. Le manager valide la licence et récupère automatiquement la clé Azure liée au client.",
       "3. Cliquez sur Réparer tout pour réécrire config.toml, auth.json et les variables utilisateur Windows.",
       "4. Installez ou ouvrez Codex App, VS Code + Codex, T3 Code ou OpenCode.",
-      "5. Relancez l’outil pour vérifier que l’endpoint APIM et le bon déploiement sont pris en compte.",
+      "5. Relancez l’outil pour vérifier que l’endpoint Azure AIPilot et le bon déploiement sont pris en compte.",
     ],
     codexConfigPath: "C:\\Users\\<USER>\\.codex\\config.toml",
     authJsonPath: "C:\\Users\\<USER>\\.codex\\auth.json",
@@ -321,7 +319,7 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
       "Installez l’application Codex officielle si vous utilisez Codex App.",
       "Installez Codex CLI avec npm si vous utilisez T3 Code ou VS Code Codex.",
       "Laissez AIPilot Manager définir AZURE_OPENAI_API_KEY, AIPILOT_OPENAI_BASE_URL et AZURE_OPENAI_DEPLOYMENT au niveau utilisateur.",
-      `Utilisez ${defaultDeployment} pour GPT-5.4. Passez à ${alternativeDeployment} si vous voulez GPT-5.5.`,
+      `Utilisez le déploiement ${defaultDeployment} (${modelLabel}).`,
       "Relancez complètement Codex ou T3 Code après modification de config.toml.",
     ],
     vscodeChecklist: [
@@ -335,13 +333,13 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
       "Installez OpenCode CLI.",
       "Créez C:\\Users\\<USER>\\.config\\opencode\\opencode.json.",
       "Créez C:\\Users\\<USER>\\.local\\share\\opencode\\auth.json.",
-      `Gardez model = "azure/${defaultDeployment}" pour GPT-5.4 puis passez à azure/${alternativeDeployment} pour GPT-5.5 si besoin.`,
+      `Gardez model = "azure/${defaultDeployment}" (${modelLabel}).`,
     ],
     finalChecks: [
-      `Le backend peut afficher la ressource historique ${azureResourceName}, mais Codex doit utiliser l’endpoint APIM.`,
-      `Le domaine Codex doit être ${AIPILOT_APIM_OPENAI_BASE_URL}.`,
-      "La clé API doit être la clé APIM individuelle récupérée après validation de licence.",
-      "OpenCode doit pointer vers model = azure/gpt-5.4-1 pour GPT-5.4, ou azure/gpt-5.5-1 pour GPT-5.5.",
+      `Le backend peut afficher la ressource historique ${azureResourceName}, mais Codex doit utiliser l’endpoint Azure AIPilot.`,
+      `Le domaine Codex doit être ${productionBaseUrl}.`,
+      "La clé API doit être la clé Azure récupérée après validation de licence.",
+      `OpenCode doit pointer vers model = azure/${defaultDeployment} (${modelLabel}).`,
       "Après changement de variables machine sur Windows, un redémarrage complet reste recommandé.",
     ],
     aiPrompt: buildAiPrompt("Windows", azureResourceName),
@@ -349,29 +347,27 @@ function getPlatformContent(platform: TutorialPlatform, azureResourceName: strin
 }
 
 function buildAiPrompt(platformLabel: string, azureResourceName: string) {
-  return `Tu es une IA d'assistance technique. Configure manuellement ${platformLabel} pour AIPilot avec APIM Azure OpenAI.
+  return `Tu es une IA d'assistance technique. Configure manuellement ${platformLabel} pour AIPilot avec Azure OpenAI.
 
 Contexte obligatoire :
 - licence AIPilot : AIPILOT_LICENSE_KEY
-- endpoint APIM : ${AIPILOT_APIM_OPENAI_BASE_URL}
-- clé API : CLE_APIM_INDIVIDUELLE_RECUPEREE_PAR_AIPILOT_MANAGER
+- endpoint Azure AIPilot : ${productionBaseUrl}
+- clé API : CLE_AZURE_RECUPEREE_PAR_AIPILOT_MANAGER
 - ressource historique affichée par le portail : ${azureResourceName}
-- GPT-5.4 = ${defaultDeployment}
-- GPT-5.5 = ${alternativeDeployment}
+- ${modelLabel} = ${defaultDeployment}
 
 Ce que tu dois faire :
 1. Installer ou vérifier Codex App, VS Code + Codex, T3 Code et OpenCode selon l'outil demandé.
-2. Valider la licence dans AIPilot Manager pour obtenir la clé APIM individuelle.
-3. Définir AZURE_OPENAI_API_KEY, AIPILOT_OPENAI_BASE_URL et AZURE_OPENAI_DEPLOYMENT avec les valeurs APIM.
+2. Valider la licence dans AIPilot Manager pour obtenir la clé Azure.
+3. Définir AZURE_OPENAI_API_KEY, AIPILOT_OPENAI_BASE_URL et AZURE_OPENAI_DEPLOYMENT avec les valeurs Azure AIPilot.
 4. Écrire exactement les fichiers de configuration AIPilot montrés sur cette page.
 5. Vérifier les chemins, les permissions et le modèle actif.
 6. Expliquer chaque étape brièvement en français, sans exposer d'autres options inutiles.
 
 Contraintes :
-- utiliser exactement les noms de déploiement Azure donnés plus haut
-- ne jamais confondre GPT-5.4 avec ${defaultDeployment}, ni GPT-5.5 avec ${alternativeDeployment}
-- ne jamais remplacer l’endpoint APIM par services.ai.azure.com ni par un endpoint openai.azure.com direct
-- ne jamais utiliser localhost en production
+- utiliser exactement le nom de déploiement Azure ${defaultDeployment}
+- ne jamais confondre ${modelLabel} avec un autre nom de déploiement
+- ne jamais remplacer l’endpoint Azure AIPilot par un autre endpoint ni par localhost
 - garder le format config.toml minimal pour Codex
 - garder le format JSON validé pour OpenCode
 - demander confirmation avant toute suppression ou réinitialisation`;
@@ -398,7 +394,7 @@ model_reasoning_effort = "medium"
 
 [model_providers.azure]
 name = "AIPilot AI"
-base_url = "${AIPILOT_APIM_OPENAI_BASE_URL}"
+base_url = "${productionBaseUrl}"
 env_key = "AZURE_OPENAI_API_KEY"
 wire_api = "responses"${windowsTrust}`;
 }
@@ -406,7 +402,7 @@ wire_api = "responses"${windowsTrust}`;
 function buildCodexVsCodeAuth() {
   return `{
   "auth_mode": "apikey",
-  "AZURE_OPENAI_API_KEY": "CLE_APIM_INDIVIDUELLE_RECUPEREE_PAR_AIPILOT_MANAGER"
+  "AZURE_OPENAI_API_KEY": "CLE_AZURE_RECUPEREE_PAR_AIPILOT_MANAGER"
 }`;
 }
 
@@ -419,27 +415,13 @@ function buildOpenCodeConfig() {
       "npm": "@ai-sdk/openai",
       "name": "AIPilot AI",
       "options": {
-        "baseURL": "${AIPILOT_APIM_OPENAI_BASE_URL}",
-        "apiKey": "CLE_APIM_INDIVIDUELLE_RECUPEREE_PAR_AIPILOT_MANAGER"
+        "baseURL": "${productionBaseUrl}",
+        "apiKey": "CLE_AZURE_RECUPEREE_PAR_AIPILOT_MANAGER"
       },
       "models": {
         "${defaultDeployment}": {
           "id": "${defaultDeployment}",
-          "name": "GPT-5.4 (AIPilot)",
-          "options": {
-            "reasoningEffort": "high"
-          }
-        },
-        "${alternativeDeployment}": {
-          "id": "${alternativeDeployment}",
-          "name": "GPT-5.5 (AIPilot)",
-          "options": {
-            "reasoningEffort": "high"
-          }
-        },
-        "gpt-5.3-codex": {
-          "id": "gpt-5.3-codex",
-          "name": "GPT-5.3 Codex (AIPilot)",
+          "name": "${modelLabel} (AIPilot)",
           "options": {
             "reasoningEffort": "high"
           }
@@ -455,7 +437,7 @@ function buildOpenCodeAuth() {
   return `{
   "azure": {
     "type": "api",
-    "key": "CLE_APIM_INDIVIDUELLE_RECUPEREE_PAR_AIPILOT_MANAGER"
+    "key": "CLE_AZURE_RECUPEREE_PAR_AIPILOT_MANAGER"
   }
 }`;
 }

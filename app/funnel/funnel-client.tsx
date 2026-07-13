@@ -13,7 +13,7 @@ type TrialFormState =
 
 const features = [
   ["🤖", "Codex Officiel OpenAI", "L’app desktop officielle d’OpenAI, pas une copie."],
-  ["⚡", "GPT-5.5 & GPT-5.4", "Choisis ton modèle selon ta mission de coding."],
+  ["⚡", "GPT-5.6", "Choisis ton modèle selon ta mission de coding."],
   ["♾️", "Aucune limite de sessions", "Code autant que tu veux, 24h/24."],
   ["💳", "Paiement 100% Tunisien", "D17, virement, Wafa Cash ou IZI Payment."],
   ["⚙️", "Installation en 5 minutes", "Un installateur configure tout automatiquement."],
@@ -31,7 +31,7 @@ const toolGallery = [
   {
     title: "Codex App",
     image: "/funnel/tools/tool-codex-app.webp",
-    text: "Le vrai agent OpenAI avec GPT-5.5 ou GPT-5.4, prêt pour le multi-fichiers et les gros chantiers.",
+    text: "Le vrai agent OpenAI avec GPT-5.6, prêt pour le multi-fichiers et les gros chantiers.",
   },
   {
     title: "T3 Code",
@@ -144,7 +144,7 @@ function readStoredProofState(): ProofStoredState {
 const faqs = [
   {
     q: "C’est quoi exactement AIPilot ?",
-    a: "AIPilot te donne accès à Codex — l’agent IA officiel d’OpenAI — avec GPT-5.5 et GPT-5.4, sans carte étrangère et avec une installation guidée en Tunisie.",
+    a: "AIPilot te donne accès à Codex — l’agent IA officiel d’OpenAI — avec GPT-5.6, sans carte étrangère et avec une installation guidée en Tunisie.",
   },
   {
     q: "Pourquoi c’est moins cher que chez OpenAI ?",
@@ -714,7 +714,7 @@ export default function FunnelClient() {
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
                 <span className="block whitespace-nowrap">Codex OpenAI</span>
-                <span className="block whitespace-nowrap">avec GPT-5.5,</span>
+                <span className="block whitespace-nowrap">avec GPT-5.6,</span>
                 <span className="block whitespace-nowrap text-[#17E8FF] drop-shadow-[0_0_24px_rgba(23,232,255,0.4)]">
                   Pour 60 DT/mois
                 </span>
@@ -746,7 +746,7 @@ export default function FunnelClient() {
 
               <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-[#C6C6C6] sm:text-lg">
                 AIPilot donne aux développeurs tunisiens un accès simple, crédible et guidé à
-                Codex avec GPT-5.5 et GPT-5.4, sans carte étrangère et avec paiement local.
+                Codex avec GPT-5.6, sans carte étrangère et avec paiement local.
               </p>
 
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm font-medium text-[#D7D7D7]">
@@ -801,7 +801,7 @@ export default function FunnelClient() {
                 {[
                   ["❌ Codex coûte 310 DT/mois", "Inaccessible avec une carte tunisienne"],
                   ["❌ Les limites te bloquent", "Reset toutes les 5h — tu perds ta concentration au pire moment"],
-                  ["❌ Tes concurrents codent 10x plus vite", "Pendant que tu cherches sur Google, eux utilisent GPT-5.5"],
+                  ["❌ Tes concurrents codent 10x plus vite", "Pendant que tu cherches sur Google, eux utilisent GPT-5.6"],
                 ].map(([title, text]) => (
                   <div
                     key={title}
@@ -1070,7 +1070,7 @@ export default function FunnelClient() {
                 className="text-3xl font-bold tracking-[-0.03em] text-white sm:text-5xl"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                GPT-5.5 — Numéro 1 Mondial du Coding
+                GPT-5.6 — Numéro 1 Mondial du Coding
               </h2>
               <p className="mt-4 text-lg text-[#A4A4A4]">
                 Meilleur que Claude Opus 4.6, meilleur que Gemini 2.5 Pro.
@@ -1081,7 +1081,7 @@ export default function FunnelClient() {
                   <thead className="border-b border-white/10 text-sm text-[#8B8B8B]">
                     <tr>
                       <th className="px-5 py-4">Critère</th>
-                      <th className="px-5 py-4 text-[#00FF88]">GPT-5.5</th>
+                      <th className="px-5 py-4 text-[#00FF88]">GPT-5.6</th>
                       <th className="px-5 py-4">Claude 4.6</th>
                       <th className="px-5 py-4">Gemini 2.5</th>
                     </tr>
@@ -1112,7 +1112,7 @@ export default function FunnelClient() {
                 <div className="relative bg-[radial-gradient(circle_at_top,rgba(23,232,255,0.14),transparent_60%)]">
                   <Image
                     src="/funnel/gpt55-benchmark.png"
-                    alt="Benchmark GPT-5.5 versus autres modèles"
+                    alt="Benchmark GPT-5.6 versus autres modèles"
                     width={1390}
                     height={900}
                     className="h-auto w-full object-cover"
@@ -1152,7 +1152,7 @@ export default function FunnelClient() {
                 className="text-3xl font-bold tracking-[-0.03em] text-white sm:text-5xl"
                 style={{ fontFamily: "var(--font-outfit)" }}
               >
-                Prêt à coder avec GPT-5.5 en 5 min
+                Prêt à coder avec GPT-5.6 en 5 min
               </h2>
               <div className="relative mt-10 space-y-10 before:absolute before:left-5 before:top-0 before:h-full before:w-px before:bg-gradient-to-b before:from-[#00FF88] before:to-transparent md:before:left-8">
                 {[
@@ -1174,7 +1174,7 @@ export default function FunnelClient() {
                   },
                   {
                     number: "③",
-                    title: "Code avec GPT-5.5",
+                    title: "Code avec GPT-5.6",
                     text: "Ouvre Codex — ton IA numéro 1 mondiale t’attend",
                     image: "/funnel/step-codex-vscode.webp",
                     imageClass: "object-cover object-top",

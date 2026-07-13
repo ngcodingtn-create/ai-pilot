@@ -1239,7 +1239,7 @@ function SettingsSheet({
         </Pill>
         <DarkField label="Ressource Azure" name="azureResourceName" defaultValue={config.azureResourceName} />
         <DarkField label="Déploiement par défaut" name="azureDefaultDeployment" defaultValue={config.azureDefaultDeployment} />
-        <DarkField label="Déploiement GPT-5.5" name="azureGpt55Deployment" defaultValue={config.azureGpt55Deployment ?? ""} />
+        <DarkField label="Déploiement GPT-5.6" name="azureGpt55Deployment" defaultValue={config.azureGpt55Deployment ?? ""} />
         <DarkField label="Nouvelle clé API Azure" name="azureApiKey" type="password" />
         <DarkField label="Email support" name="supportEmail" defaultValue={config.supportEmail ?? ""} />
         <DarkField label="WhatsApp AIPilot" name="supportWhatsappNumber" defaultValue={config.supportWhatsappNumber ?? ""} />
