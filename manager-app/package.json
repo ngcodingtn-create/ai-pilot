@@ -1,9 +1,10 @@
 {
   "name": "aipilot-manager",
-  "version": "0.2.31",
+  "version": "0.2.32",
   "private": true,
   "description": "AIPilot Manager desktop app",
   "author": "NGCoding",
+  "homepage": "https://ai-pilot-ten.vercel.app",
   "main": "main.js",
   "scripts": {
     "app": "electron .",
@@ -65,6 +66,7 @@
     },
     "linux": {
       "category": "Development",
+      "maintainer": "NGCoding <support@ai-pilot-ten.vercel.app>",
       "icon": "build/icons",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
